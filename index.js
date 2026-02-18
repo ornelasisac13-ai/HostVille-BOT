@@ -1,60 +1,58 @@
-import { Client, GatewayIntentBits, EmbedBuilder } from "discord.js";
-import dotenv from "dotenv";
-dotenv.config();
+import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
 
-if (!process.env.TKD) {
-  console.error("❌ Variável TKD não encontrada no .env");
-  process.exit(1);
-}
+// ==== CONFIGURAÇÃO ====
+// Coloque aqui seu token
+const TOKEN = 'SEU_TOKEN_AQUI';
+const CLIENT_ID = '1473705296101900420';
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
+// Comandos do bot
+const commands = [
+  new SlashCommandBuilder()
+    .setName('rule')
+    .setDescription('Envia as regras do servidor'),
+  new SlashCommandBuilder()
+    .setName('info')
+    .setDescription('Mostra informações do servidor')
+].map(cmd => cmd.toJSON());
+
+// ==== REGISTRO DOS COMANDOS ====
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+
+(async () => {
+  try {
+    console.log('Registrando comandos...');
+    await rest.put(
+      Routes.applicationCommands(CLIENT_ID),
+      { body: commands }
+    );
+    console.log('Comandos registrados com sucesso!');
+  } catch (err) {
+    console.error(err);
+  }
+})();
+
+// ==== CLIENTE DO BOT ====
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+client.on('ready', () => {
+  console.log(`Bot online! Logged in as ${client.user.tag}`);
 });
 
-client.once("clientReady", () => {
-  console.log(`🚀 Bot online: ${client.user.tag}`);
-});
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
 
-client.on("interactionCreate", async interaction => {
-  if (!interaction.isCommand()) return;
-
-  // Comando /rule
-  if (interaction.commandName === "rule") {
-    // Mensagem apenas pra pessoa que executou
-    await interaction.followUp({
-      content: "✅ Comando executado!",
-      ephemeral: true,
-    });
-
-    // Embed com regras, sem tracinho
-    const embedRules = new EmbedBuilder()
-      .setTitle("📜 Regras do HostVille")
-      .setColor("#D3AF37")
-      .setDescription(
-        "1. Respeite todos.\n" +
-        "2. Nada de spam.\n" +
-        "3. Comandos só no canal certo.\n" +
-        "4. Aproveite o servidor!"
-      );
-
-    // Envia para o canal onde foi executado
-    await interaction.channel.send({ embeds: [embedRules] });
+  // Só permitir admins
+  if (!interaction.member.permissions.has('Administrator')) {
+    return interaction.reply({ content: 'Você não tem permissão para usar este comando.', ephemeral: true });
   }
 
-  // Comando /info
-  if (interaction.commandName === "info") {
-    const uptimeMinutes = Math.floor(client.uptime / 1000 / 60);
-    const embedInfo = new EmbedBuilder()
-      .setTitle("ℹ️ Info do Bot")
-      .setColor("#D3AF37")
-      .setDescription(`Uptime: ${uptimeMinutes} minutos`);
-    
-    await interaction.followUp({ embeds: [embedInfo], ephemeral: true });
+  if (interaction.commandName === 'rule') {
+    await interaction.reply('📜 **Regras do servidor:**\n1. Seja respeitoso\n2. Nada de spam\n3. Divirta-se!');
+  }
+
+  if (interaction.commandName === 'info') {
+    await interaction.reply('ℹ️ **Informações do servidor:**\nServidor de exemplo para o bot HostVille.');
   }
 });
 
-client.login(process.env.TKD);
+client.login(TOKEN);
