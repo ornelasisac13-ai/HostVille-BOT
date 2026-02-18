@@ -1,6 +1,6 @@
-// index.js (ES Module)
-import { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, Routes } from 'discord.js';
-import { REST } from '@discordjs/rest';
+// index.cjs (CommonJS)
+const { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, Routes } = require('discord.js');
+const { REST } = require('@discordjs/rest');
 
 const TOKEN = 'SEU_TOKEN_AQUI';
 const CLIENT_ID = '1473705296101900420';
@@ -37,7 +37,7 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
 })();
 
 // Bot online
-client.on('clientReady', () => {
+client.on('ready', () => {
   console.log(`${client.user.tag} está online!`);
 });
 
