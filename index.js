@@ -39,13 +39,12 @@ async function registerCommands() {
             Routes.applicationCommands(CLIENT_ID),
             { body: commands }
         );
-        console.log("✅ Comandos registrados com sucesso!");
+        console.log("✅ Comandos registrados!");
     } catch (error) {
         console.error("❌ Erro ao registrar comandos:", error);
     }
 }
 
-// ========= READY =========
 client.once('clientReady', async (client) => {
     console.log("====================================");
     console.log("🤖 BOT ONLINE");
@@ -57,60 +56,43 @@ client.once('clientReady', async (client) => {
     await registerCommands();
 });
 
-// ========= INTERAÇÕES =========
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    console.log(`📌 Comando usado: /${interaction.commandName} | Usuário: ${interaction.user.tag}`);
+    console.log(`📌 /${interaction.commandName} | ${interaction.user.tag}`);
 
     // ========= /RULE =========
     if (interaction.commandName === 'rule') {
 
-        // Evita erro "app não respondeu"
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: 64 }); // EPHEMERAL sem warning
 
         const embed = new EmbedBuilder()
-            .setColor(0x89CFF0) // Azul bebê
+            .setColor(0x89CFF0)
             .setImage("https://image2url.com/r2/default/images/1771453214746-e642e4a3-1aba-4eae-bd21-07e118149345.jpg")
             .setTitle("📜 Regras e Diretrizes - HostVille Greenville RP")
             .setDescription(`
-As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
-
-➤ Ao participar, você concorda em agir com educação e bom senso.
+As regras garantem ordem e respeito.
 
 🤖 **AutoMod**
-Sistema ativo 24h contra spam, flood e links suspeitos.
+Sistema ativo 24h.
 
 ⚠️ **Blacklist**
-• Burlar regras ou punições  
-• Uso de exploits ou bugs  
+• Burlar regras  
+• Exploits  
 • Contas alternativas  
-• Prejudicar o servidor  
 
-🔒 **Segurança**
-Qualquer violação das regras do Discord ou do servidor é proibida.
-
-✅ **Punições**
-⚠️ Advertência | ❌ Kick | ⛔ Banimento  
-
-🚦 **Regras de Trânsito**
-• Máx. 85 MPH  
-• Respeite sinalizações  
-• Use setas  
-• Pare em STOP/vermelho  
+🚦 **Trânsito**
+Máx. 85 MPH  
 
 🎭 **Roleplay**
-• Siga sua história  
-• Sem Troll, Power-Gaming ou Fail-RP  
-• 🕒 NLR: 3 minutos após morte/prisão  
+Sem Troll, Power-Gaming ou Fail-RP  
+NLR: 3 minutos  
 
 💼 **Economia**
-• 1 trabalho por sessão  
-• Salário apenas pelo sistema oficial  
+1 trabalho por sessão  
 
 🗣️ **Comunicação**
-• Respeito sempre  
-• Use // para falar fora do RP  
+Use // fora do RP  
 
 🔗 **Links Oficiais**
 [Política de Privacidade](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)  
@@ -119,7 +101,6 @@ Qualquer violação das regras do Discord ou do servidor é proibida.
 
         await interaction.channel.send({ embeds: [embed] });
 
-        // Remove resposta invisível
         await interaction.deleteReply();
     }
 
@@ -139,12 +120,11 @@ Qualquer violação das regras do Discord ou do servidor é proibida.
                 { name: "ID", value: client.user.id, inline: true },
                 { name: "Servidores", value: `${client.guilds.cache.size}`, inline: true },
                 { name: "Uptime", value: `${hours}h ${minutes}m ${seconds}s`, inline: true }
-            )
-            .setFooter({ text: "HostVille Greenville RP" });
+            );
 
         await interaction.reply({
             embeds: [embed],
-            ephemeral: true
+            flags: 64 // EPHEMERAL sem warning
         });
     }
 });
