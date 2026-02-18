@@ -1,9 +1,7 @@
 import { Client, GatewayIntentBits, REST, Routes, EmbedBuilder } from 'discord.js';
 
-// ======================================
-// ⚠️ VARIÁVEL DO TOKEN (TKD)
+// ⚠️ Token
 const TKD = process.env.TKD || "<SEU_TOKEN_AQUI>";
-// ======================================
 
 const GUILD_ID = "928614664840052757";
 const BOT_ID = "1473705296101900420";
@@ -14,33 +12,23 @@ const client = new Client({
 
 // COMANDOS
 const commands = [
-  {
-    name: "rule",
-    description: "Mostra as regras do servidor"
-  },
-  {
-    name: "info",
-    description: "Mostra informações do bot"
-  }
+  { name: "rule", description: "Mostra as regras do servidor" },
+  { name: "info", description: "Mostra informações do bot" }
 ];
 
 // Registrar comandos
 const rest = new REST({ version: "10" }).setToken(TKD);
-
 (async () => {
   try {
     console.log("Registrando comandos...");
-    await rest.put(
-      Routes.applicationGuildCommands(BOT_ID, GUILD_ID),
-      { body: commands }
-    );
+    await rest.put(Routes.applicationGuildCommands(BOT_ID, GUILD_ID), { body: commands });
     console.log("✅ Comandos registrados com sucesso!");
   } catch (err) {
     console.error(err);
   }
 })();
 
-// EVENTO READY
+// READY
 client.once("clientReady", () => {
   console.log(`🚀 Bot online: ${client.user.tag}`);
 });
@@ -49,7 +37,12 @@ client.once("clientReady", () => {
 client.on("interactionCreate", async interaction => {
   if (!interaction.isCommand()) return;
 
+  // ========= RULE COMMAND =========
   if (interaction.commandName === "rule") {
+    // mensagem privada de confirmação
+    await interaction.reply({ content: "✅ O comando foi executado com sucesso!", ephemeral: true });
+
+    // embed público
     const embed = new EmbedBuilder()
       .setTitle("📜 Regras e Diretrizes - HostVille Greenville RP")
       .setColor("#D3AF37")
@@ -103,12 +96,12 @@ Advertência | Kick | Banimento
       .setImage("https://image2url.com/r2/default/images/1771434058556-31be1385-d620-4c2d-a19d-54ce3c9acd6f.jpg")
       .setFooter({ text: "Powered by Y2k_Nat" });
 
-    await interaction.reply({ embeds: [embed], ephemeral: false });
-    await interaction.followUp("✅ O comando foi executado com sucesso!");
+    await interaction.followUp({ embeds: [embed], ephemeral: false });
   }
 
+  // ========= INFO COMMAND =========
   if (interaction.commandName === "info") {
-    const uptime = Math.floor(client.uptime / 1000 / 60); // em minutos
+    const uptime = Math.floor(client.uptime / 1000 / 60); // minutos
     const embed = new EmbedBuilder()
       .setTitle("ℹ️ Info - HostVille Bot")
       .setColor("#D3AF37")
@@ -120,7 +113,8 @@ Advertência | Kick | Banimento
       `)
       .setFooter({ text: "Powered by Y2k_Nat" });
 
-    await interaction.reply({ embeds: [embed], ephemeral: false });
+    // apenas para quem executou
+    await interaction.reply({ embeds: [embed], ephemeral: true });
   }
 });
 
