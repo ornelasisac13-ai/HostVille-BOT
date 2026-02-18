@@ -1,103 +1,101 @@
 const { 
-  Client, 
-  GatewayIntentBits, 
-  EmbedBuilder, 
-  SlashCommandBuilder, 
-  REST, 
-  Routes 
+    Client, 
+    GatewayIntentBits, 
+    REST, 
+    Routes, 
+    SlashCommandBuilder,
+    EmbedBuilder
 } = require('discord.js');
 
+// ===== VARIÁVEIS RAILWAY =====
 const TOKEN = process.env.TOKEN;
-const CLIENT_ID = '1473705296101900420';
+const CLIENT_ID = process.env.CLIENT_ID;
+
+if (!TOKEN) {
+    console.error("❌ TOKEN não definido!");
+    process.exit(1);
+}
+
+if (!CLIENT_ID) {
+    console.error("❌ CLIENT_ID não definido!");
+    process.exit(1);
+}
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+    intents: [GatewayIntentBits.Guilds]
 });
 
+// ========= REGISTRO DO COMANDO =========
 const commands = [
-  new SlashCommandBuilder()
-    .setName('rule')
-    .setDescription('Envia as regras'),
-
-  new SlashCommandBuilder()
-    .setName('info')
-    .setDescription('Envia termos e política')
-].map(cmd => cmd.toJSON());
+    new SlashCommandBuilder()
+        .setName('rule')
+        .setDescription('Exibe as regras do servidor')
+        .toJSON()
+];
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
-(async () => {
-  try {
-    await rest.put(
-      Routes.applicationCommands(CLIENT_ID),
-      { body: commands }
-    );
-    console.log('Comandos registrados.');
-  } catch (error) {
-    console.error(error);
-  }
-})();
+async function registerCommands() {
+    try {
+        console.log("🔄 Registrando comando...");
+        await rest.put(
+            Routes.applicationCommands(CLIENT_ID),
+            { body: commands }
+        );
+        console.log("✅ Comando registrado!");
+    } catch (error) {
+        console.error(error);
+    }
+}
 
+client.once('ready', async () => {
+    console.log(`🤖 Bot online como ${client.user.tag}`);
+    await registerCommands();
+});
+
+// ========= COMANDO =========
 client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
+    if (!interaction.isChatInputCommand()) return;
 
-  if (interaction.commandName === 'rule') {
-    const embed = new EmbedBuilder()
-      .setColor(0x2B2D31)
-      .setImage('https://image2url.com/r2/default/images/1771440901443-9e36d15c-9cfa-4869-a1f1-40f26367256f.jpg')
-      .setDescription(`📜 **REGRAS OFICIAIS - HOSTVILLE Greenville RP**  
-🔒 O descumprimento pode resultar em: ⚠️ Advertência | ❌ Kick | ⛔ Banimento  
-Respeite a simulação e colabore com a experiência de todos!
+    if (interaction.commandName === 'rule') {
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-🚦 **REGRAS DE TRÂNSITO**
-Obedeça os limites de velocidade: Máx. 85 MPH  
-Respeite todas as sinalizações  
-Use setas ao virar ou mudar de faixa  
-Pare completamente em sinais STOP e vermelhos  
+        const embed = new EmbedBuilder()
+            .setColor(0x89CFF0) // Azul bebê
+            .setImage('https://image2url.com/r2/default/images/1771453214746-e642e4a3-1aba-4eae-bd21-07e118149345.jpg')
+            .setTitle('📜 Regras e Diretrizes - HostVille Greenville RP')
+            .setDescription(`
+As regras gerais têm como objetivo garantir ordem, respeito e boa convivência.
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-⚖️ **LEIS GERAIS**
-Proibido vandalismo, roubo ou uso de armas sem permissão da staff  
-Não cause caos em áreas públicas  
+🤖 **AutoMod**
+Sistema ativo 24h contra spam, flood e abusos.
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-🎭 **ROLEPLAY (RP)**
-Siga a história do seu personagem  
-Proibido Troll, Power-Gaming e Fail-RP  
-Após morte ou prisão aguarde 3 minutos  
+⚠️ **Blacklist**
+Proibição total para quem tentar burlar regras.
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-💼 **TRABALHO E ECONOMIA**
-1 trabalho por sessão  
-Salários apenas pelo sistema oficial  
-Proibido dar dinheiro fora de eventos  
+🔒 **Segurança**
+Exploit, contas alternativas ou abuso = punição.
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-🗣️ **COMUNICAÇÃO**
-Sem ofensas ou spam  
-Use // para falar fora do RP  
+🚦 **Regras de Trânsito**
+• Máx. 85 MPH  
+• Respeite sinalizações  
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-🔔 Em caso de dúvidas, abra um ticket.`);
+🎭 **Roleplay**
+• Sem Troll, Power-Gaming ou Fail-RP  
+• NLR: 3 minutos após morte/prisão  
 
-    await interaction.channel.send({ embeds: [embed] });
-  }
+💼 **Economia**
+• 1 trabalho por sessão  
 
-  if (interaction.commandName === 'info') {
-    const embed = new EmbedBuilder()
-      .setColor(0x2B2D31)
-      .setImage('https://image2url.com/r2/default/images/1771440901443-9e36d15c-9cfa-4869-a1f1-40f26367256f.jpg')
-      .setDescription(`📄 **Termos e Política de Privacidade**
+🗣️ **Comunicação**
+• Use // para falar fora do RP  
 
-🔗 Política de Privacidade:
-https://nativo-00.gitbook.io/hostville-bot-privacy-policy/
+🔗 **Links Oficiais**
+[Política de Privacidade](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)  
+[Termos de Uso](https://nativo-00.gitbook.io/hostville-bot-terms/)
+`);
 
-🔗 Termos de Uso:
-https://nativo-00.gitbook.io/hostville-bot-terms/`);
-
-    await interaction.channel.send({ embeds: [embed] });
-  }
+        await interaction.channel.send({ embeds: [embed] });
+    }
 });
 
 client.login(TOKEN);
