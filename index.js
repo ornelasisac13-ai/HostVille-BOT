@@ -1,13 +1,14 @@
-const { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, Routes } = require('discord.js');
-const { REST } = require('@discordjs/rest');
+// index.js (ES Module)
+import { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, Routes } from 'discord.js';
+import { REST } from '@discordjs/rest';
 
-const TOKEN = process.env.TOKEN; // Certifique-se de setar a variável de ambiente TOKEN
-const CLIENT_ID = '1473705296101900420'; // Seu client/application ID
-const GUILD_ID = '928614664840052757';  // O ID do servidor que você mandou
+const TOKEN = 'SEU_TOKEN_AQUI';
+const CLIENT_ID = '1473705296101900420';
+const GUILD_ID = '928614664840052757';
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-// Comandos
+// Comandos slash
 const commands = [
   new SlashCommandBuilder()
     .setName('rule')
@@ -21,6 +22,7 @@ const commands = [
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
+// Registrando comandos
 (async () => {
   try {
     console.log('Registrando comandos...');
@@ -34,69 +36,50 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
   }
 })();
 
+// Bot online
 client.on('clientReady', () => {
   console.log(`${client.user.tag} está online!`);
 });
 
+// Interações
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'rule') {
     const embed = new EmbedBuilder()
       .setTitle('📜 REGRAS OFICIAIS - HOSTVILLE Greenville RP')
-      .setDescription(`🔒 O descumprimento pode resultar em: ⚠️ Advertência | ❌ Kick | ⛔ Banimento
+      .setDescription(`🔒 O descumprimento pode resultar em: ⚠️ Advertência | ❌ Kick | ⛔ Banimento  
 Respeite a simulação e colabore com a experiência de todos!
 
 ━━━━━━━━━━━━━━━━━━━━━━━  
-🚦 **REGRAS DE TRÂNSITO**
-- Obedeça os **limites de velocidade**: **Máx. 85 MPH**
-- Respeite todas as **sinalizações**.
-- Use **setas** ao virar ou mudar de faixa.
-- Pare **completamente** em sinais **STOP** e **vermelhos**.
+🚦 **REGRAS DE TRÂNSITO**  
+- Máx. 85 MPH, siga sinais, use setas, pare no STOP.
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-⚖️ **LEIS GERAIS**
-- ❌ É proibido: **vandalismo**, **roubo** ou **uso de armas** sem permissão da staff.
-- 🚫 Não cause **caos em áreas públicas** sem combinar previamente com os envolvidos.
+⚖️ **LEIS GERAIS**  
+- ❌ Sem vandalismo, roubo ou armas sem permissão.
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-🎭 **ROLEPLAY (RP)**
-- ✅ Siga a **história do seu personagem** e respeite o RP dos outros.
-- ⚠️ **Todo jogador deve criar uma história para seu personagem**: nome, profissão, personalidade, etc.
-- ❌ Proibido:
-  - **Trollar**
-  - **Power-Gaming**
-  - **Fail-RP**
-- 🕒 Após **morte ou prisão**, aguarde **3 minutos** antes de retornar (NLR).
+🎭 **ROLEPLAY (RP)**  
+- ✅ Siga a história do seu personagem.  
+- ❌ Sem troll, powergaming ou fail-RP.
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-💼 **TRABALHO E ECONOMIA**
-- 👷‍♂️ **1 trabalho por sessão**. Respeite o **horário definido**.
-- 💰 **Salários** só pelo **sistema oficial**.
-- 🚫 **Proibido dar ou receber dinheiro** fora de eventos da staff.
+💼 **TRABALHO E ECONOMIA**  
+- 👷‍♂️ 1 trabalho por sessão, salários só pelo sistema oficial.
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-🗣️ **COMUNICAÇÃO**
-- 🤝 Fale com **respeito**. Sem ofensas, spam ou discussões desnecessárias.
-- 🎙️ Use **voz apenas em emergências**. Nada de flood.
-- 📱 Para falar com alguém à distância, **use o telefone do jogo**.
-- 💬 Para falar algo **fora do RP**, use // antes da frase
+🗣️ **COMUNICAÇÃO**  
+- 🤝 Respeite todos, sem flood.  
+- 📱 Para falar fora do RP, use // antes da frase.
 
-━━━━━━━━━━━━━━━━━━━━━━━  
-🔔 **LEMBRETE FINAL**
-> Estas regras existem para garantir uma experiência divertida, organizada e realista para todos os jogadores.
-> 💡 Em caso de dúvidas, chame a staff ou abra um ticket.
-
-🔗 [Termos de Serviço](https://nativo-00.gitbook.io/hostville-bot-terms/) | [Política de Privacidade](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)`)
-      .setColor(0xFF8C00) // cor laranja, você pode trocar
+🔗 [Termos](https://nativo-00.gitbook.io/hostville-bot-terms/) | [Política](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)`)
+      .setColor(0xFF8C00)
       .setImage('https://image2url.com/r2/default/images/1771440901443-9e36d15c-9cfa-4869-a1f1-40f26367256f.jpg');
 
-    await interaction.reply({ embeds: [embed], ephemeral: false });
+    await interaction.reply({ embeds: [embed] });
   }
 
   if (interaction.commandName === 'info') {
-    await interaction.reply({ content: 'Informações do servidor aqui!', ephemeral: false });
+    await interaction.reply({ content: 'Informações do servidor aqui!' });
   }
 });
 
+// Login
 client.login(TOKEN);
