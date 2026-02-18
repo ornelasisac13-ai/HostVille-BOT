@@ -19,96 +19,90 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
+// ========= COMANDOS =========
 const commands = [
     new SlashCommandBuilder()
         .setName('rule')
-        .setDescription('Exibe as regras do servidor')
-        .toJSON()
-];
+        .setDescription('Exibe as regras do servidor'),
+
+    new SlashCommandBuilder()
+        .setName('info')
+        .setDescription('Mostra informações do bot')
+].map(cmd => cmd.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 async function registerCommands() {
     try {
+        console.log("🔄 Registrando comandos...");
         await rest.put(
             Routes.applicationCommands(CLIENT_ID),
             { body: commands }
         );
-        console.log("✅ Comando /rule registrado!");
+        console.log("✅ Comandos registrados!");
     } catch (error) {
-        console.error(error);
+        console.error("❌ Erro ao registrar comandos:", error);
     }
 }
 
-client.once('ready', async () => {
-    console.log(`🤖 Bot online como ${client.user.tag}`);
+// ========= READY =========
+client.once('clientReady', async (client) => {
+    console.log("====================================");
+    console.log("🤖 BOT ONLINE");
+    console.log(`👤 Usuário: ${client.user.tag}`);
+    console.log(`🆔 ID: ${client.user.id}`);
+    console.log(`📅 Iniciado em: ${new Date().toLocaleString()}`);
+    console.log("====================================");
+
     await registerCommands();
 });
 
+// ========= INTERAÇÕES =========
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
+    console.log(`📌 Comando usado: /${interaction.commandName} | Usuário: ${interaction.user.tag}`);
+
+    // ========= /RULE =========
     if (interaction.commandName === 'rule') {
 
         const embed = new EmbedBuilder()
-            .setColor(0x89CFF0) // Azul bebê
+            .setColor(0x89CFF0)
             .setImage("https://image2url.com/r2/default/images/1771453214746-e642e4a3-1aba-4eae-bd21-07e118149345.jpg")
             .setTitle("📜 Regras e Diretrizes - HostVille Greenville RP")
             .setDescription(`
-As regras gerais têm como objetivo garantir ordem, respeito e boa convivência.
-
-➤ Ao participar você concorda em agir com educação e bom senso.
-
-🤖 **AutoMod**
-Sistema ativo 24h contra spam, flood, palavras proibidas e links suspeitos.
-
-⚠️ **Blacklist**
-Proibição total de participação.
-• Burlar regras
-• Exploits ou bugs
-• Contas alternativas
-• Prejudicar a comunidade
-
-🔒 **Segurança**
-Qualquer tentativa de burlar regras do Discord ou servidor é proibida.
-
-✅ **Punições**
-⚠️ Advertência | ❌ Kick | ⛔ Banimento
-
-🚦 **Regras de Trânsito**
-• Máx. 85 MPH  
-• Respeite sinalizações  
-• Use setas  
-• Pare em STOP/vermelho  
-
-⚖️ **Leis Gerais**
-• ❌ Sem vandalismo, roubo ou armas sem permissão  
-• 🚫 Não cause caos em áreas públicas  
-
-🎭 **Roleplay**
-• Siga sua história  
-• Crie nome, profissão e personalidade  
-• ❌ Sem Troll, Power-Gaming ou Fail-RP  
-• 🕒 NLR: 3 minutos após morte/prisão  
-
-💼 **Trabalho e Economia**
-• 1 trabalho por sessão  
-• Salário apenas pelo sistema  
-• 🚫 Sem dinheiro fora de eventos  
-
-🗣️ **Comunicação**
-• Respeito sempre  
-• Voz só em emergências  
-• Use telefone do jogo  
-• Use // para falar fora do RP  
-
 🔗 **Links Oficiais**
-[Política de Privacidade](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)  
+[Política de Privacidade](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)
 [Termos de Uso](https://nativo-00.gitbook.io/hostville-bot-terms/)
 `);
 
         // SEM reply
         await interaction.channel.send({ embeds: [embed] });
+    }
+
+    // ========= /INFO =========
+    if (interaction.commandName === 'info') {
+
+        const uptime = process.uptime();
+        const hours = Math.floor(uptime / 3600);
+        const minutes = Math.floor((uptime % 3600) / 60);
+        const seconds = Math.floor(uptime % 60);
+
+        const embed = new EmbedBuilder()
+            .setColor(0x89CFF0)
+            .setTitle("🤖 Informações do Bot")
+            .addFields(
+                { name: "Nome", value: client.user.tag, inline: true },
+                { name: "Servidores", value: `${client.guilds.cache.size}`, inline: true },
+                { name: "Uptime", value: `${hours}h ${minutes}m ${seconds}s`, inline: true }
+            )
+            .setFooter({ text: "HostVille Greenville RP" });
+
+        // MENSAGEM SÓ PRA QUEM EXECUTAR
+        await interaction.reply({
+            embeds: [embed],
+            ephemeral: true
+        });
     }
 });
 
