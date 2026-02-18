@@ -1,9 +1,9 @@
 {
   "name": "hostville-bot",
   "version": "1.0.0",
-  "description": "Bot do HostVille Greenville RP com comandos /rules e /info",
-  "main": "index.js",
+  "description": "Bot HostVille Greenville RP",
   "type": "module",
+  "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
@@ -11,15 +11,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "discord.js": "^14.12.1"
-  },
-  "keywords": [
-    "discord",
-    "bot",
-    "hostville",
-    "rules",
-    "info"
-  ],
-  "author": "Y2k_Nat",
-  "license": "MIT"
+    "discord.js": "^14.15.1",
+    "node-fetch": "^3.3.2"
+  }
 }
