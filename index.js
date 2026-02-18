@@ -1,23 +1,24 @@
-import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
+const { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, Routes } = require('discord.js');
+const { REST } = require('@discordjs/rest');
 
-// Variáveis do bot
-const TOKEN = process.env.TOKEN; // Seu token definido como variável de ambiente
-const CLIENT_ID = '1473705296101900420'; // Seu Client ID
-const GUILD_ID = 'SUA_GUILD_ID_AQUI'; // Substitua pelo ID do seu servidor
+const TOKEN = process.env.TOKEN; // Certifique-se de setar a variável de ambiente TOKEN
+const CLIENT_ID = '1473705296101900420'; // Seu client/application ID
+const GUILD_ID = '928614664840052757';  // O ID do servidor que você mandou
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-// Comandos do bot
+// Comandos
 const commands = [
   new SlashCommandBuilder()
     .setName('rule')
-    .setDescription('Mostra as regras do servidor'),
+    .setDescription('Mostra as regras do Hostville!')
+    .toJSON(),
   new SlashCommandBuilder()
     .setName('info')
-    .setDescription('Mostra os links de Termos e Política de Privacidade')
-].map(cmd => cmd.toJSON());
+    .setDescription('Informações do servidor')
+    .toJSON()
+];
 
-// Registrar comandos
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 (async () => {
@@ -27,24 +28,23 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
       Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
       { body: commands }
     );
-    console.log('Comandos registrados!');
-  } catch (error) {
-    console.error(error);
+    console.log('Comandos registrados com sucesso!');
+  } catch (err) {
+    console.error(err);
   }
 })();
 
-// Evento de inicialização
-client.on('ready', () => {
+client.on('clientReady', () => {
   console.log(`${client.user.tag} está online!`);
 });
 
-// Resposta aos comandos
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isCommand()) return;
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === 'rule') {
-    await interaction.reply(`📜 **REGRAS OFICIAIS - HOSTVILLE Greenville RP**  
-🔒 O descumprimento pode resultar em: ⚠️ Advertência | ❌ Kick | ⛔ Banimento  
+    const embed = new EmbedBuilder()
+      .setTitle('📜 REGRAS OFICIAIS - HOSTVILLE Greenville RP')
+      .setDescription(`🔒 O descumprimento pode resultar em: ⚠️ Advertência | ❌ Kick | ⛔ Banimento
 Respeite a simulação e colabore com a experiência de todos!
 
 ━━━━━━━━━━━━━━━━━━━━━━━  
@@ -64,10 +64,10 @@ Respeite a simulação e colabore com a experiência de todos!
 - ✅ Siga a **história do seu personagem** e respeite o RP dos outros.
 - ⚠️ **Todo jogador deve criar uma história para seu personagem**: nome, profissão, personalidade, etc.
 - ❌ Proibido:
-  - **Trollar** (atrapalhar intencionalmente)
-  - **Power-Gaming** (forçar ações irreais/injustas)
-  - **Fail-RP** (quebrar a lógica do RP)
-- 🕒 Após **morte ou prisão**, aguarde **3 minutos** antes de retornar (NLR - New Life Rule).
+  - **Trollar**
+  - **Power-Gaming**
+  - **Fail-RP**
+- 🕒 Após **morte ou prisão**, aguarde **3 minutos** antes de retornar (NLR).
 
 ━━━━━━━━━━━━━━━━━━━━━━━  
 💼 **TRABALHO E ECONOMIA**
@@ -80,21 +80,23 @@ Respeite a simulação e colabore com a experiência de todos!
 - 🤝 Fale com **respeito**. Sem ofensas, spam ou discussões desnecessárias.
 - 🎙️ Use **voz apenas em emergências**. Nada de flood.
 - 📱 Para falar com alguém à distância, **use o telefone do jogo**.
-- 💬 Para falar algo **fora do RP**, use \`//\` antes da frase.  
-  *Exemplo:* \`// minha internet caiu rapidão\`
+- 💬 Para falar algo **fora do RP**, use // antes da frase
 
 ━━━━━━━━━━━━━━━━━━━━━━━  
 🔔 **LEMBRETE FINAL**
-> Estas regras existem para garantir uma experiência divertida, organizada e realista para todos os jogadores.  
-> 💡 Em caso de dúvidas, chame a staff ou abra um ticket.`);
+> Estas regras existem para garantir uma experiência divertida, organizada e realista para todos os jogadores.
+> 💡 Em caso de dúvidas, chame a staff ou abra um ticket.
+
+🔗 [Termos de Serviço](https://nativo-00.gitbook.io/hostville-bot-terms/) | [Política de Privacidade](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)`)
+      .setColor(0xFF8C00) // cor laranja, você pode trocar
+      .setImage('https://image2url.com/r2/default/images/1771440901443-9e36d15c-9cfa-4869-a1f1-40f26367256f.jpg');
+
+    await interaction.reply({ embeds: [embed], ephemeral: false });
   }
 
   if (interaction.commandName === 'info') {
-    await interaction.reply(`📄 **Termos e Política de Privacidade:**  
-- Termos: [https://nativo-00.gitbook.io/hostville-bot-terms/](https://nativo-00.gitbook.io/hostville-bot-terms/)  
-- Política de Privacidade: [https://nativo-00.gitbook.io/hostville-bot-privacy-policy/](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)`);
+    await interaction.reply({ content: 'Informações do servidor aqui!', ephemeral: false });
   }
 });
 
-// Login do bot
 client.login(TOKEN);
