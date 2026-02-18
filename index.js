@@ -71,7 +71,7 @@ client.on('interactionCreate', async interaction => {
             .setDescription(`
 As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
 
-➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso, respeitando os demais jogadores, a staff e as diretrizes do servidor.
+➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
 
 🤖 **AutoMod**
 Sistema ativo 24h contra spam, flood, palavras proibidas, links suspeitos e comportamentos fora das regras.
@@ -88,43 +88,13 @@ Pode ocorrer por:
 É proibido burlar ou violar regras do Discord ou do servidor.
 Exploit, bugs, contas alternativas ou automações ilegais são proibidas.
 
-✅ **Regras Oficiais**
-⚠️ Advertência | ❌ Kick | ⛔ Banimento  
-Respeite a simulação e colabore com todos.
+━━━━━━━━━━━━━━━━━━━━
 
-🚦 **Regras de Trânsito**
-• Máx. 85 MPH
-• Respeite sinalizações
-• Use setas ao virar
-• Pare em STOP e sinal vermelho
+🔗 **Documentos Oficiais**
 
-⚖️ **Leis Gerais**
-• ❌ Proibido vandalismo, roubo ou armas sem permissão da staff
-• 🚫 Não cause caos em áreas públicas sem combinar
+📄 [Política de Privacidade](https://docs.google.com/document/d/1ZrScgrEAb7NnBGZW1XLQvBRaGIDrzatq8XBjlVyYP_k/edit?usp=drivesdk)
 
-🎭 **Roleplay (RP)**
-• Siga a história do seu personagem
-• Crie nome, profissão, personalidade
-• ❌ Proibido Trollar
-• ❌ Power-Gaming
-• ❌ Fail-RP
-• 🕒 NLR: aguarde 3 minutos após morte/prisão
-
-💼 **Trabalho e Economia**
-• 👷 1 trabalho por sessão
-• 💰 Salários apenas pelo sistema oficial
-• 🚫 Proibido dinheiro fora de eventos da staff
-
-🗣️ **Comunicação**
-• 🤝 Fale com respeito
-• 🎙️ Voz apenas em emergências
-• 📱 Use telefone do jogo para distância
-• 💬 Use // para falar fora do RP
-Exemplo: // minha internet caiu rapidão
-
-🔗 **Links Oficiais**
-[Política de Privacidade](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)  
-[Termos de Uso](https://nativo-00.gitbook.io/hostville-bot-terms/)
+📜 [Termos de Uso](https://docs.google.com/document/d/1hoL-0AcJhrTXZAPIschLxoeF3kzAi7knTVPDXdT20nE/edit?usp=drivesdk)
 
 ━━━━━━━━━━━━━━━━━━━━
 ✨ Powered by Y2k_Nat
