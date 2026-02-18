@@ -74,27 +74,23 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
 ➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
 
 🤖 **AutoMod**
-Sistema ativo 24h contra spam, flood, palavras proibidas, links suspeitos e comportamentos fora das regras.
+Sistema ativo 24h contra spam e abusos.
 
 ⚠️ **Blacklist**
-Estar na blacklist significa proibição total de participação no servidor.
-Pode ocorrer por:
-• Burlar regras ou punições
-• Uso de exploits, bugs ou vantagens indevidas
-• Contas alternativas para contornar sanções
-• Atitudes que prejudiquem o servidor
+• Burlar regras  
+• Exploits ou bugs  
+• Contas alternativas  
 
-🔒 **Segurança e Integridade**
-É proibido burlar ou violar regras do Discord ou do servidor.
-Exploit, bugs, contas alternativas ou automações ilegais são proibidas.
+🔒 **Segurança**
+Qualquer violação das regras é proibida.
 
 ━━━━━━━━━━━━━━━━━━━━
 
 🔗 **Documentos Oficiais**
 
-📄 [Política de Privacidade](https://docs.google.com/document/d/1ZrScgrEAb7NnBGZW1XLQvBRaGIDrzatq8XBjlVyYP_k/edit?usp=drivesdk)
+📄 [Política de Privacidade](https://docs.google.com/document/d/1hoL-0AcJhrTXZAPIschLxoeF3kzAi7knTVPDXdT20nE/edit?usp=drivesdk)
 
-📜 [Termos de Uso](https://docs.google.com/document/d/1hoL-0AcJhrTXZAPIschLxoeF3kzAi7knTVPDXdT20nE/edit?usp=drivesdk)
+📜 [Termos de Uso](https://docs.google.com/document/d/1ZrScgrEAb7NnBGZW1XLQvBRaGIDrzatq8XBjlVyYP_k/edit?usp=drivesdk)
 
 ━━━━━━━━━━━━━━━━━━━━
 ✨ Powered by Y2k_Nat
