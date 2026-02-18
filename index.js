@@ -1,18 +1,15 @@
-import { config } from 'dotenv';
-config();
-
 import { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder } from 'discord.js';
 
-const TKD = process.env.TKD; // Token agora é TKD
-const GUILD_ID = process.env.GUILD_ID;
-const CLIENT_ID = process.env.CLIENT_ID; // ID do bot
+// === VARIÁVEL DO TOKEN ===
+const TKD = 'SEU_TOKEN_AQUI';
 
-// Cliente com intents mínimas
-const client = new Client({
-    intents: [GatewayIntentBits.Guilds] // Apenas necessário para slash commands e info básica
-});
+// === GUILD ONDE OS COMANDOS SERÃO REGISTRADOS ===
+const GUILD_ID = '928614664840052757';
 
-// Slash commands
+// Cliente com intents mínimas (somente guilds)
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+// Comandos
 const commands = [
     new SlashCommandBuilder()
         .setName('rules')
@@ -22,12 +19,12 @@ const commands = [
         .setDescription('Mostra informações do bot')
 ].map(cmd => cmd.toJSON());
 
-// Registrar comandos na guild
+// Registrar comandos na guild (sem Client ID)
 const rest = new REST({ version: '10' }).setToken(TKD);
 (async () => {
     try {
         console.log('Registrando comandos...');
-        await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+        await rest.put(Routes.applicationGuildCommands('@me', GUILD_ID), { body: commands });
         console.log('Comandos registrados com sucesso!');
     } catch (err) {
         console.error(err);
@@ -43,7 +40,7 @@ client.once('ready', () => {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    // Embed de Regras
+    // Comando /rules
     if (interaction.commandName === 'rules') {
         const embed = new EmbedBuilder()
             .setTitle('📜 Regras e Diretrizes - HostVille Greenville RP')
@@ -97,34 +94,28 @@ Respeite a simulação e colabore com a experiência de todos!
 • 🎙️ Use voz apenas em emergências
 • 📱 Para falar com alguém à distância, use o telefone do jogo
 • 💬 Para falar algo fora do RP, use // antes da frase
-Exemplo: // minha internet caiu rapidão`
+Exemplo: // minha internet caiu rapidão
+
+📌 Links importantes:
+• [Privacy Policy](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)
+• [Terms of Service](https://nativo-00.gitbook.io/hostville-bot-terms/)
+`
             )
             .setImage('https://image2url.com/r2/default/images/1771434058556-31be1385-d620-4c2d-a19d-54ce3c9acd6f.jpg');
 
         await interaction.reply({ embeds: [embed] });
     }
 
-    // Embed de Info
+    // Comando /info
     if (interaction.commandName === 'info') {
-        const guild = client.guilds.cache.get(GUILD_ID);
-        const onlineCount = guild.members.cache.filter(m => m.presence?.status === 'online').size;
-        const totalCount = guild.memberCount;
-        const uptime = Math.floor(client.uptime / 1000); // segundos
-        const days = Math.floor(uptime / 86400);
-        const hours = Math.floor((uptime % 86400) / 3600);
-        const minutes = Math.floor((uptime % 3600) / 60);
-        const seconds = uptime % 60;
-
         const embed = new EmbedBuilder()
             .setTitle('🤖 HostVille Bot Info')
             .setColor('#4E5D94')
-            .setDescription(`**Online:** ${onlineCount}
-**Total de membros:** ${totalCount}
-**Uptime:** ${days}d ${hours}h ${minutes}m ${seconds}s
-**Powered by:** Y2k_Nat`);
+            .setDescription('**Powered by:** Y2k_Nat');
 
         await interaction.reply({ embeds: [embed] });
     }
 });
 
+// Login
 client.login(TKD);
