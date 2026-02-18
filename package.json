@@ -1,11 +1,12 @@
 {
-  "name": "hostville-bot",
+  "name": "hostville-rules-bot",
   "version": "1.0.0",
-  "main": "index.cjs",
+  "description": "Bot de regras HostVille Greenville RP",
+  "main": "index.js",
   "scripts": {
-    "start": "node index.cjs"
+    "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.15.0"
+    "discord.js": "^14.14.1"
   }
 }
