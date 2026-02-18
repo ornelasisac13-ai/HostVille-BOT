@@ -1,15 +1,21 @@
+// index.js
 import { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder } from 'discord.js';
 
-// === VARIÁVEL DO TOKEN ===
-const TKD = 'SEU_TOKEN_AQUI';
+// ======================
+// CONFIGURAÇÕES
+// ======================
+const TKD = 'SEU_TOKEN_AQUI'; // Coloque o token do bot aqui
+const GUILD_ID = '928614664840052757'; // Guild ID
+const CLIENT_ID = '1473705296101900420'; // ID do bot
 
-// === GUILD ONDE OS COMANDOS SERÃO REGISTRADOS ===
-const GUILD_ID = '928614664840052757';
-
-// Cliente com intents mínimas (somente guilds)
+// ======================
+// CLIENTE
+// ======================
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-// Comandos
+// ======================
+// COMANDOS
+// ======================
 const commands = [
     new SlashCommandBuilder()
         .setName('rules')
@@ -19,34 +25,43 @@ const commands = [
         .setDescription('Mostra informações do bot')
 ].map(cmd => cmd.toJSON());
 
-// Registrar comandos na guild (sem Client ID)
+// ======================
+// REGISTRAR COMANDOS NA GUILD
+// ======================
 const rest = new REST({ version: '10' }).setToken(TKD);
+
 (async () => {
     try {
         console.log('Registrando comandos...');
-        await rest.put(Routes.applicationGuildCommands('@me', GUILD_ID), { body: commands });
+        await rest.put(
+            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+            { body: commands }
+        );
         console.log('Comandos registrados com sucesso!');
     } catch (err) {
         console.error(err);
     }
 })();
 
-// Evento ready
+// ======================
+// READY
+// ======================
 client.once('ready', () => {
     console.log(`🚀 Bot online: ${client.user.tag}`);
 });
 
-// Interações
+// ======================
+// INTERAÇÕES
+// ======================
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    // Comando /rules
+    // ---------- /rules ----------
     if (interaction.commandName === 'rules') {
         const embed = new EmbedBuilder()
             .setTitle('📜 Regras e Diretrizes - HostVille Greenville RP')
-            .setColor('#4E5D94')
-            .setDescription(
-`As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
+            .setColor('#D3AF37')
+            .setDescription(`As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
 ➤ Ao participar de HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso, respeitando os demais jogadores, a staff e as diretrizes do servidor.
 
 🤖 AutoMod
@@ -82,40 +97,44 @@ Respeite a simulação e colabore com a experiência de todos!
 • ✅ Siga a história do seu personagem e respeite o RP dos outros
 • ⚠️ Todo jogador deve criar uma história para seu personagem: nome, profissão, personalidade, etc.
 • ❌ Proibido: Trollar, Power-Gaming, Fail-RP
-• 🕒 Após morte ou prisão, aguarde 3 minutos antes de retornar (NLR)
+• 🕒 Após morte ou prisão, aguarde 3 minutos antes de retornar (NLR - New Life Rule)
 
 💼 Trabalho e Economia
-• 👷‍♂️ 1 trabalho por sessão
+• 👷‍♂️ 1 trabalho por sessão. Respeite o horário definido
 • 💰 Salários só pelo sistema oficial
 • 🚫 Proibido dar ou receber dinheiro fora de eventos da staff
 
 🗣️ Comunicação
-• 🤝 Fale com respeito
-• 🎙️ Use voz apenas em emergências
+• 🤝 Fale com respeito. Sem ofensas, spam ou discussões desnecessárias
+• 🎙️ Use voz apenas em emergências. Nada de flood
 • 📱 Para falar com alguém à distância, use o telefone do jogo
 • 💬 Para falar algo fora do RP, use // antes da frase
-Exemplo: // minha internet caiu rapidão
 
-📌 Links importantes:
+📌 Links Importantes
 • [Privacy Policy](https://nativo-00.gitbook.io/hostville-bot-privacy-policy/)
 • [Terms of Service](https://nativo-00.gitbook.io/hostville-bot-terms/)
-`
-            )
+
+`)
             .setImage('https://image2url.com/r2/default/images/1771434058556-31be1385-d620-4c2d-a19d-54ce3c9acd6f.jpg');
 
         await interaction.reply({ embeds: [embed] });
+        await interaction.followUp({ content: '✅ O comando foi executado com sucesso!', ephemeral: true });
     }
 
-    // Comando /info
+    // ---------- /info ----------
     if (interaction.commandName === 'info') {
         const embed = new EmbedBuilder()
             .setTitle('🤖 HostVille Bot Info')
-            .setColor('#4E5D94')
-            .setDescription('**Powered by:** Y2k_Nat');
+            .setColor('#D3AF37')
+            .setDescription(`**Powered by:** Y2k_Nat
+**Online em:** ${client.guilds.cache.get(GUILD_ID)?.memberCount || 0} membros
+**Tempo ativo:** ${Math.floor(client.uptime / 1000 / 60)} min`);
 
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ embeds: [embed], ephemeral: true });
     }
 });
 
-// Login
+// ======================
+// LOGIN
+// ======================
 client.login(TKD);
