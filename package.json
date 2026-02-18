@@ -1,17 +1,15 @@
 {
   "name": "hostville-bot",
   "version": "1.0.0",
-  "description": "Bot HostVille Greenville RP",
-  "type": "module",
-  "main": "index.js",
+  "description": "Bot do Hostville Greenville RP",
+  "main": "index.cjs",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.cjs"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.0"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "dependencies": {
-    "discord.js": "^14.15.1",
-    "node-fetch": "^3.3.2"
   }
 }
