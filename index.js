@@ -7,17 +7,11 @@ const {
     EmbedBuilder
 } = require('discord.js');
 
-// ===== VARIÁVEIS RAILWAY =====
 const TOKEN = process.env.TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_ID = "1473705296101900420";
 
 if (!TOKEN) {
     console.error("❌ TOKEN não definido!");
-    process.exit(1);
-}
-
-if (!CLIENT_ID) {
-    console.error("❌ CLIENT_ID não definido!");
     process.exit(1);
 }
 
@@ -25,7 +19,6 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
-// ========= REGISTRO DO COMANDO =========
 const commands = [
     new SlashCommandBuilder()
         .setName('rule')
@@ -37,12 +30,11 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 async function registerCommands() {
     try {
-        console.log("🔄 Registrando comando...");
         await rest.put(
             Routes.applicationCommands(CLIENT_ID),
             { body: commands }
         );
-        console.log("✅ Comando registrado!");
+        console.log("✅ Comando /rule registrado!");
     } catch (error) {
         console.error(error);
     }
@@ -53,7 +45,6 @@ client.once('ready', async () => {
     await registerCommands();
 });
 
-// ========= COMANDO =========
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -61,32 +52,54 @@ client.on('interactionCreate', async interaction => {
 
         const embed = new EmbedBuilder()
             .setColor(0x89CFF0) // Azul bebê
-            .setImage('https://image2url.com/r2/default/images/1771453214746-e642e4a3-1aba-4eae-bd21-07e118149345.jpg')
-            .setTitle('📜 Regras e Diretrizes - HostVille Greenville RP')
+            .setImage("https://image2url.com/r2/default/images/1771453214746-e642e4a3-1aba-4eae-bd21-07e118149345.jpg")
+            .setTitle("📜 Regras e Diretrizes - HostVille Greenville RP")
             .setDescription(`
 As regras gerais têm como objetivo garantir ordem, respeito e boa convivência.
 
+➤ Ao participar você concorda em agir com educação e bom senso.
+
 🤖 **AutoMod**
-Sistema ativo 24h contra spam, flood e abusos.
+Sistema ativo 24h contra spam, flood, palavras proibidas e links suspeitos.
 
 ⚠️ **Blacklist**
-Proibição total para quem tentar burlar regras.
+Proibição total de participação.
+• Burlar regras
+• Exploits ou bugs
+• Contas alternativas
+• Prejudicar a comunidade
 
 🔒 **Segurança**
-Exploit, contas alternativas ou abuso = punição.
+Qualquer tentativa de burlar regras do Discord ou servidor é proibida.
+
+✅ **Punições**
+⚠️ Advertência | ❌ Kick | ⛔ Banimento
 
 🚦 **Regras de Trânsito**
 • Máx. 85 MPH  
 • Respeite sinalizações  
+• Use setas  
+• Pare em STOP/vermelho  
+
+⚖️ **Leis Gerais**
+• ❌ Sem vandalismo, roubo ou armas sem permissão  
+• 🚫 Não cause caos em áreas públicas  
 
 🎭 **Roleplay**
-• Sem Troll, Power-Gaming ou Fail-RP  
-• NLR: 3 minutos após morte/prisão  
+• Siga sua história  
+• Crie nome, profissão e personalidade  
+• ❌ Sem Troll, Power-Gaming ou Fail-RP  
+• 🕒 NLR: 3 minutos após morte/prisão  
 
-💼 **Economia**
+💼 **Trabalho e Economia**
 • 1 trabalho por sessão  
+• Salário apenas pelo sistema  
+• 🚫 Sem dinheiro fora de eventos  
 
 🗣️ **Comunicação**
+• Respeito sempre  
+• Voz só em emergências  
+• Use telefone do jogo  
 • Use // para falar fora do RP  
 
 🔗 **Links Oficiais**
@@ -94,6 +107,7 @@ Exploit, contas alternativas ou abuso = punição.
 [Termos de Uso](https://nativo-00.gitbook.io/hostville-bot-terms/)
 `);
 
+        // SEM reply
         await interaction.channel.send({ embeds: [embed] });
     }
 });
