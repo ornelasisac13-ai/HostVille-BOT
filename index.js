@@ -5,9 +5,9 @@ import {
     Routes, 
     SlashCommandBuilder, 
     EmbedBuilder, 
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle 
 } from "discord.js";
 import chalk from "chalk";
 import os from "os";
@@ -30,13 +30,13 @@ const stats = {
     leaves: 0
 };
 
-// ================= HISTÓRICO EM MEMÓRIA =================
+// ================= HISTÓRICO DE MEMBROS =================
 const activityHistory = [];
 
 // ================= COR CYAN FIXA =================
 const C = chalk.cyanBright;
 
-// ================= MONITOR =================
+// ================= MONITORAMENTO =================
 const Monitor = {
     getMemory() {
         const m = process.memoryUsage();
@@ -56,15 +56,14 @@ const Monitor = {
 
 // ================= HORÁRIO BRASÍLIA =================
 function getBrasiliaTime() {
-    return new Date().toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo"
-    });
+    return new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
-// ================= LOG DAS ÚLTIMAS 24H =================
-const logLast24HoursActivity = () => {
+// ================= RELATÓRIO 24H =================
+function logLast24HoursActivity() {
     const now = Date.now();
     const last24h = 24 * 60 * 60 * 1000;
+
     const recent = activityHistory.filter(a => now - a.timestamp <= last24h);
 
     const joins = recent.filter(a => a.type === "join");
@@ -90,9 +89,9 @@ const logLast24HoursActivity = () => {
     }
 
     console.log(C("════════════════════════════════════════════"));
-};
+}
 
-// ================= CLIENTE =================
+// ================= CLIENT =================
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -102,8 +101,18 @@ const client = new Client({
     ]
 });
 
+// ================= FUNÇÃO DE CHECAGEM DE CÓDIGO =================
+function checkAccess(interaction) {
+    const code = interaction.options.getString("code");
+    if (!code || code !== ACCESS_CODE) {
+        interaction.reply({ content: "❌ Código inválido", flags: 64 }); // efêmero
+        return false;
+    }
+    return true;
+}
+
 // ================= READY =================
-client.once("clientReady", async () => {
+client.once("clientReady", () => {
     console.clear();
     console.log(C("════════════════════════════════════════════"));
     console.log(C("ＨｏｓｔＶｉｌｌｅ • ＢＯＴ"));
@@ -113,76 +122,74 @@ client.once("clientReady", async () => {
     console.log(C("════════════════════════════════════════════"));
 
     logLast24HoursActivity();
-    setInterval(logLast24HoursActivity, 60 * 60 * 1000);
+    setInterval(() => logLast24HoursActivity(), 60 * 60 * 1000);
 });
 
-// ================= ENTRADA =================
+// ================= ENTRADA DE MEMBRO =================
 client.on("guildMemberAdd", member => {
     stats.joins++;
-    activityHistory.push({
-        type: "join",
-        tag: member.user.tag,
-        id: member.user.id,
-        timestamp: Date.now()
-    });
+    activityHistory.push({ type: "join", tag: member.user.tag, id: member.user.id, timestamp: Date.now() });
     console.log(C(`➕ ${member.user.tag} entrou no servidor.`));
 });
 
-// ================= SAÍDA =================
+// ================= SAÍDA DE MEMBRO =================
 client.on("guildMemberRemove", member => {
     stats.leaves++;
-    activityHistory.push({
-        type: "leave",
-        tag: member.user.tag,
-        id: member.user.id,
-        timestamp: Date.now()
-    });
+    activityHistory.push({ type: "leave", tag: member.user.tag, id: member.user.id, timestamp: Date.now() });
     console.log(C(`➖ ${member.user.tag} saiu do servidor.`));
 });
 
 // ================= COMANDOS =================
 const commands = [
     new SlashCommandBuilder()
-        .setName("info")
-        .setDescription("Informações do bot"),
-    new SlashCommandBuilder()
         .setName("rules")
-        .setDescription("Exibir regras do servidor"),
+        .setDescription("Mostrar regras")
+        .addStringOption(opt => opt.setName("code").setDescription("Código de acesso").setRequired(true)),
+
     new SlashCommandBuilder()
-        .setName("restart")
-        .setDescription("Reiniciar bot")
-        .addStringOption(opt =>
-            opt.setName("code")
-                .setDescription("Código de acesso")
-                .setRequired(true)
-        ),
+        .setName("info")
+        .setDescription("Informações do bot")
+        .addStringOption(opt => opt.setName("code").setDescription("Código de acesso").setRequired(true)),
+
     new SlashCommandBuilder()
         .setName("adm")
         .setDescription("Painel administrativo")
-        .addStringOption(opt =>
-            opt.setName("code")
-                .setDescription("Código de acesso")
-                .setRequired(true)
-        )
+        .addStringOption(opt => opt.setName("code").setDescription("Código de acesso").setRequired(true)),
+
+    new SlashCommandBuilder()
+        .setName("restart")
+        .setDescription("Reiniciar bot")
+        .addStringOption(opt => opt.setName("code").setDescription("Código de acesso").setRequired(true))
 ].map(c => c.toJSON());
 
-// ================= REGISTRAR COMANDOS =================
+// ================= REGISTRO DE COMANDOS =================
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 (async () => {
-    try {
-        await rest.put(
-            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-            { body: commands }
-        );
-        console.log(C("✅ Comandos registrados com sucesso!"));
-    } catch (err) {
-        console.log(C(`❌ Erro ao registrar comandos: ${err.message}`));
-    }
+    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
 })();
 
 // ================= INTERAÇÕES =================
 client.on("interactionCreate", async interaction => {
+    // ---------------- BOTÕES DO PAINEL ----------------
+    if (interaction.isButton()) {
+        if (interaction.customId === "adm_stats") {
+            console.log(C(`📊 Painel acessado por: ${interaction.user.tag}`));
+            await interaction.reply({ content: `📊 Estatísticas:\nComandos: ${stats.totalCommands}\nEntradas: ${stats.joins}\nSaídas: ${stats.leaves}`, flags: 64 });
+        }
+        if (interaction.customId === "adm_report") {
+            console.log(C(`📄 Relatório enviado para console por: ${interaction.user.tag}`));
+            console.log(stats);
+            logLast24HoursActivity();
+            await interaction.reply({ content: "✅ Relatório enviado para o console", flags: 64 });
+        }
+        return;
+    }
+
+    // ---------------- COMANDOS ----------------
     if (!interaction.isChatInputCommand()) return;
+
+    // Bloqueia se código inválido
+    if (!checkAccess(interaction)) return;
 
     const cmdName = interaction.commandName;
     stats.totalCommands++;
@@ -190,7 +197,21 @@ client.on("interactionCreate", async interaction => {
 
     console.log(C(`📝 Comando usado: ${cmdName} | Usuário: ${interaction.user.tag} | Servidor: ${interaction.guild?.name || "DM"}`));
 
-    // ---------------- INFO ----------------
+    // ---------------- /rules ----------------
+    if (cmdName === "rules") {
+        const embed = new EmbedBuilder()
+            .setTitle("Regras do HostVille Greenville RP")
+            .setColor("#00FFFF")
+            .setDescription(`As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.\n\n➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.\n\n━━━━━━━━━━━━━━━━━━━━\n\n📘 Para mais informações: [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)\n\n━━━━━━━━━━━━━━━━━━━━\n\n🔗 Documentos Oficiais\n📄 [Política de Privacidade](https://docs.google.com/document/d/1hoL-0AcJhrTXZAPIschLxoeF3kzAi7knTVPDXdT20nE/edit?usp=drivesdk)\n📜 [Termos de Uso](https://docs.google.com/document/d/1ZrScgrEAb7NnBGZW1XLQvBRaGIDrzatq8XBjlVyYP_k/edit?usp=drivesdk)\n\n━━━━━━━━━━━━━━━━━━━━\n✨ Powered by Y2k_Nat`)
+            .setThumbnail("https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png");
+
+        // Mensagem confirmando execução só para quem executou
+        await interaction.reply({ content: "✅ Comando executado com sucesso", flags: 64 });
+        // Embed enviado para todos no canal
+        await interaction.followUp({ embeds: [embed] });
+    }
+
+    // ---------------- /info ----------------
     if (cmdName === "info") {
         const embed = new EmbedBuilder()
             .setTitle("HostVille Bot")
@@ -198,102 +219,42 @@ client.on("interactionCreate", async interaction => {
             .setDescription("Bot oficial do servidor.")
             .addFields(
                 { name: "Uptime", value: Monitor.getUptime(), inline: true },
-                { name: "Ping", value: `${client.ws.ping}ms`, inline: true }
+                { name: "Ping", value: `${client.ws.ping}ms`, inline: true },
             );
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+
+        await interaction.reply({ embeds: [embed], flags: 64 });
     }
 
-    // ---------------- RULES ----------------
-    if (cmdName === "rules") {
-        // Mensagem privada de confirmação
-        await interaction.reply({ content: "✅ Comando executado com sucesso", ephemeral: true });
-
-        // Embed público com todas as regras
-        const embed = new EmbedBuilder()
-            .setTitle("Regras do HostVille Greenville RP")
-            .setColor("#00FFFF")
-            .setDescription(
-`As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
-
-➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
-
-━━━━━━━━━━━━━━━━━━━━
-
-📘 **Para mais informações sobre as regras, acesse o documento abaixo:**
-
-📚 [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)
-
-━━━━━━━━━━━━━━━━━━━━
-
-🔗 **Documentos Oficiais**
-
-📄 [Política de Privacidade](https://docs.google.com/document/d/1hoL-0AcJhrTXZAPIschLxoeF3kzAi7knTVPDXdT20nE/edit?usp=drivesdk)
-
-📜 [Termos de Uso](https://docs.google.com/document/d/1ZrScgrEAb7NnBGZW1XLQvBRaGIDrzatq8XBjlVyYP_k/edit?usp=drivesdk)
-
-━━━━━━━━━━━━━━━━━━━━
-✨ Powered by Y2k_Nat`
-            );
-        await interaction.channel.send({ embeds: [embed] });
-    }
-
-    // ---------------- RESTART ----------------
-    if (cmdName === "restart") {
-        const code = interaction.options.getString("code");
-        if (code !== ACCESS_CODE) return interaction.reply({ content: "❌ Código inválido", ephemeral: true });
-        await interaction.reply({ content: "♻️ Reiniciando bot...", ephemeral: true });
-        process.exit(0);
-    }
-
-    // ---------------- ADM ----------------
+    // ---------------- /adm ----------------
     if (cmdName === "adm") {
-        const code = interaction.options.getString("code");
-        if (code !== ACCESS_CODE) return interaction.reply({ content: "❌ Código inválido", ephemeral: true });
+        console.log(C(`🔒 Painel administrativo acessado por: ${interaction.user.tag}`));
 
-        // Painel ADM com dois botões
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId("adm_stats")
-                    .setLabel("Estatísticas")
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId("adm_report")
-                    .setLabel("Enviar relatórios para console")
-                    .setStyle(ButtonStyle.Secondary)
-            );
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("adm_stats").setLabel("Estatísticas").setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId("adm_report").setLabel("Enviar relatórios para console").setStyle(ButtonStyle.Secondary)
+        );
 
-        await interaction.reply({ content: "🔐 Painel acessado", components: [row], ephemeral: true });
-        console.log(C(`👑 Painel ADM acessado por ${interaction.user.tag}`));
-    }
-});
-
-// ================= BOTÕES ADM =================
-client.on("interactionCreate", async interaction => {
-    if (!interaction.isButton()) return;
-
-    if (interaction.customId === "adm_stats") {
-        await interaction.reply({ content: `📊 Estatísticas:\nComandos usados: ${stats.totalCommands}\nEntradas: ${stats.joins}\nSaídas: ${stats.leaves}`, ephemeral: true });
+        await interaction.reply({ content: "🔐 Painel acessado", components: [row], flags: 64 });
     }
 
-    if (interaction.customId === "adm_report") {
-        console.log(C("📄 Relatório completo do servidor:"));
-        console.log(stats);
-        logLast24HoursActivity();
-        await interaction.reply({ content: "✅ Relatório enviado para o console", ephemeral: true });
+    // ---------------- /restart ----------------
+    if (cmdName === "restart") {
+        process.exit(0);
     }
 });
 
 // ==================== REGISTRO DE TODOS COMANDOS ====================
 client.on("interactionCreate", async interaction => {
-    if(!interaction.isChatInputCommand()) return;
+    if (!interaction.isChatInputCommand()) return;
 
     // Registrar todos os comandos usados, inclusive de outros bots
     stats.totalCommands++;
     const cmdName = interaction.commandName;
     stats.commandsUsed[cmdName] = (stats.commandsUsed[cmdName] || 0) + 1;
 
-    console.log(C(`📝 Comando usado: ${cmdName} | Usuário: ${interaction.user.tag} | Servidor: ${interaction.guild?.name || "DM"}`));
+    console.log(
+        C(`📝 Comando usado: ${cmdName} | Usuário: ${interaction.user.tag} | Servidor: ${interaction.guild?.name || "DM"}`)
+    );
 });
 
 // ==================== LOGIN ====================
@@ -310,5 +271,5 @@ process.on("uncaughtException", err => {
     console.log(C(`❌ Exceção não capturada: ${err.message}`));
 });
 
-// ==================== FINALIZAÇÃO ====================
-console.log(C("✅ Bot iniciado com sucesso! Todos os comandos, regras, ADM e logs estão ativos."));
+// ==================== SUPRESSÃO DE WARNINGS ====================
+process.removeAllListeners("warning"); // Remove warnings de depreciação no console
