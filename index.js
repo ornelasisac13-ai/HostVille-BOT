@@ -9,6 +9,7 @@ const {
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1473705296101900420";
+const OWNER_ID = "1429525351897370625"; // ✅ ID CORRETO
 
 if (!TOKEN) {
     console.error("❌ TOKEN não definido!");
@@ -61,6 +62,14 @@ client.on('interactionCreate', async interaction => {
 
     // ========= /RULE =========
     if (interaction.commandName === 'rule') {
+
+        // 🔒 VERIFICAÇÃO DE DONO
+        if (interaction.user.id !== OWNER_ID) {
+            return interaction.reply({
+                content: "❌️ este comando só pode ser executado por Y2k_Nat",
+                flags: 64
+            });
+        }
 
         await interaction.deferReply({ flags: 64 });
 
