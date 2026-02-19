@@ -25,17 +25,13 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
-// ⏳ Cooldown 24h
-const cooldown = new Map();
-const COOLDOWN_TIME = 24 * 60 * 60 * 1000;
-
 // ========= COMANDOS =========
 const commands = [
     new SlashCommandBuilder()
         .setName('rule')
         .setDescription('Exibe as regras do servidor')
         .addStringOption(option =>
-            option.setName('codigo')
+            option.setName('code')
                 .setDescription('Digite o código de acesso')
                 .setRequired(true)
         ),
@@ -77,7 +73,7 @@ client.on('interactionCreate', async interaction => {
     // ========= /RULE =========
     if (interaction.commandName === 'rule') {
 
-        const codigoDigitado = interaction.options.getString('codigo');
+        const codigoDigitado = interaction.options.getString('code');
 
         // 🔐 Verifica código
         if (codigoDigitado !== ACCESS_CODE) {
@@ -86,27 +82,6 @@ client.on('interactionCreate', async interaction => {
                 flags: 64
             });
         }
-
-        const userId = interaction.user.id;
-        const now = Date.now();
-
-        // ⏳ Verifica cooldown
-        if (cooldown.has(userId)) {
-            const lastUsed = cooldown.get(userId);
-            const timeLeft = COOLDOWN_TIME - (now - lastUsed);
-
-            if (timeLeft > 0) {
-                const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-
-                return interaction.reply({
-                    content: `⏳ Você já usou este comando hoje.\nTente novamente em ${hours}h ${minutes}m.`,
-                    flags: 64
-                });
-            }
-        }
-
-        cooldown.set(userId, now);
 
         await interaction.deferReply({ flags: 64 });
 
