@@ -1,14 +1,6 @@
-const { 
-    Client, 
-    GatewayIntentBits, 
-    REST, 
-    Routes, 
-    SlashCommandBuilder,
-    EmbedBuilder
-} = require('discord.js');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import chalk from 'chalk';
+import os from 'os';
 
 // ==================== CONFIG ====================
 const TOKEN = process.env.TOKEN;
@@ -16,288 +8,195 @@ const CLIENT_ID = "1473705296101900420";
 const GUILD_ID = "928614664840052757";
 const ACCESS_CODE = process.env.ACCESS_CODE;
 
-// ==================== CORES ANSI ====================
-const C = {
-    reset: '\x1b[0m',
-    red: '\x1b[31m',
-    green: '\x1b[32m',
-    yellow: '\x1b[33m',
-    blue: '\x1b[34m',
-    magenta: '\x1b[35m',
-    cyan: '\x1b[36m',
-    white: '\x1b[37m',
-    gray: '\x1b[90m'
-};
+if (!TOKEN || !ACCESS_CODE) {
+  console.error(chalk.red("❌ TOKEN ou ACCESS_CODE não definido!"));
+  process.exit(1);
+}
 
-// ==================== ESTATÍSTICAS ====================
+// ==================== CLIENT ====================
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildPresences
+  ],
+  presence: { activities: [{ name: '/rule | /info | /restart', type: 0 }], status: 'online' }
+});
+
+// ==================== STATS ====================
 const stats = {
-    commandsUsed: {},
-    totalCommands: 0,
-    startTime: Date.now(),
-    restarts: 0,
-    errors: 0
+  totalCommands: 0,
+  commandsUsed: {},
+  errors: 0,
+  restarts: 0,
+  startTime: Date.now()
 };
 
 // ==================== LOGGER ====================
-const Logger = {
-    logFile: path.join(__dirname, 'bot.log'),
-
-    format: (type, msg, color) => {
-        const timestamp = new Date().toLocaleString('pt-BR');
-        const line = `[${timestamp}] ${type}: ${msg}`;
-        fs.appendFileSync(Logger.logFile, line + '\n');
-        return `${C.cyan}[${timestamp}]${C.reset} ${color}${type}:${C.reset} ${msg}`;
-    },
-
-    info: (msg) => console.log(Logger.format('ℹ️ INFO', msg, C.blue)),
-    success: (msg) => console.log(Logger.format('✅ OK', msg, C.green)),
-    warn: (msg) => console.log(Logger.format('⚠️ AVISO', msg, C.yellow)),
-    error: (msg, err = null) => {
-        stats.errors++;
-        console.log(Logger.format('❌ ERRO', msg, C.red));
-        if (err) console.log(`${C.gray}    └─ ${err.message || err}${C.reset}`);
-    },
-
-    cmd: (cmd, user, guild) => {
-        stats.totalCommands++;
-        stats.commandsUsed[cmd] = (stats.commandsUsed[cmd] || 0) + 1;
-        const guildText = guild ? ` em ${guild}` : '';
-        console.log(Logger.format('📝 CMD', `/${cmd} por ${user}${guildText}`, C.magenta));
-    },
-
-    ascii: (text) => console.log(`\n${C.cyan}╔════════════════════════════════════╗\n║  ${C.white}${text}${C.cyan}\n╚════════════════════════════════════╝${C.reset}\n`),
-
-    line: () => console.log(C.gray + '─────────────────────────────────────' + C.reset)
-};
+function logInfo(msg) { console.log(chalk.cyan(`[INFO] ${msg}`)); }
+function logSuccess(msg) { console.log(chalk.green(`[OK] ${msg}`)); }
+function logWarn(msg) { console.log(chalk.yellow(`[WARN] ${msg}`)); }
+function logError(msg) { stats.errors++; console.log(chalk.red(`[ERRO] ${msg}`)); }
+function logCmd(cmd, user, guild) {
+  stats.totalCommands++;
+  stats.commandsUsed[cmd] = (stats.commandsUsed[cmd] || 0) + 1;
+  console.log(chalk.magenta(`[CMD] /${cmd} por ${user}${guild ? ` em ${guild}` : ''}`));
+}
 
 // ==================== MONITOR ====================
-const Monitor = {
-    getMemory: () => {
-        const m = process.memoryUsage();
-        return {
-            rss: (m.rss / 1024 / 1024).toFixed(2),
-            heapUsed: (m.heapUsed / 1024 / 1024).toFixed(2),
-            heapTotal: (m.heapTotal / 1024 / 1024).toFixed(2)
-        };
-    },
+function getMemory() {
+  const m = process.memoryUsage();
+  return { rss: (m.rss / 1024 / 1024).toFixed(2), heapUsed: (m.heapUsed / 1024 / 1024).toFixed(2), heapTotal: (m.heapTotal / 1024 / 1024).toFixed(2) };
+}
 
-    getUptime: () => {
-        const ms = Date.now() - stats.startTime;
-        const d = Math.floor(ms / 86400000);
-        const h = Math.floor((ms % 86400000) / 3600000);
-        const m = Math.floor((ms % 3600000) / 60000);
-        const s = Math.floor((ms % 60000) / 1000);
-        return `${d}d ${h}h ${m}m ${s}s`;
-    },
+function getCPU() {
+  const cpus = os.cpus();
+  let idle = 0, total = 0;
+  cpus.forEach(cpu => { for (const type in cpu.times) total += cpu.times[type]; idle += cpu.times.idle; });
+  return { cores: cpus.length, usage: (100 - (idle / total * 100)).toFixed(1) };
+}
 
-    status: () => {
-        const mem = Monitor.getMemory();
-        console.log(`
-${C.cyan}┌─── 📊 MONITORAMENTO${C.reset}
-│  💾 RAM: ${C.white}${mem.rss} MB${C.reset} (Heap: ${mem.heapUsed}/${mem.heapTotal} MB)
-│  ⏱️  Uptime: ${C.white}${Monitor.getUptime()}${C.reset}
-└─────────────────────────────────${C.reset}
-`);
-    }
-};
+function getUptime() {
+  const ms = Date.now() - stats.startTime;
+  const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000);
+  return `${d}d ${h}h ${m}m ${s}s`;
+}
 
-// ==================== CLIENTE ====================
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildPresences
-    ],
-    presence: {
-        status: 'online',
-        activities: [{ name: '/rule | /info | /help', type: 0 }]
-    }
-});
+// ==================== ASCII ART ====================
+function showAscii() {
+  console.clear();
+  console.log(chalk.cyan(`╔════════════════════════════════════╗`));
+  console.log(chalk.cyan(`║`) + chalk.white(`  HostVille • BOT`) + chalk.cyan(` ║`));
+  console.log(chalk.cyan(`╚════════════════════════════════════╝`));
+}
 
 // ==================== COMANDOS SLASH ====================
 const commands = [
-    new SlashCommandBuilder()
-        .setName('rule')
-        .setDescription('Exibe as regras do servidor')
-        .addStringOption(o => o.setName('code').setDescription('Código de acesso').setRequired(true)),
-
-    new SlashCommandBuilder()
-        .setName('info')
-        .setDescription('Informações do bot'),
-
-    new SlashCommandBuilder()
-        .setName('stats')
-        .setDescription('Estatísticas do bot')
-        .setDefaultMemberPermissions(0),
-
-    new SlashCommandBuilder()
-        .setName('ping')
-        .setDescription('Testa a latência'),
-
-    new SlashCommandBuilder()
-        .setName('server')
-        .setDescription('Informações do servidor'),
-
-    new SlashCommandBuilder()
-        .setName('restart')
-        .setDescription('Reinicia o bot')
-        .setDefaultMemberPermissions(0)
+  new SlashCommandBuilder().setName('rule').setDescription('Exibe as regras do servidor')
+    .addStringOption(o => o.setName('code').setDescription('Código de acesso').setRequired(true)),
+  new SlashCommandBuilder().setName('info').setDescription('Mostra informações do bot'),
+  new SlashCommandBuilder().setName('restart').setDescription('Reinicia o bot').addStringOption(o => o.setName('code').setDescription('Código de acesso').setRequired(true))
 ].map(c => c.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 async function registerCommands() {
-    try {
-        await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
-        Logger.success(`Comandos registrados: ${commands.map(c => c.name).join(', ')}`);
-    } catch (error) {
-        Logger.error('Erro ao registrar comandos', error);
-    }
+  try {
+    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+    logSuccess('Comandos registrados no servidor!');
+  } catch (err) { logError('Erro ao registrar comandos: ' + err); }
 }
 
-// ==================== READY EVENT ====================
+// ==================== CLIENT READY ====================
 client.once('clientReady', async () => {
-    Logger.ascii(`Bem-vindo, Isac!`);
-    Logger.info(stats.errors === 0 ? '✅ Seu bot está sem erros!' : `⚠️ Seu bot possui ${stats.errors} erro(s)`);
-    Logger.line();
+  showAscii();
+  logSuccess('🤖 BOT ONLINE');
+  logInfo(`Tag: ${client.user.tag}`);
+  logInfo(`ID: ${client.user.id}`);
+  logInfo(`Bem-vindo Isac!`);
+  logInfo(`Seu bot está com ${stats.errors} erros.`);
 
-    Logger.info(`🤖 Bot online: ${client.user.tag}`);
-    Logger.info(`🆔 ID: ${client.user.id}`);
-    Logger.info(`👥 Servidores: ${client.guilds.cache.size}`);
-    Logger.info(`💬 Canais: ${client.channels.cache.size}`);
-    Logger.info(`⏱️ Uptime: ${Monitor.getUptime()}`);
-    Logger.info(`💾 RAM usada: ${Monitor.getMemory().rss} MB`);
-    Logger.info(`⚡ Ping: ${client.ws.ping} ms`);
-    Logger.line();
+  await registerCommands();
 
-    console.log(`
-${C.cyan}╔════════════════════════════════════════╗
-║                                        ║
-║        ${C.white}H O S T V I L L E • B O T${C.cyan}        ║
-║                                        ║
-╚════════════════════════════════════════╝
-${C.reset}
-`);
-
-    registerCommands();
-
-    // Atualização RAM/ping a cada 6h
-    setInterval(() => {
-        const mem = Monitor.getMemory();
-        Logger.info(`💾 RAM usada: ${mem.rss} MB | ⚡ Ping: ${client.ws.ping} ms`);
-    }, 6 * 60 * 60 * 1000);
+  // Monitor automático a cada 6h
+  setInterval(() => {
+    const mem = getMemory();
+    logInfo(`RAM usada: ${mem.rss} MB | Ping: ${client.ws.ping}ms`);
+  }, 6 * 60 * 60 * 1000); // 6h
 });
 
-// ==================== EVENTS ====================
-
-// Membros entram
-client.on('guildMemberAdd', member => {
-    console.log(`👋 Novo membro entrou: ${member.user.tag} | Total: ${member.guild.memberCount}`);
-});
-
-// Membros saem
-client.on('guildMemberRemove', member => {
-    console.log(`👋 Membro saiu: ${member.user.tag} | Total restante: ${member.guild.memberCount}`);
-});
-
-// Mensagem deletada
-client.on('messageDelete', async message => {
-    if (message.partial) await message.fetch().catch(() => null);
-    if (!message || message.author?.bot) return;
-
-    let deletedBy = 'Desconhecido';
-    try {
-        const logs = await message.guild.fetchAuditLogs({ limit: 1, type: 72 });
-        const entry = logs.entries.first();
-        if (entry && entry.target.id === message.author.id && (Date.now() - entry.createdTimestamp) < 5000) {
-            deletedBy = entry.executor.tag;
-        }
-    } catch {
-        deletedBy = 'Desconhecido';
-    }
-
-    console.log(`${C.red}❗️ ${deletedBy} apagou uma mensagem de ${message.author.tag}:${C.reset} "${message.content}"`);
-});
-
-// Mensagens criadas (log de comandos e mensagens)
-client.on('messageCreate', message => {
-    if (message.author.bot) return;
-    console.log(`${C.green}💬 Nova mensagem de ${message.author.tag}:${C.reset} "${message.content}"`);
-});
-
-// Comandos
+// ==================== INTERACTIONS ====================
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-    const { commandName, user, guild } = interaction;
-    Logger.cmd(commandName, user.tag, guild?.name);
+  if (!interaction.isChatInputCommand()) return;
 
-    try {
-        if (commandName === 'rule') {
-            const code = interaction.options.getString('code');
-            if (code !== ACCESS_CODE) return interaction.reply({ content: "❌ Código inválido!", flags: 64 });
+  const { commandName, user, guild } = interaction;
+  logCmd(commandName, user.tag, guild?.name);
 
-            await interaction.deferReply({ flags: 64 });
-            const embed = new EmbedBuilder()
-                .setColor(0x89CFF0)
-                .setTitle("📜 Regras - HostVille Greenville RP")
-                .setDescription("As regras gerais e links oficiais...")
-                .setImage("https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png");
+  // ========= /RULE =========
+  if (commandName === 'rule') {
+    const code = interaction.options.getString('code');
+    if (code !== ACCESS_CODE) return interaction.reply({ content: "❌ Código inválido!", flags: 64 });
 
-            await interaction.channel.send({ embeds: [embed] });
-            await interaction.deleteReply();
-        }
+    await interaction.deferReply({ flags: 64 });
 
-        if (commandName === 'info') {
-            const members = guild.members.cache;
-            const online = members.filter(m => m.presence?.status === 'online').size;
-            const offline = members.size - online;
+    const embed = new EmbedBuilder()
+      .setColor(0x89CFF0)
+      .setTitle("📜 Regras - HostVille Greenville RP")
+      .setDescription(`
+As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
 
-            const embed = new EmbedBuilder()
-                .setColor(0x89CFF0)
-                .setTitle("🤖 Informações do Bot")
-                .addFields(
-                    { name: "Nome", value: client.user.tag, inline: true },
-                    { name: "ID", value: client.user.id, inline: true },
-                    { name: "Servidores", value: `${client.guilds.cache.size}`, inline: true },
-                    { name: "Membros Online", value: `${online}`, inline: true },
-                    { name: "Membros Offline", value: `${offline}`, inline: true },
-                    { name: "Ping", value: `${client.ws.ping}ms`, inline: true },
-                    { name: "Uptime", value: Monitor.getUptime(), inline: true }
-                )
-                .setFooter({ text: "HostVille Greenville RP" })
-                .setTimestamp();
+➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
 
-            await interaction.reply({ embeds: [embed], flags: 64 });
-        }
+━━━━━━━━━━━━━━━━━━━━
 
-        if (commandName === 'restart') {
-            Logger.warn('Reiniciando bot...');
-            stats.restarts++;
-            await interaction.reply({ content: '♻️ Reiniciando...', flags: 64 });
-            client.destroy();
-            setTimeout(() => client.login(TOKEN), 3000);
-        }
+📘 **Para mais informações sobre as regras, acesse o documento abaixo:**
 
-        if (commandName === 'ping') {
-            const msg = await interaction.reply({ content: '🏓 Pong!', flags: 64, fetchReply: true });
-            const ping = msg.createdTimestamp - interaction.createdTimestamp;
-            await interaction.editReply(`🏓 Pong! | Latência: ${ping}ms | API: ${client.ws.ping}ms`);
-        }
-    } catch (error) {
-        Logger.error(`Erro ao executar comando ${commandName}`, error);
-    }
+📚 [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)
+
+━━━━━━━━━━━━━━━━━━━━
+
+🔗 **Documentos Oficiais**
+
+📄 [Política de Privacidade](https://docs.google.com/document/d/1hoL-0AcJhrTXZAPIschLxoeF3kzAi7knTVPDXdT20nE/edit?usp=drivesdk)
+
+📜 [Termos de Uso](https://docs.google.com/document/d/1ZrScgrEAb7NnBGZW1XLQvBRaGIDrzatq8XBjlVyYP_k/edit?usp=drivesdk)
+
+━━━━━━━━━━━━━━━━━━━━
+✨ Powered by Y2k_Nat
+`)
+      .setImage("https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png");
+
+    await interaction.channel.send({ embeds: [embed] });
+    await interaction.deleteReply();
+  }
+
+  // ========= /INFO =========
+  if (commandName === 'info') {
+    const online = guild.members.cache.filter(m => m.presence?.status !== 'offline').size;
+    const offline = guild.memberCount - online;
+
+    const embed = new EmbedBuilder()
+      .setColor(0x89CFF0)
+      .setTitle("🤖 Informações do Bot")
+      .addFields(
+        { name: "Nome", value: client.user.tag, inline: true },
+        { name: "ID", value: client.user.id, inline: true },
+        { name: "Servidores", value: `${client.guilds.cache.size}`, inline: true },
+        { name: "Online", value: `${online}`, inline: true },
+        { name: "Offline", value: `${offline}`, inline: true },
+        { name: "Ping", value: `${client.ws.ping}ms`, inline: true },
+        { name: "Uptime", value: getUptime(), inline: true }
+      )
+      .setFooter({ text: "HostVille Greenville RP" });
+
+    await interaction.reply({ embeds: [embed], flags: 64 });
+  }
+
+  // ========= /RESTART =========
+  if (commandName === 'restart') {
+    const code = interaction.options.getString('code');
+    if (code !== ACCESS_CODE) return interaction.reply({ content: "❌ Código inválido!", flags: 64 });
+
+    await interaction.reply({ content: "⚠️ Reiniciando bot...", flags: 64 });
+    stats.restarts++;
+    client.destroy();
+    setTimeout(() => client.login(TOKEN), 3000);
+  }
 });
 
-// ==================== ERROS ====================
-process.on('unhandledRejection', reason => Logger.error('Rejeição não tratada', reason));
-process.on('uncaughtException', error => Logger.error('Exceção não capturada', error));
+// ==================== EVENTOS ====================
+client.on('guildMemberAdd', member => logInfo(`👋 ${member.user.tag} entrou no servidor (${member.guild.name})`));
+client.on('guildMemberRemove', member => logWarn(`👋 ${member.user.tag} saiu do servidor (${member.guild.name})`));
 
-// ==================== LOGIN ====================
-if (!TOKEN || !ACCESS_CODE) {
-    Logger.error('TOKEN ou ACCESS_CODE não definidos!');
-    process.exit(1);
-}
+client.on('messageDelete', message => {
+  if (message.author.bot) return;
+  logWarn(`❗️ ${message.author.tag} apagou uma mensagem: "${message.content}"`);
+});
 
 client.login(TOKEN);
+
+process.on('unhandledRejection', reason => logError(`Rejeição não tratada: ${reason}`));
+process.on('uncaughtException', err => logError(`Exceção não tratada: ${err}`));
