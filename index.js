@@ -1,45 +1,46 @@
-import { 
-    Client, 
-    GatewayIntentBits, 
-    REST, 
-    Routes, 
-    SlashCommandBuilder, 
-    EmbedBuilder 
-} from 'discord.js';
+import {
+    Client,
+    GatewayIntentBits,
+    REST,
+    Routes,
+    SlashCommandBuilder,
+    EmbedBuilder,
+    AuditLogEvent
+} from "discord.js";
 
-import chalk from 'chalk';
-import os from 'os';
-import process from 'process';
+import chalk from "chalk";
+import os from "os";
+import process from "process";
 
-// ==================== CONFIG ====================
+/* ================= CONFIG ================= */
+
 const TOKEN = process.env.TOKEN;
+const ACCESS_CODE = process.env.ACCESS_CODE;
 const CLIENT_ID = "1473705296101900420";
 const GUILD_ID = "928614664840052757";
-const ACCESS_CODE = process.env.ACCESS_CODE;
 
-if (!TOKEN) {
-    console.log("TOKEN não definido.");
-    process.exit(1);
-}
+if (!TOKEN) process.exit(1);
+if (!ACCESS_CODE) process.exit(1);
 
-if (!ACCESS_CODE) {
-    console.log("ACCESS_CODE não definido.");
-    process.exit(1);
-}
+/* ================= ESTATÍSTICAS ================= */
 
-// ==================== ESTATÍSTICAS ====================
 const stats = {
-    commandsUsed: {},
-    totalCommands: 0,
     startTime: Date.now(),
+    totalCommands: 0,
+    commandsUsed: {},
     restarts: 0,
-    errors: 0
+    errors: 0,
+    joins: 0,
+    leaves: 0,
+    deletedMessages: 0
 };
 
-// ==================== ESTILO ====================
-const C = chalk.hex('#00FFFF'); // CIANO REAL FUNCIONANDO
+/* ================= COR ================= */
 
-// ==================== CLIENT ====================
+const C = chalk.hex("#00FFFF");
+
+/* ================= CLIENT ================= */
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -50,10 +51,15 @@ const client = new Client({
     ]
 });
 
-// ==================== MONITOR ====================
-function getMemory() {
-    const m = process.memoryUsage();
-    return (m.rss / 1024 / 1024).toFixed(2);
+/* ================= UTIL ================= */
+
+function getRAM() {
+    return (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
+}
+
+function getCPU() {
+    const cpus = os.cpus();
+    return cpus.length;
 }
 
 function getUptime() {
@@ -64,57 +70,44 @@ function getUptime() {
     return `${h}h ${m}m ${s}s`;
 }
 
-function consoleBanner() {
+function banner() {
     console.clear();
-
     console.log(C("══════════════════════════════════════════════════════"));
-    console.log(C.bold("            ＨｏｓｔＶｉｌｌｅ • ＢＯＴ"));
+    console.log(C.bold("ＨｏｓｔＶｉｌｌｅ • ＢＯＴ"));
     console.log(C("══════════════════════════════════════════════════════"));
-
-    console.log(C("👤 Usuário: Isac"));
-    console.log(C("📅 Data: " + new Date().toLocaleDateString("pt-BR")));
-    console.log(C("⏰ Hora: " + new Date().toLocaleTimeString("pt-BR")));
-    console.log(C("══════════════════════════════════════════════════════"));
-
-    console.log(C(`💾 RAM: ${getMemory()} MB`));
-    console.log(C(`⏱️ Uptime: ${getUptime()}`));
-    console.log(C(`❌ Erros: ${stats.errors === 0 ? "Seu bot está sem erros" : stats.errors}`));
-
+    console.log(C(`💾 RAM: ${getRAM()} MB`));
+    console.log(C(`🖥 CPU Cores: ${getCPU()}`));
+    console.log(C(`📡 Ping: ${client.ws.ping}ms`));
+    console.log(C(`⏱ Uptime: ${getUptime()}`));
+    console.log(C(`👥 Entradas: ${stats.joins} | Saídas: ${stats.leaves}`));
+    console.log(C(`🗑 Mensagens apagadas: ${stats.deletedMessages}`));
+    console.log(C(`❌ Erros: ${stats.errors === 0 ? "Sem erros" : stats.errors}`));
     console.log(C("══════════════════════════════════════════════════════\n"));
 }
 
-// Atualiza monitor a cada 6 horas
-setInterval(() => {
-    consoleBanner();
-}, 21600000);
+/* ================= COMANDOS ================= */
 
-// ==================== COMANDOS ====================
 const commands = [
     new SlashCommandBuilder()
-        .setName('rule')
-        .setDescription('Exibe as regras')
-        .addStringOption(option =>
-            option.setName('code')
-                .setDescription('Código de acesso')
-                .setRequired(true)
+        .setName("rule")
+        .setDescription("Exibe as regras")
+        .addStringOption(opt =>
+            opt.setName("code").setDescription("Código").setRequired(true)
         ),
 
     new SlashCommandBuilder()
-        .setName('info')
-        .setDescription('Informações do bot'),
+        .setName("info")
+        .setDescription("Informações do bot"),
 
     new SlashCommandBuilder()
-        .setName('restart')
-        .setDescription('Reinicia o bot')
-        .addStringOption(option =>
-            option.setName('code')
-                .setDescription('Código de acesso')
-                .setRequired(true)
+        .setName("restart")
+        .setDescription("Reinicia o bot")
+        .addStringOption(opt =>
+            opt.setName("code").setDescription("Código").setRequired(true)
         )
-
 ].map(cmd => cmd.toJSON());
 
-const rest = new REST({ version: '10' }).setToken(TOKEN);
+const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 async function registerCommands() {
     await rest.put(
@@ -123,97 +116,153 @@ async function registerCommands() {
     );
 }
 
-// ==================== READY ====================
-client.once('clientReady', async () => {
-    consoleBanner();
-    console.log(C("🤖 Bot conectado como " + client.user.tag));
+/* ================= READY ================= */
+
+client.once("clientReady", async () => {
+    banner();
     await registerCommands();
 });
 
-// ==================== EVENTOS ====================
+/* ================= MONITOR AUTOMÁTICO ================= */
 
-// Membro entrou
-client.on('guildMemberAdd', member => {
-    console.log(C(`➕ ${member.user.tag} entrou no servidor.`));
+setInterval(() => {
+    banner();
+}, 3600000);
+
+/* ================= EVENTOS ================= */
+
+// Entrou
+client.on("guildMemberAdd", member => {
+    stats.joins++;
+    console.log(C(`➕ ${member.user.tag} entrou.`));
 });
 
-// Membro saiu
-client.on('guildMemberRemove', member => {
-    console.log(C(`➖ ${member.user.tag} saiu do servidor.`));
+// Saiu
+client.on("guildMemberRemove", member => {
+    stats.leaves++;
+    console.log(C(`➖ ${member.user.tag} saiu.`));
 });
 
-// Mensagem apagada
-client.on('messageDelete', message => {
-    if (!message.author) return;
-    console.log(C(`❗️ ${message.author.tag} apagou uma mensagem: ${message.content}`));
+// Mensagem apagada com executor
+client.on("messageDelete", async message => {
+    if (!message.guild || !message.author) return;
+
+    stats.deletedMessages++;
+
+    try {
+        const logs = await message.guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.MessageDelete
+        });
+
+        const entry = logs.entries.first();
+        if (!entry) return;
+
+        const { executor } = entry;
+
+        console.log(C(
+            `🗑 ${executor.tag} apagou mensagem de ${message.author.tag}: ${message.content}`
+        ));
+    } catch {
+        console.log(C(`🗑 ${message.author.tag} apagou: ${message.content}`));
+    }
 });
 
-// ==================== INTERAÇÕES ====================
-client.on('interactionCreate', async interaction => {
+// Detectar tentativa de comando manual
+client.on("messageCreate", msg => {
+    if (msg.author.bot) return;
+    if (msg.content.startsWith("/")) {
+        console.log(C(`📡 ${msg.author.tag} digitou: ${msg.content}`));
+    }
+});
+
+/* ================= INTERAÇÕES ================= */
+
+client.on("interactionCreate", async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     stats.totalCommands++;
     stats.commandsUsed[interaction.commandName] =
         (stats.commandsUsed[interaction.commandName] || 0) + 1;
 
-    console.log(C(`📌 /${interaction.commandName} usado por ${interaction.user.tag}`));
+    console.log(C(`📌 /${interaction.commandName} por ${interaction.user.tag}`));
 
-    // RULE
-    if (interaction.commandName === 'rule') {
-        const code = interaction.options.getString('code');
-
-        if (code !== ACCESS_CODE) {
-            return interaction.reply({ content: "Código inválido.", ephemeral: true });
-        }
+    if (interaction.commandName === "rule") {
+        const code = interaction.options.getString("code");
+        if (code !== ACCESS_CODE)
+            return interaction.reply({ content: "Código inválido", ephemeral: true });
 
         const embed = new EmbedBuilder()
             .setColor(0x00FFFF)
-            .setTitle("📜 Regras - HostVille Greenville RP")
-            .setDescription("Acesse o documento oficial abaixo.")
+            .setTitle("📜 Regras - HostVille")
+            .setDescription("Documento oficial abaixo.")
             .setImage("https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png");
 
         await interaction.reply({ embeds: [embed] });
     }
 
-    // INFO
-    if (interaction.commandName === 'info') {
+    if (interaction.commandName === "info") {
         const embed = new EmbedBuilder()
             .setColor(0x00FFFF)
-            .setTitle("🤖 Informações do Bot")
+            .setTitle("🤖 Informações")
             .addFields(
-                { name: "Servidores", value: `${client.guilds.cache.size}`, inline: true },
                 { name: "Ping", value: `${client.ws.ping}ms`, inline: true },
-                { name: "RAM", value: `${getMemory()} MB`, inline: true },
+                { name: "RAM", value: `${getRAM()} MB`, inline: true },
                 { name: "Uptime", value: getUptime(), inline: true }
             );
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    // RESTART
-    if (interaction.commandName === 'restart') {
-        const code = interaction.options.getString('code');
-
-        if (code !== ACCESS_CODE) {
-            return interaction.reply({ content: "Código inválido.", ephemeral: true });
-        }
+    if (interaction.commandName === "restart") {
+        const code = interaction.options.getString("code");
+        if (code !== ACCESS_CODE)
+            return interaction.reply({ content: "Código inválido", ephemeral: true });
 
         await interaction.reply({ content: "Reiniciando...", ephemeral: true });
         stats.restarts++;
-        process.exit(0); // Railway reinicia automaticamente
+        process.exit(0);
     }
 });
 
-// ==================== ERROS ====================
-process.on('unhandledRejection', err => {
+/* ================= ANTI-CRASH ================= */
+
+process.on("unhandledRejection", err => {
     stats.errors++;
-    console.log(C("Erro não tratado: " + err));
+    console.log(C("⚠ Unhandled Rejection"));
+    console.log(err);
 });
 
-process.on('uncaughtException', err => {
+process.on("uncaughtException", err => {
     stats.errors++;
-    console.log(C("Exceção não tratada: " + err));
+    console.log(C("💥 Uncaught Exception"));
+    console.log(err);
 });
 
-// ==================== LOGIN ====================
+process.on("warning", warn => {
+    console.log(C("⚠ Warning: " + warn.name));
+});
+
+/* ================= RATE LIMIT ================= */
+
+client.rest.on("rateLimited", info => {
+    console.log(C(`🚨 Rate Limit: ${info.timeout}ms`));
+});
+
+/* ================= RECONNECT ================= */
+
+client.on("shardDisconnect", () => {
+    console.log(C("🔌 Desconectado."));
+});
+
+client.on("shardReconnecting", () => {
+    console.log(C("♻ Reconectando..."));
+});
+
+client.on("shardReady", () => {
+    console.log(C("✅ Reconectado."));
+});
+
+/* ================= LOGIN ================= */
+
 client.login(TOKEN);
