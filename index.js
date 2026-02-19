@@ -110,7 +110,7 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
 ━━━━━━━━━━━━━━━━━━━━
 ✨ Powered by Y2k_Nat
 `)
-            .setImage("https://image2url.com/r2/default/images/1771465538216-c9d66778-4649-4b72-a664-684311eeaed4.png");
+            .setImage("https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png");
 
         await interaction.channel.send({ embeds: [embed] });
         await interaction.deleteReply();
