@@ -259,4 +259,21 @@ As regras gerais tÃªm como objetivo garantir a ordem, o respeito e a boa convivÃ
 
 // ==================== EVENTOS ====================
 client.on('guildMemberAdd', member => log.memberJoin(member.user.tag, member.guild.name));
-client.on('guildMemberRemove', member => log.memberLeave(member
+client.on('guildMemberRemove', member => log.memberLeave(member.user.tag, member.guild.name));
+client.on('messageDelete', msg => {
+  if (msg.author?.bot) return;
+  log.msgDelete(msg.author?.tag, msg.content, msg.guild?.name);
+});
+client.on('messageUpdate', (oldMsg, newMsg) => {
+  if (oldMsg.author?.bot || oldMsg.content === newMsg.content) return;
+  log.msgEdit(oldMsg.author?.tag, oldMsg.content, newMsg.content, oldMsg.guild?.name);
+});
+client.on('guildBanAdd', (guild, user) => log.ban(user.tag, "Sem motivo", guild.name));
+client.on('guildBanRemove', (guild, user) => log.unban(user.tag, guild.name));
+
+// ==================== MONITORAMENTO ====================
+setInterval(() => {
+  const mem = getMemory();
+  const cpu = getCPU();
+  log.info(`Monitor: RAM ${mem.heapUsed}MB | CPU ${cpu.usage}% | Ping ${client.ws.ping}ms`);
+}, 30
