@@ -1,171 +1,267 @@
-import { 
-    Client, 
-    GatewayIntentBits, 
-    REST, 
-    Routes, 
-    SlashCommandBuilder, 
+import {
+    Client,
+    GatewayIntentBits,
+    REST,
+    Routes,
+    SlashCommandBuilder,
     EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
     PermissionFlagsBits
 } from "discord.js";
 
 import chalk from "chalk";
+import os from "os";
 import process from "process";
 
-// ================= CONFIG =================
+/* =====================================================
+   CONFIGURAÇÃO
+===================================================== */
+
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1473705296101900420";
 const GUILD_ID = "928614664840052757";
 const ACCESS_CODE = process.env.ACCESS_CODE;
 
-// ================= COR FIXA =================
-const C = chalk.cyanBright;
+if (!TOKEN) {
+    console.error("TOKEN não definido.");
+    process.exit(1);
+}
 
-// ================= ESTATÍSTICAS =================
+if (!ACCESS_CODE) {
+    console.error("ACCESS_CODE não definido.");
+    process.exit(1);
+}
+
+/* =====================================================
+   ESTATÍSTICAS GLOBAIS
+===================================================== */
+
 const stats = {
-    commandsUsed: {},
-    totalCommands: 0,
     startTime: Date.now(),
-    restarts: 0,
+    totalCommands: 0,
     errors: 0,
     joins: 0,
-    leaves: 0
+    leaves: 0,
+    deletedMessages: 0,
+    panelAccess: 0
 };
 
-// ================= HISTÓRICO EM MEMÓRIA =================
+/* =====================================================
+   HISTÓRICO 24H
+===================================================== */
+
 const activityHistory = [];
 
-// ================= MONITOR =================
+/* =====================================================
+   LOGGER EMPRESARIAL
+===================================================== */
+
+const C = chalk.cyanBright;
+const G = chalk.greenBright;
+const R = chalk.redBright;
+const Y = chalk.yellowBright;
+const M = chalk.magentaBright;
+const W = chalk.white;
+
+function line() {
+    console.log(C("════════════════════════════════════════════════════════════"));
+}
+
+function logInfo(message) {
+    console.log(C("ℹ️  INFO  ") + W(message));
+}
+
+function logSuccess(message) {
+    console.log(G("✅ SUCCESS ") + W(message));
+}
+
+function logError(message) {
+    stats.errors++;
+    console.log(R("❌ ERROR  ") + W(message));
+}
+
+function logWarn(message) {
+    console.log(Y("⚠️  WARN   ") + W(message));
+}
+
+function logCommand(user, command) {
+    console.log(M("📝 COMMAND ") + W(`${user} executou /${command}`));
+}
+
+function logJoin(user) {
+    console.log(G("➕ JOIN    ") + W(user));
+}
+
+function logLeave(user) {
+    console.log(R("➖ LEAVE   ") + W(user));
+}
+
+function logDelete(user, content) {
+    console.log(Y("🗑 DELETE  ") + W(`${user} apagou: ${content}`));
+}
+
+/* =====================================================
+   MONITORAMENTO
+===================================================== */
+
 const Monitor = {
-    getMemory() {
+    memory() {
         const m = process.memoryUsage();
-        return {
-            rss: (m.rss / 1024 / 1024).toFixed(2),
-            heapUsed: (m.heapUsed / 1024 / 1024).toFixed(2)
-        };
+        return (m.rss / 1024 / 1024).toFixed(2);
     },
 
-    getUptime() {
+    uptime() {
         const ms = Date.now() - stats.startTime;
         const h = Math.floor(ms / 3600000);
         const m = Math.floor((ms % 3600000) / 60000);
         const s = Math.floor((ms % 60000) / 1000);
         return `${h}h ${m}m ${s}s`;
+    },
+
+    cpu() {
+        const cpus = os.cpus();
+        return cpus.length;
     }
 };
 
-// ================= HORÁRIO BRASÍLIA =================
-function getBrasiliaTime() {
+/* =====================================================
+   HORÁRIO BRASÍLIA
+===================================================== */
+
+function brasiliaNow() {
     return new Date().toLocaleString("pt-BR", {
         timeZone: "America/Sao_Paulo"
     });
 }
 
-// ================= LOG ESTRUTURADO =================
-function structuredLog(type, message) {
-    console.log(C("════════════════════════════════════════════"));
-    console.log(C(`[${type}] ${getBrasiliaTime()}`));
-    console.log(C(message));
-    console.log(C("════════════════════════════════════════════"));
-}
+/* =====================================================
+   RELATÓRIO 24H
+===================================================== */
 
-// ================= RELATÓRIO 24H =================
-function logLast24HoursActivity() {
+function reportLast24Hours() {
     const now = Date.now();
-    const last24h = 24 * 60 * 60 * 1000;
+    const limit = 24 * 60 * 60 * 1000;
 
-    const recent = activityHistory.filter(a => now - a.timestamp <= last24h);
+    const recent = activityHistory.filter(a => now - a.timestamp <= limit);
 
     const joins = recent.filter(a => a.type === "join");
     const leaves = recent.filter(a => a.type === "leave");
 
-    structuredLog(
-        "RELATÓRIO 24H",
-        joins.length === 0
-            ? "Não entrou ninguém no servidor nas últimas 24 horas"
-            : `Entraram (${joins.length}) no servidor nas últimas 24 horas, sendo elas: ${joins.map(j => j.tag).join(", ")}`
-    );
+    line();
+    console.log(C("🕒 Horário Brasília: ") + W(brasiliaNow()));
 
-    if (leaves.length > 0) {
-        console.log(C(`Saíram (${leaves.length}) nas últimas 24 horas: ${leaves.map(l => l.tag).join(", ")}`));
+    if (joins.length === 0) {
+        console.log(C("Não entrou ninguém nas últimas 24 horas."));
+    } else {
+        console.log(
+            C(`Entraram (${joins.length}) nas últimas 24h: `) +
+            W(joins.map(j => j.tag).join(", "))
+        );
     }
+
+    if (leaves.length === 0) {
+        console.log(C("Não saiu ninguém nas últimas 24 horas."));
+    } else {
+        console.log(
+            C(`Saíram (${leaves.length}) nas últimas 24h: `) +
+            W(leaves.map(l => l.tag).join(", "))
+        );
+    }
+
+    line();
 }
 
-// ================= CLIENT =================
+/* =====================================================
+   CLIENT DISCORD
+===================================================== */
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildPresences
     ]
 });
 
-// ================= READY =================
-client.once("ready", async () => {
+/* =====================================================
+   EVENTO READY
+===================================================== */
+
+client.once("ready", () => {
     console.clear();
-    structuredLog("BOOT", "ＨｏｓｔＶｉｌｌｅ • ＢＯＴ iniciado");
+    line();
+    console.log(C("ＨｏｓｔＶｉｌｌｅ • ＢＯＴ"));
+    console.log(C("Logado como: ") + W(client.user.tag));
+    console.log(C("Ping: ") + W(client.ws.ping + "ms"));
+    console.log(C("RAM: ") + W(Monitor.memory() + " MB"));
+    console.log(C("CPU Cores: ") + W(Monitor.cpu()));
+    line();
 
-    console.log(C(`Logado como ${client.user.tag}`));
-    console.log(C(`Ping: ${client.ws.ping}ms`));
-    console.log(C(`Memória: ${Monitor.getMemory().rss} MB`));
-
-    logLast24HoursActivity();
+    reportLast24Hours();
 
     setInterval(() => {
-        logLast24HoursActivity();
+        reportLast24Hours();
     }, 60 * 60 * 1000);
 });
 
-// ================= ENTRADA =================
+/* =====================================================
+   EVENTOS DE SERVIDOR
+===================================================== */
+
 client.on("guildMemberAdd", member => {
     stats.joins++;
+
     activityHistory.push({
         type: "join",
         tag: member.user.tag,
         timestamp: Date.now()
     });
 
-    structuredLog("JOIN", `${member.user.tag} entrou no servidor.`);
+    logJoin(member.user.tag);
 });
 
-// ================= SAÍDA =================
 client.on("guildMemberRemove", member => {
     stats.leaves++;
+
     activityHistory.push({
         type: "leave",
         tag: member.user.tag,
         timestamp: Date.now()
     });
 
-    structuredLog("LEAVE", `${member.user.tag} saiu do servidor.`);
+    logLeave(member.user.tag);
 });
 
-// ================= MENSAGEM APAGADA =================
 client.on("messageDelete", message => {
     if (!message.author) return;
 
-    structuredLog(
-        "DELETE",
-        `Mensagem apagada por ${message.author.tag} | Conteúdo: ${message.content || "Sem conteúdo"}`
-    );
-});
+    stats.deletedMessages++;
 
-// ================= COMANDOS =================
+    logDelete(message.author.tag, message.content || "[Embed/Arquivo]");
+});
+/* =====================================================
+   COMANDOS SLASH
+===================================================== */
+
 const commands = [
-    new SlashCommandBuilder()
-        .setName("info")
-        .setDescription("Informações do bot"),
 
     new SlashCommandBuilder()
         .setName("rule")
-        .setDescription("Mostrar regras"),
+        .setDescription("Exibir regras do servidor")
+        .addStringOption(opt =>
+            opt.setName("code")
+                .setDescription("Código de acesso")
+                .setRequired(true)
+        ),
+
+    new SlashCommandBuilder()
+        .setName("info")
+        .setDescription("Informações completas do bot"),
 
     new SlashCommandBuilder()
         .setName("restart")
-        .setDescription("Reiniciar bot")
+        .setDescription("Reiniciar o bot")
         .addStringOption(opt =>
             opt.setName("code")
                 .setDescription("Código de acesso")
@@ -180,107 +276,163 @@ const commands = [
                 .setDescription("Código de acesso")
                 .setRequired(true)
         )
+
 ].map(c => c.toJSON());
 
-// ================= REGISTRAR =================
+/* =====================================================
+   REGISTRO DOS COMANDOS
+===================================================== */
+
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 (async () => {
-    await rest.put(
-        Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-        { body: commands }
-    );
+    try {
+        await rest.put(
+            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+            { body: commands }
+        );
+        logSuccess("Comandos registrados com sucesso.");
+    } catch (err) {
+        logError("Erro ao registrar comandos.");
+    }
 })();
 
-// ================= INTERAÇÕES =================
+/* =====================================================
+   INTERAÇÕES
+===================================================== */
+
 client.on("interactionCreate", async interaction => {
-    if (!interaction.isChatInputCommand() && !interaction.isButton()) return;
 
-    if (interaction.isChatInputCommand()) {
-        stats.totalCommands++;
+    if (!interaction.isChatInputCommand()) return;
 
-        if (interaction.commandName === "info") {
-            const embed = new EmbedBuilder()
-                .setTitle("HostVille Bot")
-                .setColor("#00FFFF")
-                .setDescription("Bot oficial do servidor.")
-                .addFields(
-                    { name: "Uptime", value: Monitor.getUptime(), inline: true },
-                    { name: "Ping", value: `${client.ws.ping}ms`, inline: true }
-                );
+    stats.totalCommands++;
+    logCommand(interaction.user.tag, interaction.commandName);
 
-            structuredLog("CMD", `/info usado por ${interaction.user.tag}`);
-            return interaction.reply({ embeds: [embed] });
-        }
+    /* ===================== RULE ===================== */
 
-        if (interaction.commandName === "rule") {
-            structuredLog("CMD", `/rule usado por ${interaction.user.tag}`);
+    if (interaction.commandName === "rule") {
+
+        const code = interaction.options.getString("code");
+
+        if (code !== ACCESS_CODE) {
             return interaction.reply({
-                content: "📜 Regras do servidor:\nRespeite todos os membros.\nSem spam.\nSem divulgação.\nLink: https://discord.com/channels/928614664840052757"
+                content: "❌ Código inválido.",
+                flags: 64
             });
         }
 
-        if (interaction.commandName === "restart") {
-            const code = interaction.options.getString("code");
+        const embed = new EmbedBuilder()
+            .setColor("#89CFF0")
+            .setTitle("📜 Regras - HostVille Greenville RP")
+            .setDescription(`
+As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
 
-            if (code !== ACCESS_CODE) {
-                structuredLog("SECURITY", `Tentativa inválida de restart por ${interaction.user.tag}`);
-                return interaction.reply({ content: "Código inválido.", flags: 64 });
-            }
+➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
 
-            structuredLog("RESTART", `Bot reiniciado por ${interaction.user.tag}`);
-            await interaction.reply("Reiniciando...");
-            process.exit(0);
+━━━━━━━━━━━━━━━━━━━━
+
+📘 **Para mais informações sobre as regras, acesse o documento abaixo:**
+
+📚 [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)
+
+━━━━━━━━━━━━━━━━━━━━
+
+🔗 **Documentos Oficiais**
+
+📄 [Política de Privacidade](https://docs.google.com/document/d/1hoL-0AcJhrTXZAPIschLxoeF3kzAi7knTVPDXdT20nE/edit?usp=drivesdk)
+
+📜 [Termos de Uso](https://docs.google.com/document/d/1ZrScgrEAb7NnBGZW1XLQvBRaGIDrzatq8XBjlVyYP_k/edit?usp=drivesdk)
+
+━━━━━━━━━━━━━━━━━━━━
+✨ Powered by Y2k_Nat
+`)
+            .setImage("https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png");
+
+        await interaction.reply({
+            embeds: [embed]
+        });
+
+        logSuccess(`/rule usado por ${interaction.user.tag}`);
+    }
+
+    /* ===================== INFO ===================== */
+
+    if (interaction.commandName === "info") {
+
+        const embed = new EmbedBuilder()
+            .setColor("#00FFFF")
+            .setTitle("🤖 Informações do Bot")
+            .addFields(
+                { name: "Uptime", value: Monitor.uptime(), inline: true },
+                { name: "Ping", value: `${client.ws.ping}ms`, inline: true },
+                { name: "RAM", value: `${Monitor.memory()} MB`, inline: true },
+                { name: "Erros", value: `${stats.errors}`, inline: true },
+                { name: "Entradas", value: `${stats.joins}`, inline: true },
+                { name: "Saídas", value: `${stats.leaves}`, inline: true },
+                { name: "Mensagens Apagadas", value: `${stats.deletedMessages}`, inline: true },
+                { name: "Comandos Usados", value: `${stats.totalCommands}`, inline: true }
+            )
+            .setFooter({ text: "HostVille Greenville RP" });
+
+        await interaction.reply({
+            embeds: [embed]
+        });
+    }
+
+    /* ===================== RESTART ===================== */
+
+    if (interaction.commandName === "restart") {
+
+        const code = interaction.options.getString("code");
+
+        if (code !== ACCESS_CODE) {
+            return interaction.reply({
+                content: "❌ Código inválido.",
+                flags: 64
+            });
         }
 
-        if (interaction.commandName === "adm") {
-            const code = interaction.options.getString("code");
+        await interaction.reply("♻️ Reiniciando...");
+        logWarn(`Bot reiniciado por ${interaction.user.tag}`);
+        process.exit(0);
+    }
 
-            if (code !== ACCESS_CODE) {
-                structuredLog("SECURITY", `Tentativa inválida de ADM por ${interaction.user.tag}`);
-                return interaction.reply({ content: "Código inválido.", flags: 64 });
-            }
+    /* ===================== PAINEL ADM ===================== */
 
-            structuredLog("ADM", `Painel acessado por ${interaction.user.tag}`);
+    if (interaction.commandName === "adm") {
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId("adm_stats")
-                    .setLabel("Ver Estatísticas")
-                    .setStyle(ButtonStyle.Primary),
+        const code = interaction.options.getString("code");
 
-                new ButtonBuilder()
-                    .setCustomId("adm_24h")
-                    .setLabel("Relatório 24h")
-                    .setStyle(ButtonStyle.Secondary)
+        if (code !== ACCESS_CODE) {
+            return interaction.reply({
+                content: "❌ Código inválido.",
+                flags: 64
+            });
+        }
+
+        stats.panelAccess++;
+
+        const embed = new EmbedBuilder()
+            .setColor("#00FFFF")
+            .setTitle("👑 Painel Administrativo")
+            .setDescription("Acesso autorizado ao painel ADM.")
+            .addFields(
+                { name: "Acessos ao Painel", value: `${stats.panelAccess}`, inline: true },
+                { name: "Erros do Sistema", value: `${stats.errors}`, inline: true },
+                { name: "Horário Brasília", value: brasiliaNow(), inline: false }
             );
 
-            return interaction.reply({
-                content: "🔐 Painel Administrativo",
-                components: [row]
-            });
-        }
+        await interaction.reply({
+            embeds: [embed]
+        });
+
+        logInfo(`Painel ADM acessado por ${interaction.user.tag}`);
     }
 
-    if (interaction.isButton()) {
-        if (interaction.customId === "adm_stats") {
-            structuredLog("ADM_BTN", `Stats visualizado por ${interaction.user.tag}`);
-            return interaction.reply({
-                content: `Uptime: ${Monitor.getUptime()}\nJoins: ${stats.joins}\nLeaves: ${stats.leaves}`,
-                flags: 64
-            });
-        }
-
-        if (interaction.customId === "adm_24h") {
-            structuredLog("ADM_BTN", `Relatório 24h visualizado por ${interaction.user.tag}`);
-            logLast24HoursActivity();
-            return interaction.reply({
-                content: "Relatório enviado no console.",
-                flags: 64
-            });
-        }
-    }
 });
 
-// ================= LOGIN =================
+/* =====================================================
+   LOGIN
+===================================================== */
+
 client.login(TOKEN);
