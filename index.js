@@ -66,6 +66,11 @@ client.once('clientReady', async () => {
     console.log("====================================");
 
     await registerCommands();
+
+    console.log(" ");
+    console.log("═══════════════════════════════════");
+    console.log("  Todos os Serviços Foram Carregados com Sucesso✅️");
+    console.log("═══════════════════════════════════");
 });
 
 client.on('interactionCreate', async interaction => {
@@ -188,11 +193,6 @@ client.on('reconnecting', () => {
 
 client.on('error', (error) => {
     console.error("❌ Erro na conexão do bot:", error);
-});
-
-client.on('debug', (info) => {
-    // Descomente a linha abaixo para ver todos os debugs (muito detalhado)
-    // console.log("🔍 Debug:", info);
 });
 
 client.login(TOKEN);
