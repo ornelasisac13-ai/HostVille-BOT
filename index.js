@@ -56,7 +56,7 @@ async function registerCommands() {
     }
 }
 
-client.once('clientReady', async (client) => {
+client.once('ready', async () => {
     console.log("====================================");
     console.log("🤖 BOT ONLINE");
     console.log(`👤 ${client.user.tag}`);
@@ -87,8 +87,14 @@ client.on('interactionCreate', async interaction => {
 
         const embed = new EmbedBuilder()
             .setColor(0x89CFF0)
-            .setTitle("📜 Regras - HostVille Greenville RP")
+            .setTitle("📜 Regras e Diretrizes - HostVille Greenville RP")
             .setDescription(`
+As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
+
+➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
+
+━━━━━━━━━━━━━━━━━━━━
+
 📘 **Para mais informações sobre as regras, acesse o documento abaixo:**
 
 📚 [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)
@@ -105,8 +111,7 @@ client.on('interactionCreate', async interaction => {
 ✨ Powered by Y2k_Nat
 `);
 
-        await interaction.channel.send({ embeds: [embed] });
-        await interaction.deleteReply();
+        await interaction.followUp({ embeds: [embed], ephemeral: true });
     }
 
     // ========= /INFO =========
@@ -130,7 +135,7 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.reply({
             embeds: [embed],
-            flags: 64
+            ephemeral: true
         });
     }
 });
