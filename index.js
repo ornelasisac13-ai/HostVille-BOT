@@ -6,6 +6,9 @@ const {
     SlashCommandBuilder,
     EmbedBuilder
 } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 // ==================== CONFIGURAÇÃO ====================
 const TOKEN = process.env.TOKEN;
@@ -13,11 +16,9 @@ const CLIENT_ID = "1473705296101900420";
 const GUILD_ID = "928614664840052757";
 const ACCESS_CODE = process.env.ACCESS_CODE;
 
-// ==================== CORES PARA CONSOLE ====================
-const colors = {
+// ==================== CORES ANSI ====================
+const C = {
     reset: '\x1b[0m',
-    bright: '\x1b[1m',
-    dim: '\x1b[2m',
     red: '\x1b[31m',
     green: '\x1b[32m',
     yellow: '\x1b[33m',
@@ -28,170 +29,212 @@ const colors = {
     gray: '\x1b[90m'
 };
 
-// ==================== LOGGER CUSTOMIZADO ====================
-const logger = {
-    time: () => new Date().toLocaleString('pt-BR'),
+// ==================== ESTATÍSTICAS ====================
+const stats = {
+    commandsUsed: {},
+    totalCommands: 0,
+    startTime: Date.now(),
+    restarts: 0,
+    errors: 0
+};
 
-    info: (msg) => {
-        console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.blue}ℹ️ INFO:${colors.reset} ${msg}`);
+// ==================== LOGGER ====================
+const Logger = {
+    logFile: path.join(__dirname, 'bot.log'),
+    
+    format: (type, msg, color) => {
+        const timestamp = new Date().toLocaleString('pt-BR');
+        const line = `[${timestamp}] ${type}: ${msg}`;
+        try { fs.appendFileSync(Logger.logFile, line + '\n'); } catch {}
+        return `${C.cyan}[${timestamp}]${C.reset} ${color}${type}:${C.reset} ${msg}`;
     },
-
-    success: (msg) => {
-        console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.green}✅ SUCESSO:${colors.reset} ${msg}`);
+    
+    info: (msg) => console.log(Logger.format('ℹ️ INFO', msg, C.blue)),
+    success: (msg) => console.log(Logger.format('✅ OK', msg, C.green)),
+    warn: (msg) => console.log(Logger.format('⚠️ AVISO', msg, C.yellow)),
+    error: (msg, err = null) => {
+        stats.errors++;
+        console.log(Logger.format('❌ ERRO', msg, C.red));
+        if (err) console.log(`${C.gray}    └─ ${err.message || err}${C.reset}`);
     },
-
-    warn: (msg) => {
-        console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.yellow}⚠️ AVISO:${colors.reset} ${msg}`);
+    cmd: (cmd, user, guild) => {
+        stats.totalCommands++;
+        stats.commandsUsed[cmd] = (stats.commandsUsed[cmd] || 0) + 1;
+        const guildText = guild ? ` em ${guild}` : '';
+        console.log(Logger.format('📝 CMD', `/${cmd} por ${user}${guildText}`, C.magenta));
     },
+    
+    ascii: (text) => console.log(`\n${C.cyan}╔════════════════════════════════════╗\n║  ${C.white}${text}${C.cyan}\n╚════════════════════════════════════╝${C.reset}\n`),
+    
+    line: () => console.log(C.gray + '─────────────────────────────────────' + C.reset)
+};
 
-    error: (msg, error = null) => {
-        console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.red}❌ ERRO:${colors.reset} ${msg}`);
-        if (error) {
-            console.log(`${colors.gray}└─── Detalhes: ${error.message || error}${colors.reset}`);
-        }
+// ==================== MONITORAMENTO ====================
+const Monitor = {
+    getMemory: () => {
+        const m = process.memoryUsage();
+        return {
+            rss: (m.rss / 1024 / 1024).toFixed(2),
+            heapUsed: (m.heapUsed / 1024 / 1024).toFixed(2),
+            heapTotal: (m.heapTotal / 1024 / 1024).toFixed(2)
+        };
     },
-
-    debug: (msg) => {
-        if (process.env.DEBUG === 'true') {
-            console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.gray}🔍 DEBUG:${colors.reset} ${msg}`);
-        }
+    
+    getCPU: () => {
+        const cpus = os.cpus();
+        let idle = 0, total = 0;
+        cpus.forEach(cpu => {
+            for (const type in cpu.times) total += cpu.times[type];
+            idle += cpu.times.idle;
+        });
+        return {
+            cores: cpus.length,
+            usage: (100 - (idle / total * 100)).toFixed(1)
+        };
     },
-
-    command: (cmd, user) => {
-        console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.magenta}📝 COMANDO:${colors.reset} ${colors.white}${cmd}${colors.reset} ${colors.gray}por${colors.reset} ${colors.yellow}${user}${colors.reset}`);
+    
+    getUptime: () => {
+        const ms = Date.now() - stats.startTime;
+        const d = Math.floor(ms / 86400000);
+        const h = Math.floor((ms % 86400000) / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        const s = Math.floor((ms % 60000) / 1000);
+        return `${d}d ${h}h ${m}m ${s}s`;
     },
-
-    line: (char = '═', length = 50) => {
-        console.log(colors.gray + char.repeat(length) + colors.reset);
+    
+    status: () => {
+        const mem = Monitor.getMemory();
+        const cpu = Monitor.getCPU();
+        console.log(`
+${C.cyan}┌─── 📊 MONITORAMENTO${C.reset}
+│  💾 RAM: ${C.white}${mem.rss} MB${C.reset} (Heap: ${mem.heapUsed}/${mem.heapTotal} MB)
+│  ⚡ CPU: ${C.white}${cpu.usage}%${C.reset} (${cpu.cores} núcleos)
+│  ⏱️  Uptime: ${C.white}${Monitor.getUptime()}${C.reset}
+└─────────────────────────────────${C.reset}
+`);
     }
 };
 
-// ==================== VALIDAÇÃO DE VARIÁVEIS ====================
-function validateEnv() {
-    logger.line();
-    logger.info('Validando variáveis de ambiente...');
+// ==================== CLI ====================
+function setupConsoleCommands(client) {
+    const readline = require('readline').createInterface({ input: process.stdin, output: process.stdout });
     
-    const missing = [];
-    
-    if (!TOKEN) missing.push('TOKEN');
-    if (!ACCESS_CODE) missing.push('ACCESS_CODE');
-    
-    if (missing.length > 0) {
-        logger.error(`Variáveis ausentes: ${missing.join(', ')}`);
-        logger.line();
-        process.exit(1);
-    }
-    
-    logger.success('Todas as variáveis estão configuradas!');
-    logger.line();
+    const prompt = () => {
+        readline.question(C.green + '\n> ' + C.reset, async (input) => {
+            const cmd = input.toLowerCase().trim();
+            switch (cmd) {
+                case 'status':
+                    Monitor.status();
+                    break;
+                case 'stats':
+                    console.log(stats);
+                    break;
+                case 'monitor':
+                    Logger.info('Monitoramento ativo (Ctrl+C para sair)');
+                    setInterval(() => {
+                        const mem = Monitor.getMemory();
+                        const cpu = Monitor.getCPU();
+                        process.stdout.write(`\rCPU: ${cpu.usage}% | RAM: ${mem.rss}MB | Uptime: ${Monitor.getUptime()}   `);
+                    }, 2000);
+                    break;
+                case 'clear':
+                    console.clear();
+                    break;
+                case 'reload':
+                    await registerCommands();
+                    Logger.success('Comandos recarregados!');
+                    break;
+                case 'restart':
+                    stats.restarts++;
+                    client.destroy();
+                    setTimeout(() => client.login(TOKEN), 3000);
+                    break;
+                case 'help':
+                    Logger.info('Comandos: status, stats, monitor, clear, reload, restart, help, exit');
+                    break;
+                case 'exit':
+                    client.destroy();
+                    process.exit(0);
+                    break;
+                default:
+                    if (cmd) Logger.warn(`Comando "${cmd}" não reconhecido.`);
+            }
+            prompt();
+        });
+    };
+    prompt();
 }
 
-// ==================== CLIENTE DO BOT ====================
+// ==================== VALIDAÇÃO ====================
+if (!TOKEN || !ACCESS_CODE) {
+    Logger.error('TOKEN ou ACCESS_CODE não definidos!');
+    process.exit(1);
+}
+
+// ==================== CLIENTE ====================
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ],
-    presence: {
-        status: 'online',
-        activities: [{
-            name: '/rule | /info',
-            type: 0
-        }]
-    }
+    presence: { status: 'online', activities: [{ name: '/rule | /info | /stats', type: 0 }] }
 });
 
-// ==================== COMANDOS ====================
+// ==================== COMANDOS SLASH ====================
 const commands = [
-    new SlashCommandBuilder()
-        .setName('rule')
-        .setDescription('Exibe as regras do servidor')
-        .addStringOption(option =>
-            option.setName('code')
-                .setDescription('Digite o código de acesso')
-                .setRequired(true)
-        ),
-
-    new SlashCommandBuilder()
-        .setName('info')
-        .setDescription('Mostra informações do bot')
-].map(cmd => cmd.toJSON());
+    new SlashCommandBuilder().setName('rule').setDescription('Exibe as regras do servidor').addStringOption(o => o.setName('code').setDescription('Código de acesso').setRequired(true)),
+    new SlashCommandBuilder().setName('info').setDescription('Informações do bot'),
+    new SlashCommandBuilder().setName('stats').setDescription('Estatísticas do bot').setDefaultMemberPermissions(0),
+    new SlashCommandBuilder().setName('ping').setDescription('Testa a latência'),
+    new SlashCommandBuilder().setName('server').setDescription('Informações do servidor')
+].map(c => c.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
-// ==================== REGISTRO DE COMANDOS ====================
 async function registerCommands() {
     try {
-        logger.info('Registrando comandos no servidor...');
-        
-        await rest.put(
-            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-            { body: commands }
-        );
-        
-        logger.success(`Comandos registrados: ${commands.map(c => `/${c.name}`).join(', ')}`);
-        
-    } catch (error) {
-        logger.error('Falha ao registrar comandos', error);
-        logger.warn('O bot continuará funcionando, mas os comandos podem não estar disponíveis.');
-    }
+        await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+        Logger.success(`Comandos registrados: ${commands.map(c => c.name).join(', ')}`);
+    } catch (err) { Logger.error('Erro ao registrar comandos', err); }
 }
 
 // ==================== EVENTOS ====================
-
-// Evento: Bot pronto
 client.once('ready', () => {
-    logger.line('═');
-    logger.success('🤖 BOT ONLINE');
-    logger.info(`👤 Tag: ${client.user.tag}`);
-    logger.info(`🆔 ID: ${client.user.id}`);
-    logger.info(`📊 Servidores: ${client.guilds.cache.size}`);
-    logger.line('═');
+    Logger.ascii('HOSTVILLE BOT');
+    Logger.success('Bot online!');
+    Logger.info(`Tag: ${client.user.tag}`);
+    Logger.info(`ID: ${client.user.id}`);
+    Logger.line();
     
     registerCommands();
+    setupConsoleCommands(client);
+
+    // Status automático a cada 60s
+    setInterval(() => {
+        const mem = Monitor.getMemory();
+        Logger.info(`RAM: ${mem.rss}MB | Ping: ${client.ws.ping}ms`);
+    }, 60000);
 });
 
-// Evento: Erros não tratados
-process.on('uncaughtException', (error) => {
-    logger.error('Erro não capturado!', error);
-    logger.warn('Tentando reconectar em 5 segundos...');
-    
-    setTimeout(() => {
-        logger.info('Reiniciando bot...');
-        process.exit(1);
-    }, 5000);
-});
+process.on('uncaughtException', err => Logger.error('Exceção não capturada', err));
+process.on('unhandledRejection', reason => Logger.error('Rejeição não tratada', reason));
 
-process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Promessa rejeitada não tratada', reason);
-});
-
-// Evento: Interação
-client.on('interactionCreate', async (interaction) => {
+// ==================== INTERACTIONS ====================
+client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
-
-    const { commandName, user } = interaction;
-    logger.command(`/${commandName}`, user.tag);
+    const { commandName, user, guild } = interaction;
+    Logger.cmd(commandName, user.tag, guild?.name);
 
     // ========= /RULE =========
     if (commandName === 'rule') {
-        const codigoDigitado = interaction.options.getString('code');
-
-        if (codigoDigitado !== ACCESS_CODE) {
-            logger.warn(`Código incorreto usado por ${user.tag}`);
-            
-            return interaction.reply({
-                content: "❌ **Código de acesso inválido.**\nTente novamente com o código correto.",
-                ephemeral: true
-            });
-        }
+        const code = interaction.options.getString('code');
+        if (code !== ACCESS_CODE) return interaction.reply({ content: '❌ Código inválido!', ephemeral: true });
 
         await interaction.deferReply({ ephemeral: true });
-
         const embed = new EmbedBuilder()
             .setColor(0x89CFF0)
-            .setTitle("📜 Regras - HostVille Greenville RP")
+            .setTitle('📜 Regras - HostVille Greenville RP')
             .setDescription(`
 As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
 
@@ -199,7 +242,7 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
 
 ━━━━━━━━━━━━━━━━━━━━
 
-📘 **Para mais informações sobre as regras, acesse o documento abaixo:**
+📘 **Para mais informações sobre as regras:**
 
 📚 [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)
 
@@ -214,54 +257,76 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
 ━━━━━━━━━━━━━━━━━━━━
 ✨ Powered by Y2k_Nat
 `)
-            .setImage("https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png");
+            .setImage('https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png');
 
-        await interaction.channel.send({ embeds: [embed] });
-        await interaction.deleteReply();
-        
-        logger.success(`Regras enviadas para ${user.tag} no canal ${interaction.channel.name}`);
+        await interaction.editReply({ embeds: [embed] });
     }
 
     // ========= /INFO =========
     if (commandName === 'info') {
-        const uptime = process.uptime();
-        const hours = Math.floor(uptime / 3600);
-        const minutes = Math.floor((uptime % 3600) / 60);
-        const seconds = Math.floor(uptime % 60);
+        const embed = new EmbedBuilder()
+            .setColor(0x89CFF0)
+            .setTitle('🤖 Informações do Bot')
+            .addFields(
+                { name: 'Nome', value: client.user.tag, inline: true },
+                { name: 'ID', value: client.user.id, inline: true },
+                { name: 'Servidores', value: `${client.guilds.cache.size}`, inline: true },
+                { name: 'Uptime', value: Monitor.getUptime(), inline: true },
+                { name: 'Ping', value: `${client.ws.ping}ms`, inline: true }
+            )
+            .setFooter({ text: 'HostVille Greenville RP' })
+            .setTimestamp();
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    // ========= /STATS =========
+    if (commandName === 'stats') {
+        const topCmds = Object.entries(stats.commandsUsed)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([c, n]) => `/${c}: **${n}**`)
+            .join('\n') || 'Nenhum comando usado';
 
         const embed = new EmbedBuilder()
             .setColor(0x89CFF0)
-            .setTitle("🤖 Informações do Bot")
+            .setTitle('📊 Estatísticas')
             .addFields(
-                { name: "Nome", value: client.user.tag, inline: true },
-                { name: "ID", value: client.user.id, inline: true },
-                { name: "Servidores", value: `${client.guilds.cache.size}`, inline: true },
-                { name: "Uptime", value: `${hours}h ${minutes}m ${seconds}s`, inline: true },
-                { name: "Ping", value: `${client.ws.ping}ms`, inline: true }
+                { name: 'Total de Comandos', value: `${stats.totalCommands}`, inline: true },
+                { name: 'Erros', value: `${stats.errors}`, inline: true },
+                { name: 'Reinícios', value: `${stats.restarts}`, inline: true },
+                { name: 'Top Comandos', value: topCmds }
             )
-            .setFooter({ 
-                text: "HostVille Greenville RP",
-                iconURL: client.user.displayAvatarURL()
-            })
             .setTimestamp();
 
-        await interaction.reply({
-            embeds: [embed],
-            ephemeral: true
-        });
-        
-        logger.success(`Info enviada para ${user.tag}`);
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    // ========= /PING =========
+    if (commandName === 'ping') {
+        const pingAPI = client.ws.ping;
+        await interaction.reply({ content: `🏓 Pong! | API: ${pingAPI}ms`, ephemeral: true });
+    }
+
+    // ========= /SERVER =========
+    if (commandName === 'server') {
+        if (!guild) return;
+        const owner = await guild.fetchOwner();
+        const embed = new EmbedBuilder()
+            .setColor(0x89CFF0)
+            .setTitle(`📌 ${guild.name}`)
+            .setThumbnail(guild.iconURL())
+            .addFields(
+                { name: 'ID', value: guild.id, inline: true },
+                { name: 'Membros', value: `${guild.memberCount}`, inline: true },
+                { name: 'Criado em', value: guild.createdAt.toLocaleDateString('pt-BR'), inline: true },
+                { name: 'Dono', value: owner.user.tag, inline: true },
+                { name: 'Boosts', value: `${guild.premiumSubscriptionCount}`, inline: true }
+            )
+            .setTimestamp();
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
     }
 });
 
-// ==================== INICIAR BOT ====================
-validateEnv();
-
-client.login(TOKEN)
-    .then(() => {
-        logger.success('Conectado ao Discord!');
-    })
-    .catch((error) => {
-        logger.error('Falha ao conectar ao Discord', error);
-        process.exit(1);
-    });
+client.login(TOKEN);
