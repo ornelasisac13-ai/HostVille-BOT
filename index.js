@@ -4,13 +4,11 @@ import {
     REST,
     Routes,
     SlashCommandBuilder,
-    EmbedBuilder,
-    MessageFlags
+    EmbedBuilder
 } from "discord.js";
 
 import chalk from "chalk";
 import os from "os";
-import process from "process";
 
 // ================= CONFIG =================
 const TOKEN = process.env.TOKEN;
@@ -19,101 +17,100 @@ const GUILD_ID = "928614664840052757";
 const ACCESS_CODE = process.env.ACCESS_CODE;
 
 if (!TOKEN) {
-    console.error("❌ TOKEN não definido.");
+    console.log(chalk.red("TOKEN não definido."));
     process.exit(1);
 }
 
 if (!ACCESS_CODE) {
-    console.error("❌ ACCESS_CODE não definido.");
+    console.log(chalk.red("ACCESS_CODE não definido."));
     process.exit(1);
 }
 
 // ================= ESTATÍSTICAS =================
 const stats = {
     totalCommands: 0,
-    startTime: Date.now(),
-    errors: 0
+    errors: 0,
+    joins: [],
+    leaves: []
 };
 
-// ================= HISTÓRICO =================
-const activityHistory = [];
-
-// ================= COR FIXA =================
+// ================= UTIL =================
 const C = chalk.cyanBright;
 
-// ================= MONITOR =================
-const Monitor = {
-    getMemory() {
-        const m = process.memoryUsage();
-        return (m.rss / 1024 / 1024).toFixed(2);
-    },
+function brTime() {
+    return new Date().toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo"
+    });
+}
 
-    getUptime() {
-        const ms = Date.now() - stats.startTime;
-        const h = Math.floor(ms / 3600000);
-        const m = Math.floor((ms % 3600000) / 60000);
-        const s = Math.floor((ms % 60000) / 1000);
-        return `${h}h ${m}m ${s}s`;
-    }
-};
-
-// ================= SAFE REPLY =================
-async function safeReply(interaction, options) {
-    try {
-        if (interaction.replied || interaction.deferred) {
-            return await interaction.followUp(options);
-        } else {
-            return await interaction.reply(options);
-        }
-    } catch (err) {
-        stats.errors++;
-        console.error("Erro ao responder interaction:", err.message);
-    }
+function logStructured(title, message) {
+    console.log(C("════════════════════════════════════════════"));
+    console.log(C(`📌 ${title}`));
+    console.log(C(message));
+    console.log(C(`🕒 ${brTime()}`));
+    console.log(C("════════════════════════════════════════════"));
 }
 
 // ================= CLIENT =================
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
     ]
 });
 
 // ================= READY =================
-client.once("clientReady", async () => {
+client.once("ready", () => {
     console.clear();
-    console.log(C("════════════════════════════════════"));
+    console.log(C("════════════════════════════════════════════"));
     console.log(C("ＨｏｓｔＶｉｌｌｅ • ＢＯＴ"));
     console.log(C(`Logado como ${client.user.tag}`));
     console.log(C(`Ping: ${client.ws.ping}ms`));
-    console.log(C(`Memória: ${Monitor.getMemory()} MB`));
-    console.log(C("════════════════════════════════════"));
+    console.log(C(`Memória: ${(process.memoryUsage().rss / 1024 / 1024).toFixed(2)} MB`));
+    console.log(C("════════════════════════════════════════════"));
 
-    setInterval(() => {
-        console.log(C(`⏱ Uptime: ${Monitor.getUptime()} | 💾 ${Monitor.getMemory()}MB | 📡 ${client.ws.ping}ms`));
-    }, 6 * 60 * 60 * 1000);
+    setInterval(report24h, 60 * 60 * 1000);
 });
 
-// ================= ENTRADA =================
+// ================= HISTÓRICO 24H =================
+function report24h() {
+    const now = Date.now();
+    const last24 = 24 * 60 * 60 * 1000;
+
+    const joins = stats.joins.filter(j => now - j.time <= last24);
+    const leaves = stats.leaves.filter(l => now - l.time <= last24);
+
+    console.log(C("════════════════════════════════════════════"));
+    console.log(C(`🕒 Relatório 24h (${brTime()})`));
+
+    if (joins.length === 0) {
+        console.log(C("Não entrou ninguém no servidor nas últimas 24 horas"));
+    } else {
+        console.log(C(`Entraram (${joins.length}) nas últimas 24h:`));
+        joins.forEach(j => console.log(C(`+ ${j.tag}`)));
+    }
+
+    if (leaves.length === 0) {
+        console.log(C("Não saiu ninguém do servidor nas últimas 24 horas"));
+    } else {
+        console.log(C(`Saíram (${leaves.length}) nas últimas 24h:`));
+        leaves.forEach(l => console.log(C(`- ${l.tag}`)));
+    }
+
+    console.log(C("════════════════════════════════════════════"));
+}
+
+// ================= EVENTOS =================
 client.on("guildMemberAdd", member => {
-    activityHistory.push({
-        type: "join",
-        tag: member.user.tag,
-        timestamp: Date.now()
-    });
-
-    console.log(C(`➕ ${member.user.tag} entrou.`));
+    stats.joins.push({ tag: member.user.tag, time: Date.now() });
+    logStructured("ENTROU", `${member.user.tag} entrou no servidor.`);
 });
 
-// ================= SAÍDA =================
 client.on("guildMemberRemove", member => {
-    activityHistory.push({
-        type: "leave",
-        tag: member.user.tag,
-        timestamp: Date.now()
-    });
-
-    console.log(C(`➖ ${member.user.tag} saiu.`));
+    stats.leaves.push({ tag: member.user.tag, time: Date.now() });
+    logStructured("SAIU", `${member.user.tag} saiu do servidor.`);
 });
 
 // ================= COMANDOS =================
@@ -124,11 +121,25 @@ const commands = [
 
     new SlashCommandBuilder()
         .setName("rule")
-        .setDescription("Mostrar regras"),
+        .setDescription("Exibe as regras do servidor")
+        .addStringOption(opt =>
+            opt.setName("code")
+                .setDescription("Código de acesso")
+                .setRequired(true)
+        ),
 
     new SlashCommandBuilder()
         .setName("restart")
-        .setDescription("Reiniciar bot")
+        .setDescription("Reiniciar o bot")
+        .addStringOption(opt =>
+            opt.setName("code")
+                .setDescription("Código de acesso")
+                .setRequired(true)
+        ),
+
+    new SlashCommandBuilder()
+        .setName("adm")
+        .setDescription("Painel Administrativo")
         .addStringOption(opt =>
             opt.setName("code")
                 .setDescription("Código de acesso")
@@ -136,86 +147,108 @@ const commands = [
         )
 ].map(c => c.toJSON());
 
-// ================= REGISTRO =================
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
-async function registerCommands() {
-    try {
-        await rest.put(
-            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-            { body: commands }
-        );
-        console.log(C("✅ Comandos registrados."));
-    } catch (err) {
-        stats.errors++;
-        console.error("Erro ao registrar comandos:", err.message);
-    }
-}
+await rest.put(
+    Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+    { body: commands }
+);
 
 // ================= INTERAÇÕES =================
 client.on("interactionCreate", async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     stats.totalCommands++;
+    logStructured("COMANDO", `/${interaction.commandName} usado por ${interaction.user.tag}`);
 
-    try {
+    // INFO
+    if (interaction.commandName === "info") {
+        const embed = new EmbedBuilder()
+            .setTitle("🤖 Informações do Bot")
+            .setColor("#89CFF0")
+            .addFields(
+                { name: "Ping", value: `${client.ws.ping}ms`, inline: true },
+                { name: "Comandos usados", value: `${stats.totalCommands}`, inline: true }
+            )
+            .setFooter({ text: "HostVille Greenville RP" });
 
-        if (interaction.commandName === "info") {
+        await interaction.reply({ embeds: [embed], flags: 64 });
+    }
 
-            const embed = new EmbedBuilder()
-                .setTitle("HostVille Bot")
-                .setColor("#00FFFF")
-                .addFields(
-                    { name: "Uptime", value: Monitor.getUptime(), inline: true },
-                    { name: "Ping", value: `${client.ws.ping}ms`, inline: true },
-                    { name: "Memória", value: `${Monitor.getMemory()} MB`, inline: true }
-                );
+    // RULE COMPLETO RESTAURADO
+    if (interaction.commandName === "rule") {
+        const code = interaction.options.getString("code");
 
-            await safeReply(interaction, { embeds: [embed] });
+        if (code !== ACCESS_CODE) {
+            return interaction.reply({ content: "❌ Código inválido.", flags: 64 });
         }
 
-        if (interaction.commandName === "rule") {
+        await interaction.reply({ content: "✅ Regras enviadas.", flags: 64 });
 
-            await safeReply(interaction, {
-                content: "Respeite todos os membros e siga as regras do servidor."
-            });
+        const embed = new EmbedBuilder()
+            .setColor(0x89CFF0)
+            .setTitle("📜 Regras - HostVille Greenville RP")
+            .setDescription(`
+As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
+
+➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
+
+━━━━━━━━━━━━━━━━━━━━
+
+📘 **Para mais informações sobre as regras, acesse o documento abaixo:**
+
+📚 [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)
+
+━━━━━━━━━━━━━━━━━━━━
+
+🔗 **Documentos Oficiais**
+
+📄 [Política de Privacidade](https://docs.google.com/document/d/1hoL-0AcJhrTXZAPIschLxoeF3kzAi7knTVPDXdT20nE/edit?usp=drivesdk)
+
+📜 [Termos de Uso](https://docs.google.com/document/d/1ZrScgrEAb7NnBGZW1XLQvBRaGIDrzatq8XBjlVyYP_k/edit?usp=drivesdk)
+
+━━━━━━━━━━━━━━━━━━━━
+✨ Powered by Y2k_Nat
+`)
+            .setImage("https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png");
+
+        await interaction.channel.send({ embeds: [embed] });
+    }
+
+    // RESTART
+    if (interaction.commandName === "restart") {
+        const code = interaction.options.getString("code");
+
+        if (code !== ACCESS_CODE) {
+            return interaction.reply({ content: "❌ Código inválido.", flags: 64 });
         }
 
-        if (interaction.commandName === "restart") {
+        await interaction.reply({ content: "♻️ Reiniciando...", flags: 64 });
+        process.exit(0);
+    }
 
-            const code = interaction.options.getString("code");
+    // PAINEL ADM
+    if (interaction.commandName === "adm") {
+        const code = interaction.options.getString("code");
 
-            if (code !== ACCESS_CODE) {
-                return safeReply(interaction, {
-                    content: "Código inválido.",
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-
-            await safeReply(interaction, { content: "Reiniciando..." });
-
-            setTimeout(() => {
-                process.exit(0);
-            }, 1000);
+        if (code !== ACCESS_CODE) {
+            return interaction.reply({ content: "❌ Código inválido.", flags: 64 });
         }
 
-    } catch (err) {
-        stats.errors++;
-        console.error("Erro na interaction:", err.message);
+        logStructured("PAINEL ADM", `Acessado por ${interaction.user.tag}`);
+
+        await interaction.reply({
+            content:
+`📊 Painel Administrativo
+
+Comandos usados: ${stats.totalCommands}
+Erros: ${stats.errors}
+Ping: ${client.ws.ping}ms
+Memória: ${(process.memoryUsage().rss / 1024 / 1024).toFixed(2)} MB
+Horário Brasília: ${brTime()}`,
+            flags: 64
+        });
     }
 });
 
-// ================= PROTEÇÃO GLOBAL =================
-process.on("unhandledRejection", err => {
-    stats.errors++;
-    console.error("Unhandled Rejection:", err);
-});
-
-process.on("uncaughtException", err => {
-    stats.errors++;
-    console.error("Uncaught Exception:", err);
-});
-
-// ================= START =================
-await registerCommands();
 client.login(TOKEN);
