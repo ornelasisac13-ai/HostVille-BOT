@@ -351,3 +351,5 @@ process.on("unhandledRejection", (reason, promise) => {
 process.on("uncaughtException", err => {
     console.log(C(`❌ Exceção não capturada: ${err.message}`));
 });
+
+// ==================== FIM DO ARQUIVO ====================
