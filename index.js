@@ -1,3 +1,11 @@
+// Suprimir warnings de deprecação
+process.on('warning', (warning) => {
+    if (warning.name === 'DeprecationWarning' && warning.message.includes('ready event')) {
+        return;
+    }
+    console.warn(warning.name, warning.message);
+});
+
 const { 
     Client, 
     GatewayIntentBits, 
@@ -179,10 +187,6 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
 });
 
 // ========= EVENTOS ADICIONAIS =========
-client.on('ready', () => {
-    console.log("✅ Bot conectado e pronto!");
-});
-
 client.on('disconnect', () => {
     console.log("⚠️ Bot desconectado do Discord!");
 });
