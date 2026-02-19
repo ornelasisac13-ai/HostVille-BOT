@@ -1,6 +1,6 @@
-import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import chalk from 'chalk';
-import os from 'os';
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const chalk = require('chalk');
+const os = require('os');
 
 // ==================== CONFIG ====================
 const TOKEN = process.env.TOKEN;
@@ -81,7 +81,8 @@ const log = {
     stats.totalCommands++;
     stats.commandsUsed[cmd] = (stats.commandsUsed[cmd] || 0) + 1;
     stats.lastAction = `/${cmd} por ${user}`;
-    console.log(chalk.gray(`[${getTime()}]`) + chalk.magenta(` [CMD]  `) + chalk.yellow(`⚠️ ${user} executou /${cmd} com o bot ${client.user.username}`) + (guild ? chalk.gray(` em ${guild}`) : ''));
+    const botName = client.user ? client.user.username : 'Unknown';
+    console.log(chalk.gray(`[${getTime()}]`) + chalk.magenta(` [CMD]  `) + chalk.yellow(`⚠️ ${user} executou /${cmd} com o bot ${botName}`) + (guild ? chalk.gray(` em ${guild}`) : ''));
   },
   
   memberJoin: (user, guild) => {
@@ -95,12 +96,14 @@ const log = {
   },
   
   msgDelete: (user, content, guild) => {
+    if (!content) return;
     const truncated = content.length > 50 ? content.substring(0, 50) + '...' : content;
     stats.lastAction = `Msg apagada por ${user}`;
     console.log(chalk.gray(`[${getTime()}]`) + chalk.red(` [DEL]  `) + chalk.yellow(`⚠️ ${user} apagou a mensagem:`) + chalk.gray(` "${truncated}"`) + (guild ? chalk.gray(` em ${guild}`) : ''));
   },
   
   msgEdit: (user, oldContent, newContent, guild) => {
+    if (!oldContent || !newContent) return;
     const oldTrunc = oldContent.length > 30 ? oldContent.substring(0, 30) + '...' : oldContent;
     const newTrunc = newContent.length > 30 ? newContent.substring(0, 30) + '...' : newContent;
     stats.lastAction = `Msg editada por ${user}`;
@@ -121,6 +124,7 @@ const log = {
   ascii: () => {
     const mem = getMemory();
     const cpu = getCPU();
+    const botName = client.user ? client.user.tag : 'Loading...';
     
     console.clear();
     console.log(chalk.cyan(`
@@ -134,7 +138,7 @@ const log = {
     console.log(chalk.gray(`   ╔═══════════════════════════════════════════════════════════════╗`));
     console.log(chalk.gray(`   ║`) + chalk.white(` 🤖 HOSTVILLE • BOT v2.3                                     `) + chalk.gray(`║`));
     console.log(chalk.gray(`   ╠═══════════════════════════════════════════════════════════════╣`));
-    console.log(chalk.gray(`   ║`) + chalk.white(` Bot:        `) + chalk.cyan(client.user.tag) + chalk.gray(' '.repeat(50 - client.user.tag.length)) + `║`));
+    console.log(chalk.gray(`   ║`) + chalk.white(` Bot:        `) + chalk.cyan(botName) + chalk.gray(' '.repeat(50 - botName.length)) + `║`));
     console.log(chalk.gray(`   ║`) + chalk.white(` Servidores:`) + chalk.cyan(` ${client.guilds.cache.size}`) + chalk.gray(' '.repeat(51 - String(client.guilds.cache.size).length)) + `║`));
     console.log(chalk.gray(`   ║`) + chalk.white(` RAM:        `) + chalk.cyan(` ${mem.heapUsed} MB`) + chalk.gray(' '.repeat(51 - String(mem.heapUsed).length - 3)) + `║`));
     console.log(chalk.gray(`   ║`) + chalk.white(` CPU:        `) + chalk.cyan(` ${cpu.usage}% (${cpu.cores} cores)`) + chalk.gray(' '.repeat(51 - String(cpu.usage).length - String(cpu.cores).length - 10)) + `║`));
@@ -166,7 +170,7 @@ async function registerCommands() {
 }
 
 // ==================== CLIENT READY ====================
-client.once('clientReady', async () => {
+client.once('ready', async () => {
   stats.lastRestart = Date.now();
   log.ascii();
   log.success('🤖 BOT ONLINE');
@@ -255,27 +259,4 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
 
 // ==================== EVENTOS ====================
 client.on('guildMemberAdd', member => log.memberJoin(member.user.tag, member.guild.name));
-client.on('guildMemberRemove', member => log.memberLeave(member.user.tag, member.guild.name));
-client.on('messageDelete', msg => {
-  if (msg.author?.bot) return;
-  log.msgDelete(msg.author?.tag, msg.content, msg.guild?.name);
-});
-client.on('messageUpdate', (oldMsg, newMsg) => {
-  if (oldMsg.author?.bot || oldMsg.content === newMsg.content) return;
-  log.msgEdit(oldMsg.author?.tag, oldMsg.content, newMsg.content, oldMsg.guild?.name);
-});
-client.on('guildBanAdd', (guild, user) => log.ban(user.tag, "Sem motivo", guild.name));
-client.on('guildBanRemove', (guild, user) => log.unban(user.tag, guild.name));
-
-// ==================== MONITORAMENTO ====================
-setInterval(() => {
-  const mem = getMemory();
-  const cpu = getCPU();
-  log.info(`Monitor: RAM ${mem.heapUsed}MB | CPU ${cpu.usage}% | Ping ${client.ws.ping}ms`);
-}, 30 * 60 * 1000);
-
-// ==================== START ====================
-client.login(TOKEN);
-
-process.on('unhandledRejection', r => log.error(`Rejeição não tratada: ${r}`));
-process.on('uncaughtException', e => log.error(`Exceção não tratada: ${e}`));
+client.on('guildMemberRemove', member => log.memberLeave(member
