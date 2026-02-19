@@ -9,6 +9,7 @@ const {
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1473705296101900420";
+const OWNER_ID = "1467601136780443661";
 
 if (!TOKEN) {
     console.error("❌ TOKEN não definido!");
@@ -62,6 +63,14 @@ client.on('interactionCreate', async interaction => {
     // ========= /RULE =========
     if (interaction.commandName === 'rule') {
 
+        // 🔒 VERIFICAÇÃO DE DONO
+        if (interaction.user.id !== OWNER_ID) {
+            return interaction.reply({
+                content: "❌️ este comando só pode ser executado por Y2k_Nat",
+                flags: 64
+            });
+        }
+
         await interaction.deferReply({ flags: 64 });
 
         const embed = new EmbedBuilder()
@@ -83,6 +92,12 @@ Sistema ativo 24h contra spam e abusos.
 
 🔒 **Segurança**
 Qualquer violação das regras é proibida.
+
+━━━━━━━━━━━━━━━━━━━━
+
+📘 **Para mais informações sobre as regras, acesse esse documento:**
+
+📑 https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk
 
 ━━━━━━━━━━━━━━━━━━━━
 
