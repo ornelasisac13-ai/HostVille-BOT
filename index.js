@@ -1,12 +1,18 @@
 // index.js
-require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Collection, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const fs = require('fs');
-const os = require('os');
-const { stringify } = require('csv-stringify/sync');
-const chalk = require('chalk');
+import dotenv from 'dotenv';
+dotenv.config();
 
-// Funções de log com cores
+import { 
+  Client, GatewayIntentBits, Partials, Collection, EmbedBuilder, 
+  ActionRowBuilder, ButtonBuilder, ButtonStyle 
+} from 'discord.js';
+
+import fs from 'fs';
+import os from 'os';
+import { stringify } from 'csv-stringify/sync';
+import chalk from 'chalk';
+
+// Declaração das funções de log
 const logComando = (msg) => console.log(chalk.cyan('[COMANDO] ') + msg);
 const logMensagemCriada = (msg) => console.log(chalk.green('[MSG CRIADA] ') + msg);
 const logMensagemDeletada = (msg) => console.log(chalk.gray('[MSG DELETADA] ') + msg);
@@ -20,11 +26,28 @@ const logEstatisticasGerais = (msg) => console.log(chalk.green('[ESTATÍSTICAS] 
 const logErro = (msg) => console.log(chalk.red('[ERRO] ') + msg);
 const logInfo = (msg) => console.log(chalk.white('[INFO] ') + msg);
 
-// Configurações
+// Funções auxiliares
+async function getCpuUsage() {
+  return (os.loadavg()[0] * 100).toFixed(2);
+}
+
+function formatDuration(ms) {
+  const sec = Math.floor(ms / 1000);
+  const min = Math.floor(sec / 60);
+  const hour = Math.floor(min / 60);
+  const day = Math.floor(hour / 24);
+  return `${day}d ${hour % 24}h ${min % 60}m ${sec % 60}s`;
+}
+
+// Checagem do TOKEN
 const TOKEN = process.env.TOKEN || 'SEU_TOKEN_AQUI';
+if (!TOKEN || TOKEN === 'SEU_TOKEN_AQUI') {
+  console.error(chalk.red('⚠️ TOKEN do bot não definido!'));
+  process.exit(1);
+}
+
 const ACCESS_CODE = process.env.ACCESS_CODE || 'senha';
 
-// Criar o cliente
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -37,25 +60,22 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User],
 });
 
-// Coleções de comandos
-client.commands = new Collection();
-
-// Estatísticas e logs
+// Variáveis globais
 const stats = {
-  totalCommands: 0,
   totalInputs: 0,
   totalOutputs: 0,
-  messagesDeleted: 0,
   errors: 0,
+  messagesDeleted: 0,
   panelAccesses: 0,
   startTime: Date.now(),
-  activity24h: [], // logs consolidado
+  totalCommands: 0,
   messagesHistory: new Map(),
-  joinLeaveHistory: [], // histórico de joins/leaves
+  joinLeaveHistory: [],
+  activity24h: [],
 };
 
-// Carregar atividade anterior se existir
-function loadActivity() {
+// Carregar atividade anterior
+async function loadActivity() {
   if (fs.existsSync('activity24h.json')) {
     const data = fs.readFileSync('activity24h.json');
     stats.activity24h = JSON.parse(data);
@@ -74,28 +94,9 @@ function addActivityLog(entry) {
   }
 }
 
-function checkCode(interaction, code) {
-  stats.totalInputs++;
-  if (code !== ACCESS_CODE) {
-    interaction.reply({ content: 'Código incorreto.', ephemeral: true });
-    return false;
-  }
-  return true;
-}
+// Comandos
+client.commands = new Collection();
 
-async function getCpuUsage() {
-  return (os.loadavg()[0] * 100).toFixed(2);
-}
-
-function formatDuration(ms) {
-  const sec = Math.floor(ms / 1000);
-  const min = Math.floor(sec / 60);
-  const hour = Math.floor(min / 60);
-  const day = Math.floor(hour / 24);
-  return `${day}d ${hour % 24}h ${min % 60}m ${sec % 60}s`;
-}
-
-// --- Comandos ---
 client.commands.set('rules', {
   name: 'rules',
   description: 'Mostra as regras do servidor',
@@ -104,7 +105,10 @@ client.commands.set('rules', {
   ],
   execute: async (interaction) => {
     const code = interaction.options.getString('code');
-    if (!checkCode(interaction, code)) return;
+    if (code !== ACCESS_CODE) {
+      interaction.reply({ content: 'Código incorreto.', ephemeral: true });
+      return;
+    }
     const embed = new EmbedBuilder()
       .setColor('#89CFF0')
       .setDescription(`As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
@@ -138,8 +142,6 @@ client.commands.set('adm', {
     { name: 'code', type: 3, description: 'Código de acesso', required: true }
   ],
   execute: async (interaction) => {
-    const code = interaction.options.getString('code');
-    if (!checkCode(interaction, code)) return;
     const btnStats = new ButtonBuilder().setCustomId('stats').setLabel('Estatísticas').setStyle(ButtonStyle.Primary);
     const btnReport = new ButtonBuilder().setCustomId('report').setLabel('Enviar Relatórios').setStyle(ButtonStyle.Secondary);
     const btnClean = new ButtonBuilder().setCustomId('cleanConsole').setLabel('Clean Console').setStyle(ButtonStyle.Danger);
@@ -157,7 +159,10 @@ client.commands.set('serverinfo', {
   ],
   execute: async (interaction) => {
     const code = interaction.options.getString('code');
-    if (!checkCode(interaction, code)) return;
+    if (code !== ACCESS_CODE) {
+      interaction.reply({ content: 'Código incorreto.', ephemeral: true });
+      return;
+    }
     const guild = interaction.guild;
     const embed = new EmbedBuilder()
       .setTitle('Informações do Servidor')
@@ -171,7 +176,7 @@ client.commands.set('serverinfo', {
   }
 });
 
-// --- Eventos de mensagens ---
+// Eventos de mensagens
 client.on('messageCreate', (message) => {
   if (message.author.bot) return;
   const msgLog = {
@@ -190,13 +195,16 @@ client.on('messageCreate', (message) => {
   stats.messagesHistory.get(message.author.id).push(msgLog);
 });
 
-// Evento de mensagem deletada
+// Evento mensagem deletada
 client.on('messageDelete', (message) => {
   if (message.author && message.author.bot) return;
+  // Para evitar crash ao deletar mensagens sem conteúdo (ex: embed, arquivo)
+  if (!message.content && !message.embeds?.length && !message.attachments?.size) return;
   logMensagemDeletada(`Mensagem deletada de ${message.author ? message.author.tag : 'Desconhecido'} no canal ${message.channel.name}: ${message.content}`);
+  stats.messagesDeleted++;
 });
 
-// Evento de edição de mensagem
+// Evento mensagem editada
 client.on('messageUpdate', (oldMessage, newMessage) => {
   if (oldMessage.author && oldMessage.author.bot) return;
   if (oldMessage.content !== newMessage.content) {
@@ -206,7 +214,7 @@ Para: ${newMessage.content}`);
   }
 });
 
-// --- Evento de join ---
+// Evento join
 client.on('guildMemberAdd', (member) => {
   const joinLog = {
     id: member.id,
@@ -219,7 +227,7 @@ client.on('guildMemberAdd', (member) => {
   logJoin(`${member.user.tag} entrou no servidor`);
 });
 
-// --- Evento de leave ---
+// Evento leave
 client.on('guildMemberRemove', (member) => {
   const leaveLog = {
     id: member.id,
@@ -232,10 +240,11 @@ client.on('guildMemberRemove', (member) => {
   logLeave(`${member.user.tag} saiu do servidor`);
 });
 
-// --- Evento de interação ---
+// Evento de interação
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand()) {
-    stats.totalOutputs++;
+    stats.totalInputs++;
+    stats.totalCommands++; // Incrementa comandos utilizados
     logComando(`${interaction.user.tag} usou comando /${interaction.commandName}`);
     const cmd = client.commands.get(interaction.commandName);
     if (cmd) {
@@ -290,7 +299,14 @@ client.on('interactionCreate', async (interaction) => {
           ['ID', 'Tipo', 'Conteúdo', 'Autor', 'Timestamp', 'Canal'],
         ];
         for (const log of stats.activity24h) {
-          csvData.push([log.id, log.type, log.content || '', log.author || log.username, log.timestamp, log.channel || '']);
+          csvData.push([
+            log.id,
+            log.type,
+            log.content || '',
+            log.author || log.username,
+            new Date(log.timestamp).toLocaleString(),
+            log.channel || ''
+          ]);
         }
         const csvString = stringify(csvData);
         fs.writeFileSync('export.csv', csvString);
@@ -301,10 +317,12 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-// --- Login ---
-client.login(TOKEN).then(() => {
-  console.log(chalk.green('Bot ligado!'));
-  logInfo('Bot iniciado com sucesso!');
-}).catch((err) => {
-  console.error(chalk.red('Erro ao login:'), err);
-});
+// Login
+client.login(TOKEN)
+  .then(() => {
+    console.log(chalk.green('✅ Bot ligado!'));
+    logInfo('Bot iniciado com sucesso e pronto para uso.');
+  })
+  .catch((err) => {
+    console.error(chalk.red('❌ Erro ao fazer login:'), err);
+  });
