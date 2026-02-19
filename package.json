@@ -1,15 +1,19 @@
 {
-  "name": "hostville-rules-bot",
-  "version": "1.0.0",
-  "description": "Bot de regras HostVille Greenville RP",
-  "type": "module",
+  "name": "hostville-bot",
+  "version": "2.3.0",
+  "description": "Bot Discord HostVille Greenville RP",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "chalk": "^5.3.0",
-    "gradient-string": "^2.0.1"
-  }
+    "chalk": "^4.1.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "Isac",
+  "license": "MIT"
 }
