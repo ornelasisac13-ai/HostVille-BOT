@@ -56,7 +56,7 @@ async function registerCommands() {
     }
 }
 
-client.once('ready', async () => {
+client.once('clientReady', async (client) => {
     console.log("====================================");
     console.log("🤖 BOT ONLINE");
     console.log(`👤 ${client.user.tag}`);
@@ -87,7 +87,7 @@ client.on('interactionCreate', async interaction => {
 
         const embed = new EmbedBuilder()
             .setColor(0x89CFF0)
-            .setTitle("📜 Regras e Diretrizes - HostVille Greenville RP")
+            .setTitle("📜 Regras - HostVille Greenville RP")
             .setDescription(`
 As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
 
@@ -111,7 +111,8 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
 ✨ Powered by Y2k_Nat
 `);
 
-        await interaction.followUp({ embeds: [embed], ephemeral: true });
+        await interaction.channel.send({ embeds: [embed] });
+        await interaction.deleteReply();
     }
 
     // ========= /INFO =========
@@ -135,7 +136,7 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
 
         await interaction.reply({
             embeds: [embed],
-            ephemeral: true
+            flags: 64
         });
     }
 });
