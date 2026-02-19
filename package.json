@@ -3,6 +3,7 @@
   "version": "2.3.0",
   "description": "Bot Discord HostVille Greenville RP",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js"
