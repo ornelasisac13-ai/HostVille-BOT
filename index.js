@@ -9,7 +9,6 @@ const {
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1473705296101900420";
-const OWNER_ID = "1429525351897370625"; // ✅ ID CORRETO
 
 if (!TOKEN) {
     console.error("❌ TOKEN não definido!");
@@ -19,6 +18,10 @@ if (!TOKEN) {
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
+
+// ⏳ Cooldown Map
+const cooldown = new Map();
+const COOLDOWN_TIME = 24 * 60 * 60 * 1000; // 24 horas
 
 // ========= COMANDOS =========
 const commands = [
@@ -46,30 +49,34 @@ async function registerCommands() {
 }
 
 client.once('clientReady', async (client) => {
-    console.log("====================================");
-    console.log("🤖 BOT ONLINE");
-    console.log(`👤 ${client.user.tag}`);
-    console.log(`🆔 ${client.user.id}`);
-    console.log("====================================");
-
+    console.log("🤖 BOT ONLINE:", client.user.tag);
     await registerCommands();
 });
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    console.log(`📌 /${interaction.commandName} | ${interaction.user.tag}`);
-
-    // ========= /RULE =========
     if (interaction.commandName === 'rule') {
 
-        // 🔒 VERIFICAÇÃO DE DONO
-        if (interaction.user.id !== OWNER_ID) {
-            return interaction.reply({
-                content: "❌️ este comando só pode ser executado por Y2k_Nat",
-                flags: 64
-            });
+        const userId = interaction.user.id;
+        const now = Date.now();
+
+        if (cooldown.has(userId)) {
+            const lastUsed = cooldown.get(userId);
+            const timeLeft = COOLDOWN_TIME - (now - lastUsed);
+
+            if (timeLeft > 0) {
+                const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+
+                return interaction.reply({
+                    content: `⏳ Você já usou este comando hoje.\nTente novamente em ${hours}h ${minutes}m.`,
+                    flags: 64
+                });
+            }
         }
+
+        cooldown.set(userId, now);
 
         await interaction.deferReply({ flags: 64 });
 
@@ -82,22 +89,11 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
 
 ➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
 
-🤖 **AutoMod**
-Sistema ativo 24h contra spam e abusos.
-
-⚠️ **Blacklist**
-• Burlar regras  
-• Exploits ou bugs  
-• Contas alternativas  
-
-🔒 **Segurança**
-Qualquer violação das regras é proibida.
-
 ━━━━━━━━━━━━━━━━━━━━
 
-📘 **Para mais informações sobre as regras, acesse esse documento:**
+📘 **Para mais informações sobre as regras, acesse o documento abaixo:**
 
-📑 https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk
+📚 [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)
 
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -115,7 +111,6 @@ Qualquer violação das regras é proibida.
         await interaction.deleteReply();
     }
 
-    // ========= /INFO =========
     if (interaction.commandName === 'info') {
 
         const uptime = process.uptime();
