@@ -9,9 +9,15 @@ const {
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1473705296101900420";
+const ACCESS_CODE = process.env.ACCESS_CODE;
 
 if (!TOKEN) {
     console.error("❌ TOKEN não definido!");
+    process.exit(1);
+}
+
+if (!ACCESS_CODE) {
+    console.error("❌ ACCESS_CODE não definido!");
     process.exit(1);
 }
 
@@ -19,15 +25,20 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
-// ⏳ Cooldown Map
+// ⏳ Cooldown 24h
 const cooldown = new Map();
-const COOLDOWN_TIME = 24 * 60 * 60 * 1000; // 24 horas
+const COOLDOWN_TIME = 24 * 60 * 60 * 1000;
 
 // ========= COMANDOS =========
 const commands = [
     new SlashCommandBuilder()
         .setName('rule')
-        .setDescription('Exibe as regras do servidor'),
+        .setDescription('Exibe as regras do servidor')
+        .addStringOption(option =>
+            option.setName('codigo')
+                .setDescription('Digite o código de acesso')
+                .setRequired(true)
+        ),
 
     new SlashCommandBuilder()
         .setName('info')
@@ -49,18 +60,37 @@ async function registerCommands() {
 }
 
 client.once('clientReady', async (client) => {
-    console.log("🤖 BOT ONLINE:", client.user.tag);
+    console.log("====================================");
+    console.log("🤖 BOT ONLINE");
+    console.log(`👤 ${client.user.tag}`);
+    console.log(`🆔 ${client.user.id}`);
+    console.log("====================================");
+
     await registerCommands();
 });
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
+    console.log(`📌 /${interaction.commandName} | ${interaction.user.tag}`);
+
+    // ========= /RULE =========
     if (interaction.commandName === 'rule') {
+
+        const codigoDigitado = interaction.options.getString('codigo');
+
+        // 🔐 Verifica código
+        if (codigoDigitado !== ACCESS_CODE) {
+            return interaction.reply({
+                content: "❌ Código de acesso inválido.",
+                flags: 64
+            });
+        }
 
         const userId = interaction.user.id;
         const now = Date.now();
 
+        // ⏳ Verifica cooldown
         if (cooldown.has(userId)) {
             const lastUsed = cooldown.get(userId);
             const timeLeft = COOLDOWN_TIME - (now - lastUsed);
@@ -82,15 +112,8 @@ client.on('interactionCreate', async interaction => {
 
         const embed = new EmbedBuilder()
             .setColor(0x89CFF0)
-            .setImage("https://image2url.com/r2/default/images/1771453214746-e642e4a3-1aba-4eae-bd21-07e118149345.jpg")
-            .setTitle("📜 Regras e Diretrizes - HostVille Greenville RP")
+            .setTitle("📜 Regras - HostVille Greenville RP")
             .setDescription(`
-As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
-
-➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
-
-━━━━━━━━━━━━━━━━━━━━
-
 📘 **Para mais informações sobre as regras, acesse o documento abaixo:**
 
 📚 [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)
@@ -111,6 +134,7 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
         await interaction.deleteReply();
     }
 
+    // ========= /INFO =========
     if (interaction.commandName === 'info') {
 
         const uptime = process.uptime();
