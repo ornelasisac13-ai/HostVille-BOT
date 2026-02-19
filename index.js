@@ -7,32 +7,102 @@ const {
     EmbedBuilder
 } = require('discord.js');
 
+// ==================== CONFIGURAÇÃO ====================
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1473705296101900420";
 const GUILD_ID = "928614664840052757";
 const ACCESS_CODE = process.env.ACCESS_CODE;
 
-if (!TOKEN) {
-    console.error("❌ TOKEN não definido!");
-    process.exit(1);
+// ==================== CORES PARA CONSOLE ====================
+const colors = {
+    reset: '\x1b[0m',
+    bright: '\x1b[1m',
+    dim: '\x1b[2m',
+    red: '\x1b[31m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    magenta: '\x1b[35m',
+    cyan: '\x1b[36m',
+    white: '\x1b[37m',
+    gray: '\x1b[90m'
+};
+
+// ==================== LOGGER CUSTOMIZADO ====================
+const logger = {
+    time: () => new Date().toLocaleString('pt-BR'),
+
+    info: (msg) => {
+        console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.blue}ℹ️ INFO:${colors.reset} ${msg}`);
+    },
+
+    success: (msg) => {
+        console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.green}✅ SUCESSO:${colors.reset} ${msg}`);
+    },
+
+    warn: (msg) => {
+        console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.yellow}⚠️ AVISO:${colors.reset} ${msg}`);
+    },
+
+    error: (msg, error = null) => {
+        console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.red}❌ ERRO:${colors.reset} ${msg}`);
+        if (error) {
+            console.log(`${colors.gray}└─── Detalhes: ${error.message || error}${colors.reset}`);
+        }
+    },
+
+    debug: (msg) => {
+        if (process.env.DEBUG === 'true') {
+            console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.gray}🔍 DEBUG:${colors.reset} ${msg}`);
+        }
+    },
+
+    command: (cmd, user) => {
+        console.log(`${colors.cyan}[${logger.time()}]${colors.reset} ${colors.magenta}📝 COMANDO:${colors.reset} ${colors.white}${cmd}${colors.reset} ${colors.gray}por${colors.reset} ${colors.yellow}${user}${colors.reset}`);
+    },
+
+    line: (char = '═', length = 50) => {
+        console.log(colors.gray + char.repeat(length) + colors.reset);
+    }
+};
+
+// ==================== VALIDAÇÃO DE VARIÁVEIS ====================
+function validateEnv() {
+    logger.line();
+    logger.info('Validando variáveis de ambiente...');
+    
+    const missing = [];
+    
+    if (!TOKEN) missing.push('TOKEN');
+    if (!ACCESS_CODE) missing.push('ACCESS_CODE');
+    
+    if (missing.length > 0) {
+        logger.error(`Variáveis ausentes: ${missing.join(', ')}`);
+        logger.line();
+        process.exit(1);
+    }
+    
+    logger.success('Todas as variáveis estão configuradas!');
+    logger.line();
 }
 
-if (!ACCESS_CODE) {
-    console.error("❌ ACCESS_CODE não definido!");
-    process.exit(1);
-}
-
+// ==================== CLIENTE DO BOT ====================
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMessageTyping,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildInvites
-    ]
+        GatewayIntentBits.MessageContent
+    ],
+    presence: {
+        status: 'online',
+        activities: [{
+            name: '/rule | /info',
+            type: 0
+        }]
+    }
 });
 
+// ==================== COMANDOS ====================
 const commands = [
     new SlashCommandBuilder()
         .setName('rule')
@@ -50,70 +120,86 @@ const commands = [
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
+// ==================== REGISTRO DE COMANDOS ====================
 async function registerCommands() {
     try {
-        console.log("⏳ Registrando comandos...");
+        logger.info('Registrando comandos no servidor...');
+        
         await rest.put(
             Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
             { body: commands }
         );
-        console.log("✅ Comandos registrados instantaneamente no servidor!");
+        
+        logger.success(`Comandos registrados: ${commands.map(c => `/${c.name}`).join(', ')}`);
+        
     } catch (error) {
-        console.error("❌ Erro ao registrar comandos:", error);
+        logger.error('Falha ao registrar comandos', error);
+        logger.warn('O bot continuará funcionando, mas os comandos podem não estar disponíveis.');
     }
 }
 
-client.once('ready', async () => {
-    console.log("====================================");
-    console.log("🤖 BOT ONLINE");
-    console.log(`👤 ${client.user.tag}`);
-    console.log(`🆔 ${client.user.id}`);
-    console.log(`📅 Iniciado em: ${new Date().toLocaleString('pt-BR')}`);
-    console.log("====================================");
+// ==================== EVENTOS ====================
 
-    await registerCommands();
-
-    console.log(" ");
-    console.log("═══════════════════════════════════");
-    console.log("  Todos os Serviços Foram Carregados com Sucesso✅️");
-    console.log("═══════════════════════════════════");
+// Evento: Bot pronto
+client.once('ready', () => {
+    logger.line('═');
+    logger.success('🤖 BOT ONLINE');
+    logger.info(`👤 Tag: ${client.user.tag}`);
+    logger.info(`🆔 ID: ${client.user.id}`);
+    logger.info(`📊 Servidores: ${client.guilds.cache.size}`);
+    logger.line('═');
+    
+    registerCommands();
 });
 
-client.on('interactionCreate', async interaction => {
+// Evento: Erros não tratados
+process.on('uncaughtException', (error) => {
+    logger.error('Erro não capturado!', error);
+    logger.warn('Tentando reconectar em 5 segundos...');
+    
+    setTimeout(() => {
+        logger.info('Reiniciando bot...');
+        process.exit(1);
+    }, 5000);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Promessa rejeitada não tratada', reason);
+});
+
+// Evento: Interação
+client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
-    console.log(`📌 Comando recebido: /${interaction.commandName}`);
-    console.log(`   👤 Usuário: ${interaction.user.tag} (${interaction.user.id})`);
-    console.log(`   📺 Canal: ${interaction.channel.name} (${interaction.channel.id})`);
-    console.log(`   🏠 Servidor: ${interaction.guild.name}`);
+    const { commandName, user } = interaction;
+    logger.command(`/${commandName}`, user.tag);
 
-    try {
-        if (interaction.commandName === 'rule') {
-            console.log("   🔐 Verificando código de acesso...");
-            const codigoDigitado = interaction.options.getString('code');
+    // ========= /RULE =========
+    if (commandName === 'rule') {
+        const codigoDigitado = interaction.options.getString('code');
 
-            if (codigoDigitado !== ACCESS_CODE) {
-                console.log("   ❌ Código incorreto digitado");
-                return interaction.reply({
-                    content: "❌ Código de acesso inválido.",
-                    flags: 64
-                });
-            }
+        if (codigoDigitado !== ACCESS_CODE) {
+            logger.warn(`Código incorreto usado por ${user.tag}`);
+            
+            return interaction.reply({
+                content: "❌ **Código de acesso inválido.**\nTente novamente com o código correto.",
+                ephemeral: true
+            });
+        }
 
-            console.log("   ✅ Código correto! Enviando regras...");
-            await interaction.deferReply({ flags: 64 });
+        await interaction.deferReply({ ephemeral: true });
 
-            const embed = new EmbedBuilder()
-                .setColor(0x89CFF0)
-                .setTitle("📜 Regras - HostVille Greenville RP")
-                .setDescription(`
+        const embed = new EmbedBuilder()
+            .setColor(0x89CFF0)
+            .setTitle("📜 Regras - HostVille Greenville RP")
+            .setDescription(`
 As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
 
 ➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
 
 ━━━━━━━━━━━━━━━━━━━━
 
-📘 **Para mais informações sobre as regras, visite o documento abaixo:**
+📘 **Para mais informações sobre as regras, acesse o documento abaixo:**
 
 📚 [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)
 
@@ -128,202 +214,54 @@ As regras gerais têm como objetivo garantir a ordem, o respeito e a boa conviv�
 ━━━━━━━━━━━━━━━━━━━━
 ✨ Powered by Y2k_Nat
 `)
-                .setImage("https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png");
+            .setImage("https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png");
 
-            await interaction.channel.send({ embeds: [embed] });
-            await interaction.deleteReply();
-            console.log("   ✅ Regras enviadas com sucesso!");
-        }
+        await interaction.channel.send({ embeds: [embed] });
+        await interaction.deleteReply();
+        
+        logger.success(`Regras enviadas para ${user.tag} no canal ${interaction.channel.name}`);
+    }
 
-        if (interaction.commandName === 'info') {
-            console.log("   📊 Coletando informações do bot...");
-            const uptime = process.uptime();
-            const hours = Math.floor(uptime / 3600);
-            const minutes = Math.floor((uptime % 3600) / 60);
-            const seconds = Math.floor(uptime % 60);
+    // ========= /INFO =========
+    if (commandName === 'info') {
+        const uptime = process.uptime();
+        const hours = Math.floor(uptime / 3600);
+        const minutes = Math.floor((uptime % 3600) / 60);
+        const seconds = Math.floor(uptime % 60);
 
-            const embed = new EmbedBuilder()
-                .setColor(0x89CFF0)
-                .setTitle("🤖 Informações do Bot")
-                .addFields(
-                    { name: "Nome", value: client.user.tag, inline: true },
-                    { name: "ID", value: client.user.id, inline: true },
-                    { name: "Servidores", value: `${client.guilds.cache.size}`, inline: true },
-                    { name: "Uptime", value: `${hours}h ${minutes}m ${seconds}s`, inline: true }
-                )
-                .setFooter({ text: "HostVille Greenville RP" });
+        const embed = new EmbedBuilder()
+            .setColor(0x89CFF0)
+            .setTitle("🤖 Informações do Bot")
+            .addFields(
+                { name: "Nome", value: client.user.tag, inline: true },
+                { name: "ID", value: client.user.id, inline: true },
+                { name: "Servidores", value: `${client.guilds.cache.size}`, inline: true },
+                { name: "Uptime", value: `${hours}h ${minutes}m ${seconds}s`, inline: true },
+                { name: "Ping", value: `${client.ws.ping}ms`, inline: true }
+            )
+            .setFooter({ 
+                text: "HostVille Greenville RP",
+                iconURL: client.user.displayAvatarURL()
+            })
+            .setTimestamp();
 
-            await interaction.reply({
-                embeds: [embed],
-                flags: 64
-            });
-            console.log("   ✅ Informações enviadas!");
-        }
-    } catch (error) {
-        console.error("❌ Erro ao executar comando:", error);
-        try {
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ 
-                    content: "⚠️ Ocorreu um erro ao executar este comando. Tente novamente.", 
-                    flags: 64 
-                });
-            } else {
-                await interaction.reply({ 
-                    content: "⚠️ Ocorreu um erro ao executar este comando. Tente novamente.", 
-                    flags: 64 
-                });
-            }
-        } catch (e) {
-            console.error("❌ Erro ao enviar mensagem de erro:", e);
-        }
+        await interaction.reply({
+            embeds: [embed],
+            ephemeral: true
+        });
+        
+        logger.success(`Info enviada para ${user.tag}`);
     }
 });
 
-client.on('guildMemberAdd', (member) => {
-    console.log(`👋 Novo membro entrou: ${member.user.tag} (${member.user.id})`);
-    console.log(`   📊 Membros totais: ${member.guild.memberCount}`);
-    console.log(`   🏠 Servidor: ${member.guild.name}`);
-});
+// ==================== INICIAR BOT ====================
+validateEnv();
 
-client.on('guildMemberRemove', (member) => {
-    console.log(`👋 Membro saiu: ${member.user.tag} (${member.user.id})`);
-    console.log(`   📊 Membros restantes: ${member.guild.memberCount}`);
-    console.log(`   🏠 Servidor: ${member.guild.name}`);
-});
-
-client.on('messageCreate', (message) => {
-    if (message.author.bot) return;
-    console.log(`💬 Nova mensagem de ${message.author.tag}`);
-    console.log(`   📺 Canal: #${message.channel.name}`);
-    console.log(`   📝 Conteúdo: ${message.content.substring(0, 100)}${message.content.length > 100 ? '...' : ''}`);
-});
-
-client.on('messageDelete', (message) => {
-    if (message.author.bot) return;
-    console.log(`🗑️ Mensagem deletada de ${message.author.tag}`);
-    console.log(`   📺 Canal: #${message.channel.name}`);
-    console.log(`   📝 Conteúdo: ${message.content.substring(0, 100)}${message.content.length > 100 ? '...' : ''}`);
-});
-
-client.on('messageUpdate', (oldMessage, newMessage) => {
-    if (oldMessage.author.bot) return;
-    console.log(`✏️ Mensagem editada por ${oldMessage.author.tag}`);
-    console.log(`   📺 Canal: #${oldMessage.channel.name}`);
-    console.log(`   📝 Antes: ${oldMessage.content.substring(0, 100)}${oldMessage.content.length > 100 ? '...' : ''}`);
-    console.log(`   📝 Depois: ${newMessage.content.substring(0, 100)}${newMessage.content.length > 100 ? '...' : ''}`);
-});
-
-client.on('channelCreate', (channel) => {
-    console.log(`📁 Canal criado: #${channel.name} (${channel.type})`);
-    console.log(`   🏠 Servidor: ${channel.guild.name}`);
-});
-
-client.on('channelDelete', (channel) => {
-    console.log(`📁 Canal deletado: #${channel.name} (${channel.type})`);
-    console.log(`   🏠 Servidor: ${channel.guild.name}`);
-});
-
-client.on('channelUpdate', (oldChannel, newChannel) => {
-    console.log(`📁 Canal atualizado: #${oldChannel.name}`);
-    console.log(`   🏠 Servidor: ${oldChannel.guild.name}`);
-});
-
-client.on('roleCreate', (role) => {
-    console.log(`🎭 Cargo criado: ${role.name}`);
-    console.log(`   🏠 Servidor: ${role.guild.name}`);
-});
-
-client.on('roleDelete', (role) => {
-    console.log(`🎭 Cargo deletado: ${role.name}`);
-    console.log(`   🏠 Servidor: ${role.guild.name}`);
-});
-
-client.on('roleUpdate', (oldRole, newRole) => {
-    console.log(`🎭 Cargo atualizado: ${oldRole.name} → ${newRole.name}`);
-    console.log(`   🏠 Servidor: ${oldRole.guild.name}`);
-});
-
-client.on('guildBanAdd', (ban) => {
-    console.log(`🔨 Usuário banido: ${ban.user.tag} (${ban.user.id})`);
-    console.log(`   🏠 Servidor: ${ban.guild.name}`);
-});
-
-client.on('guildBanRemove', (ban) => {
-    console.log(`✅ Usuário desbanido: ${ban.user.tag} (${ban.user.id})`);
-    console.log(`   🏠 Servidor: ${ban.guild.name}`);
-});
-
-client.on('inviteCreate', (invite) => {
-    console.log(`🔗 Invite criado: ${invite.url}`);
-    console.log(`   👤 Criado por: ${invite.inviter.tag}`);
-    console.log(`   📺 Canal: ${invite.channel.name}`);
-    console.log(`   🏠 Servidor: ${invite.guild.name}`);
-});
-
-client.on('inviteDelete', (invite) => {
-    console.log(`🔗 Invite deletado: ${invite.url}`);
-    console.log(`   📺 Canal: ${invite.channel.name}`);
-    console.log(`   🏠 Servidor: ${invite.guild.name}`);
-});
-
-client.on('emojiCreate', (emoji) => {
-    console.log(`😀 Emoji criado: ${emoji.name}`);
-    console.log(`   📎 URL: ${emoji.url}`);
-    console.log(`   🏠 Servidor: ${emoji.guild.name}`);
-});
-
-client.on('emojiDelete', (emoji) => {
-    console.log(`😀 Emoji deletado: ${emoji.name}`);
-    console.log(`   🏠 Servidor: ${emoji.guild.name}`);
-});
-
-client.on('stickerCreate', (sticker) => {
-    console.log(`📦 Sticker criado: ${sticker.name}`);
-    console.log(`   🏠 Servidor: ${sticker.guild.name}`);
-});
-
-client.on('stickerDelete', (sticker) => {
-    console.log(`📦 Sticker deletado: ${sticker.name}`);
-    console.log(`   🏠 Servidor: ${sticker.guild.name}`);
-});
-
-client.on('voiceStateUpdate', (oldState, newState) => {
-    const member = oldState.member || newState.member;
-    if (!member) return;
-    if (!oldState.channelId && newState.channelId) {
-        console.log(`🎤 ${member.user.tag} entrou no canal de voz`);
-        console.log(`   🔊 Canal: ${newState.channel.name}`);
-        console.log(`   🏠 Servidor: ${newState.guild.name}`);
-    } else if (oldState.channelId && !newState.channelId) {
-        console.log(`🎤 ${member.user.tag} saiu do canal de voz`);
-        console.log(`   🔊 Canal: ${oldState.channel.name}`);
-        console.log(`   🏠 Servidor: ${oldState.guild.name}`);
-    } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
-        console.log(`🎤 ${member.user.tag} mudou de canal de voz`);
-        console.log(`   🔊 De: ${oldState.channel.name} → Para: ${newState.channel.name}`);
-        console.log(`   🏠 Servidor: ${newState.guild.name}`);
-    }
-});
-
-client.on('disconnect', () => {
-    console.log("⚠️ Bot desconectado do Discord!");
-});
-
-client.on('reconnecting', () => {
-    console.log("🔄 Tentando reconectar ao Discord...");
-});
-
-client.on('error', (error) => {
-    console.error("❌ Erro na conexão do bot:", error);
-});
-
-client.login(TOKEN);
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error("❌ Promise rejeitada não tratada:", reason);
-});
-
-process.on('uncaughtException', (error) => {
-    console.error("❌ Exceção não tratada:", error);
-    process.exit(1);
-});
+client.login(TOKEN)
+    .then(() => {
+        logger.success('Conectado ao Discord!');
+    })
+    .catch((error) => {
+        logger.error('Falha ao conectar ao Discord', error);
+        process.exit(1);
+    });
