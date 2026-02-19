@@ -9,6 +9,7 @@ const {
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = "1473705296101900420";
+const GUILD_ID = "928614664840052757";
 const ACCESS_CODE = process.env.ACCESS_CODE;
 
 if (!TOKEN) {
@@ -46,10 +47,10 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
 async function registerCommands() {
     try {
         await rest.put(
-            Routes.applicationCommands(CLIENT_ID),
+            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
             { body: commands }
         );
-        console.log("✅ Comandos registrados!");
+        console.log("✅ Comandos registrados instantaneamente no servidor!");
     } catch (error) {
         console.error("Erro ao registrar comandos:", error);
     }
@@ -75,7 +76,6 @@ client.on('interactionCreate', async interaction => {
 
         const codigoDigitado = interaction.options.getString('code');
 
-        // 🔐 Verifica código
         if (codigoDigitado !== ACCESS_CODE) {
             return interaction.reply({
                 content: "❌ Código de acesso inválido.",
