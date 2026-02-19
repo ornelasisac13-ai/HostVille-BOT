@@ -3,14 +3,16 @@
   "version": "1.0.0",
   "description": "Bot de regras HostVille Greenville RP",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "start": "node --no-warnings index.js",
-    "dev": "node --no-warnings index.js"
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1"
   },
   "engines": {
     "node": "20.x"
   },
-  "dependencies": {
-    "discord.js": "^14.14.1"
-  }
+  "license": "MIT"
 }
