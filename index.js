@@ -70,6 +70,10 @@ function getLastRestart() {
   return `${date.toLocaleDateString('pt-BR')} ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+function pad(str, len) {
+  return str + ' '.repeat(Math.max(0, len - str.length));
+}
+
 // ==================== LOGGER ====================
 const log = {
   info: msg => console.log(chalk.gray(`[${getTime()}]`) + chalk.cyan(` [INFO] `) + msg),
@@ -138,14 +142,14 @@ const log = {
     console.log(chalk.gray(`   ╔═══════════════════════════════════════════════════════════════╗`));
     console.log(chalk.gray(`   ║`) + chalk.white(` 🤖 HOSTVILLE • BOT v2.3                                     `) + chalk.gray(`║`));
     console.log(chalk.gray(`   ╠═══════════════════════════════════════════════════════════════╣`));
-    console.log(chalk.gray(`   ║`) + chalk.white(` Bot:        `) + chalk.cyan(botName) + chalk.gray(' '.repeat(50 - botName.length)) + `║`));
-    console.log(chalk.gray(`   ║`) + chalk.white(` Servidores:`) + chalk.cyan(` ${client.guilds.cache.size}`) + chalk.gray(' '.repeat(51 - String(client.guilds.cache.size).length)) + `║`));
-    console.log(chalk.gray(`   ║`) + chalk.white(` RAM:        `) + chalk.cyan(` ${mem.heapUsed} MB`) + chalk.gray(' '.repeat(51 - String(mem.heapUsed).length - 3)) + `║`));
-    console.log(chalk.gray(`   ║`) + chalk.white(` CPU:        `) + chalk.cyan(` ${cpu.usage}% (${cpu.cores} cores)`) + chalk.gray(' '.repeat(51 - String(cpu.usage).length - String(cpu.cores).length - 10)) + `║`));
-    console.log(chalk.gray(`   ║`) + chalk.white(` Uptime:     `) + chalk.cyan(` ${getUptime()}`) + chalk.gray(' '.repeat(51 - getUptime().length)) + `║`));
-    console.log(chalk.gray(`   ║`) + chalk.white(` Última ação:`) + chalk.yellow(` ${stats.lastAction}`) + chalk.gray(' '.repeat(51 - stats.lastAction.length - 10)) + `║`));
-    console.log(chalk.gray(`   ║`) + chalk.white(` Último res:`) + chalk.cyan(` ${getLastRestart()}`) + chalk.gray(' '.repeat(51 - getLastRestart().length)) + `║`));
-    console.log(chalk.gray(`   ║`) + chalk.white(` Erros:      `) + (stats.errors > 0 ? chalk.red(` ${stats.errors}`) : chalk.green(` 0`)) + chalk.gray(' '.repeat(51 - String(stats.errors).length)) + `║`));
+    console.log(chalk.gray(`   ║`) + chalk.white(` Bot:        `) + chalk.cyan(pad(botName, 50)) + chalk.gray(`║`));
+    console.log(chalk.gray(`   ║`) + chalk.white(` Servidores:`) + chalk.cyan(pad(String(client.guilds.cache.size), 50)) + chalk.gray(`║`));
+    console.log(chalk.gray(`   ║`) + chalk.white(` RAM:        `) + chalk.cyan(pad(mem.heapUsed + ' MB', 50)) + chalk.gray(`║`));
+    console.log(chalk.gray(`   ║`) + chalk.white(` CPU:        `) + chalk.cyan(pad(cpu.usage + '% (' + cpu.cores + ' cores)', 50)) + chalk.gray(`║`));
+    console.log(chalk.gray(`   ║`) + chalk.white(` Uptime:     `) + chalk.cyan(pad(getUptime(), 50)) + chalk.gray(`║`));
+    console.log(chalk.gray(`   ║`) + chalk.white(` Última ação:`) + chalk.yellow(pad(stats.lastAction, 50)) + chalk.gray(`║`));
+    console.log(chalk.gray(`   ║`) + chalk.white(` Último res:`) + chalk.cyan(pad(getLastRestart(), 50)) + chalk.gray(`║`));
+    console.log(chalk.gray(`   ║`) + chalk.white(` Erros:      `) + (stats.errors > 0 ? chalk.red(pad(String(stats.errors), 50)) : chalk.green(pad('0', 50))) + chalk.gray(`║`));
     console.log(chalk.gray(`   ╚═══════════════════════════════════════════════════════════════╝`));
     console.log('');
   }
@@ -276,4 +280,6 @@ setInterval(() => {
   const mem = getMemory();
   const cpu = getCPU();
   log.info(`Monitor: RAM ${mem.heapUsed}MB | CPU ${cpu.usage}% | Ping ${client.ws.ping}ms`);
-}, 30
+}, 30 * 60 * 1000);
+
+// ====================
