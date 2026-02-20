@@ -33,18 +33,13 @@ commands.push({
     options: [
       {
         name: 'code',
-        type: 3, // STRING
+        type: 3,
         description: 'Senha de acesso',
         required: true,
       },
     ],
   },
   async execute(interaction) {
-    const { EmbedBuilder } = require('discord.js'); // Removido, usar o do topo
-    // Como já importamos EmbedBuilder no topo, podemos usar diretamente:
-
-    const { EmbedBuilder } = require('discord.js');
-
     const code = interaction.options.getString('code');
     if (code !== process.env.ACCESS_CODE) {
       return interaction.reply({ content: 'Código incorreto!', ephemeral: true });
@@ -78,9 +73,7 @@ commands.push({
       );
 
     await interaction.channel.send({ embeds: [embed] });
-
-    const imageUrl = 'https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png';
-    await interaction.channel.send({ content: imageUrl });
+    await interaction.channel.send({ content: 'https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png' });
   },
 });
 
@@ -99,15 +92,11 @@ commands.push({
     ],
   },
   async execute(interaction) {
-    const { EmbedBuilder } = require('discord.js'); // Removido, usar do topo
-    // Como já importamos EmbedBuilder no topo, podemos usar diretamente:
-
-    const { EmbedBuilder } = require('discord.js');
-
     const code = interaction.options.getString('code');
     if (code !== process.env.ACCESS_CODE) {
       return interaction.reply({ content: 'Código incorreto!', ephemeral: true });
     }
+
     const guild = interaction.guild;
     const info = `
 Servidor: ${guild.name}
@@ -134,11 +123,6 @@ commands.push({
     ],
   },
   async execute(interaction) {
-    const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js'); // Removido, usar do topo
-    // Como já importamos no topo, podemos usar diretamente:
-
-    const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-
     const code = interaction.options.getString('code');
     if (code !== process.env.ACCESS_CODE) {
       return interaction.reply({ content: 'Código incorreto!', ephemeral: true });
@@ -162,9 +146,6 @@ commands.push({
 // Listener para botões
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton()) {
-    const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js'); // Removido, usar do topo
-    // Como já importamos no topo, podemos usar diretamente:
-
     switch (interaction.customId) {
       case 'stats': {
         const uptimeSeconds = Math.floor(client.uptime / 1000);
@@ -197,15 +178,13 @@ client.on('interactionCreate', async (interaction) => {
 // Quando o bot estiver pronto
 client.once('ready', async () => {
   console.log(chalk.yellow('Bot está online!'));
-  // Log de comandos registrados
-  for (const cmd of commands) {
-    logCommand(cmd.data.name);
-  }
+  for (const cmd of commands) logCommand(cmd.data.name);
+
   // Registrar comandos globais
   if (client.application?.commands) {
     await client.application.commands.set(commands.map(c => c.data));
   }
 });
 
-// Login do bot
+// Login
 client.login(process.env.TOKEN);
