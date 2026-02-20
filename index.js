@@ -16,6 +16,10 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
 });
 
+// === VARIÁVEL GLOBAL PARA CONTROLAR O READLINE ===
+let rl = null;
+let isMenuActive = false;
+
 // === FUNÇÕES DE LOG ===
 function getTimestamp() {
   return chalk.gray(`[${new Date().toLocaleString('pt-BR')}]`);
@@ -31,10 +35,6 @@ function logError(message) {
 
 function logWarn(message) {
   console.log(`${getTimestamp()} ${chalk.yellow('⚠ AVISO')}: ${chalk.white(message)}`);
-}
-
-function logEvent(event, message) {
-  console.log(`${getTimestamp()} ${chalk.magenta('◆ ' + event)}: ${message}`);
 }
 
 // === COMANDO /adm ===
@@ -80,8 +80,24 @@ client.once('clientReady', async () => {
 
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
   
+  // Inicia o menu interativo
+  initReadline();
   showMenu();
 });
+
+// === INICIALIZAR READLINE ===
+function initReadline() {
+  if (!rl) {
+    rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    
+    rl.on('close', () => {
+      isMenuActive = false;
+    });
+  }
+}
 
 // === EVENTO: INTERAÇÃO (BOTÕES) ===
 client.on('interactionCreate', async (interaction) => {
@@ -197,12 +213,10 @@ process.on('uncaughtException', (error) => {
 //        MENU INTERATIVO NO CONSOLE
 // ==========================================
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
 function showMenu() {
+  if (isMenuActive) return;
+  isMenuActive = true;
+  
   console.log(chalk.cyan('\n╔══════════════════════════════════════╗'));
   console.log(chalk.cyan('║      🎮 MENU DO CONSOLE DO BOT       ║'));
   console.log(chalk.cyan('╠══════════════════════════════════════╣'));
@@ -215,11 +229,16 @@ function showMenu() {
   console.log(chalk.cyan('╚══════════════════════════════════════╝'));
   
   rl.question(chalk.yellow('\n👉 Escolha uma opção: '), (answer) => {
+    isMenuActive = false;
     handleMenuOption(answer);
   });
 }
 
-async function handleMenuOption(option) {
+function handleMenuOption(option) {
+  if (!rl || rl.closed) {
+    initReadline();
+  }
+  
   switch (option) {
     case '1':
       showStats();
@@ -239,7 +258,9 @@ async function handleMenuOption(option) {
       break;
     case '0':
       console.log(chalk.red('❌ Encerrando...'));
-      rl.close();
+      if (rl && !rl.closed) {
+        rl.close();
+      }
       process.exit(0);
     default:
       console.log(chalk.red('❌ Opção inválida!'));
