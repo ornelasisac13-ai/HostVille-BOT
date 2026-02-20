@@ -5,6 +5,7 @@ import { Client, GatewayIntentBits } from 'discord.js';
 import chalk from 'chalk';
 
 const TOKEN = process.env.TOKEN || 'SEU_TOKEN_AQUI';
+const GUILD_ID = '928614664840052757'; // substitua pelo ID do seu servidor
 
 if (!TOKEN || TOKEN === 'SEU_TOKEN_AQUI') {
   console.error(chalk.red('⚠️ TOKEN do bot não definido!'));
@@ -15,14 +16,14 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.once('ready', async () => {
   console.log(chalk.green('✅ Bot ligado!'));
-  console.log(chalk.white('🔎 Checando comandos cadastrados...'));
+  console.log(chalk.white(`🔎 Checando comandos do servidor (${GUILD_ID})...`));
 
   try {
-    // Pega todos os comandos globais
-    const commands = await client.application.commands.fetch();
+    const guild = await client.guilds.fetch(GUILD_ID);
+    const commands = await guild.commands.fetch();
 
     if (!commands.size) {
-      console.log(chalk.yellow('Nenhum comando cadastrado.'));
+      console.log(chalk.yellow('Nenhum comando cadastrado neste servidor.'));
       return;
     }
 
@@ -33,15 +34,15 @@ client.once('ready', async () => {
 
     // Deletando cada comando
     for (const cmd of commands.values()) {
-      await client.application.commands.delete(cmd.id);
+      await guild.commands.delete(cmd.id);
       console.log(chalk.red(`❌ Comando deletado: /${cmd.name}`));
     }
 
-    console.log(chalk.green('✅ Todos os comandos foram removidos!'));
+    console.log(chalk.green('✅ Todos os comandos do servidor foram removidos!'));
   } catch (err) {
     console.error(chalk.red('Erro ao buscar ou deletar comandos:'), err);
   } finally {
-    process.exit(0); // fecha o bot após limpar
+    process.exit(0);
   }
 });
 
