@@ -1,49 +1,115 @@
+// index.js
+import { Client, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import dotenv from 'dotenv';
-dotenv.config();
-
-import { Client, GatewayIntentBits } from 'discord.js';
 import chalk from 'chalk';
 
-const TOKEN = process.env.TOKEN || 'SEU_TOKEN_AQUI';
-const GUILD_ID = '928614664840052757'; // substitua pelo ID do seu servidor
+dotenv.config();
 
-if (!TOKEN || TOKEN === 'SEU_TOKEN_AQUI') {
-  console.error(chalk.red('⚠️ TOKEN do bot não definido!'));
-  process.exit(1);
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.MessageDelete, // necessário para deletar mensagens
+  ],
+  partials: [Partials.Channel, Partials.Message],
+});
+
+// Função para logar eventos
+function logEvent(title, content) {
+  console.log(chalk.green(`=== ${title} ===`));
+  console.log(content);
+  console.log(chalk.green('===================\n'));
 }
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+// Comando /adm
+const commands = [
+  {
+    data: {
+      name: 'adm',
+      description: 'Painel Administrativo',
+      options: [
+        {
+          name: 'code',
+          type: 3, // STRING
+          description: 'Senha de acesso',
+          required: true,
+        },
+      ],
+    },
+    async execute(interaction) {
+      const code = interaction.options.getString('code');
+      if (code !== process.env.ACCESS_CODE) {
+        return interaction.reply({ content: 'Código incorreto!', flags: 64 });
+      }
 
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('stats')
+          .setLabel('Estatísticas')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId('console')
+          .setLabel('Enviar para console')
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+      await interaction.reply({ content: 'Painel Administrativo:', components: [row], flags: 64 });
+    },
+  },
+];
+
+// Registrar comandos no Discord
 client.once('ready', async () => {
-  console.log(chalk.green('✅ Bot ligado!'));
-  console.log(chalk.white(`🔎 Checando comandos do servidor (${GUILD_ID})...`));
+  console.log(chalk.yellow('Bot online! Registrando comando /adm...'));
+  if (client.application?.commands) {
+    await client.application.commands.set(commands.map(c => c.data));
+    console.log(chalk.green('Comando /adm registrado com sucesso!'));
+  }
+});
+// Interações de botões
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isButton()) return;
 
-  try {
-    const guild = await client.guilds.fetch(GUILD_ID);
-    const commands = await guild.commands.fetch();
-
-    if (!commands.size) {
-      console.log(chalk.yellow('Nenhum comando cadastrado neste servidor.'));
-      return;
+  switch (interaction.customId) {
+    case 'stats': {
+      const guild = interaction.guild;
+      const uptimeSeconds = Math.floor(client.uptime / 1000);
+      const embed = new EmbedBuilder()
+        .setTitle('Estatísticas do Bot')
+        .setColor('#00FF00')
+        .addFields(
+          { name: 'Servidor', value: `${guild.name}`, inline: true },
+          { name: 'Criado em', value: `${guild.createdAt.toDateString()}`, inline: true },
+          { name: 'Total de membros', value: `${guild.memberCount}`, inline: true },
+          { name: 'Ping', value: `${client.ws.ping}ms`, inline: true },
+          { name: 'Uptime', value: `${Math.floor(uptimeSeconds/3600)}h ${Math.floor((uptimeSeconds%3600)/60)}m ${uptimeSeconds%60}s`, inline: true }
+        );
+      await interaction.reply({ embeds: [embed], flags: 64 });
+      break;
     }
-
-    console.log(chalk.blue(`Comandos encontrados (${commands.size}):`));
-    commands.forEach(cmd => {
-      console.log(chalk.cyan(`- /${cmd.name} (ID: ${cmd.id})`));
-    });
-
-    // Deletando cada comando
-    for (const cmd of commands.values()) {
-      await guild.commands.delete(cmd.id);
-      console.log(chalk.red(`❌ Comando deletado: /${cmd.name}`));
+    case 'console': {
+      const guild = interaction.guild;
+      const uptimeSeconds = Math.floor(client.uptime / 1000);
+      console.log('=== Estatísticas do Bot ===');
+      console.log(`Servidor: ${guild.name}`);
+      console.log(`Criado em: ${guild.createdAt}`);
+      console.log(`Total de membros: ${guild.memberCount}`);
+      console.log(`Ping: ${client.ws.ping}ms`);
+      console.log(`Uptime: ${Math.floor(uptimeSeconds/3600)}h ${Math.floor((uptimeSeconds%3600)/60)}m ${uptimeSeconds%60}s`);
+      console.log('===========================');
+      await interaction.reply({ content: 'Estatísticas enviadas ao console!', flags: 64 });
+      break;
     }
-
-    console.log(chalk.green('✅ Todos os comandos do servidor foram removidos!'));
-  } catch (err) {
-    console.error(chalk.red('Erro ao buscar ou deletar comandos:'), err);
-  } finally {
-    process.exit(0);
   }
 });
 
-client.login(TOKEN);
+// Listener de mensagens deletadas
+client.on('messageDelete', async (message) => {
+  const author = message.author ? `${message.author.tag} (${message.author.id})` : 'Desconhecido';
+  const content = message.content ? message.content : '[Conteúdo não disponível]';
+  logEvent('Mensagem Apagada', `Autor: ${author}\nCanal: ${message.channel.name}\nConteúdo: ${content}`);
+});
+
+// Login do bot
+client.login(process.env.TOKEN);
