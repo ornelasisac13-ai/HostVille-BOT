@@ -3,16 +3,14 @@
   "version": "1.0.0",
   "description": "Bot Discord com logs no console",
   "main": "index.js",
-  "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "start": "node index.js"
   },
   "keywords": ["discord", "bot"],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "chalk": "^5.3.0",
+    "chalk": "^4.1.2",
     "discord.js": "^14.14.1",
     "dotenv": "^16.4.5"
   }
