@@ -1,19 +1,12 @@
-// index.js - Parte 1/2
-import { 
-  Client, 
-  GatewayIntentBits, 
-  Partials, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
-  ButtonStyle, 
-  EmbedBuilder 
-} from 'discord.js';
+// index.js - Parte 1
+import { Client, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
 
 dotenv.config();
 
-// Inicializa o cliente
+const GUILD_ID = '928614664840052757'; // ID do servidor de teste
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -34,8 +27,7 @@ ${chalk.green('=== Comando Registrado:')} ${chalk.cyan(commandName)}
 // Array de comandos
 const commands = [];
 
-// ---------------------------
-// /rules
+// ---------------- /rules ----------------
 commands.push({
   data: {
     name: 'rules',
@@ -89,8 +81,7 @@ commands.push({
   },
 });
 
-// ---------------------------
-// /serverinfo
+// ---------------- /serverinfo ----------------
 commands.push({
   data: {
     name: 'serverinfo',
@@ -116,12 +107,12 @@ ID: ${guild.id}
 Total de membros: ${guild.memberCount}
 Criado em: ${guild.createdAt.toDateString()}
 `;
-    return interaction.reply({ content: info, ephemeral: true });
+    return interaction.reply(info);
   },
 });
+// index.js - Parte 2
 
-// ---------------------------
-// /adm
+// ---------------- /adm ----------------
 commands.push({
   data: {
     name: 'adm',
@@ -155,8 +146,8 @@ commands.push({
     await interaction.reply({ content: 'Painel Administrativo:', components: [row], ephemeral: true });
   },
 });
-// ---------------------------
-// Listener para interações de botões
+
+// ---------------- Listener de botões ----------------
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton()) {
     switch (interaction.customId) {
@@ -167,7 +158,7 @@ client.on('interactionCreate', async (interaction) => {
           .setColor('#00FF00')
           .addFields(
             { name: 'Ping', value: `${client.ws.ping}ms`, inline: true },
-            { name: 'Uptime', value: `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`, inline: true },
+            { name: 'Uptime', value: `${Math.floor(uptimeSeconds/3600)}h ${Math.floor((uptimeSeconds%3600)/60)}m ${uptimeSeconds%60}s`, inline: true },
             { name: 'Servidores', value: `${client.guilds.cache.size}`, inline: true },
             { name: 'Usuários', value: `${client.users.cache.size}`, inline: true }
           );
@@ -188,9 +179,8 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-// ---------------------------
-// Evento clientReady (Discord.js v15+)
-client.once('clientReady', async () => {
+// ---------------- Ready e registro de comandos por guild ----------------
+client.once('ready', async () => {
   console.log(chalk.yellow('Bot está online!'));
 
   // Log de comandos registrados
@@ -198,25 +188,16 @@ client.once('clientReady', async () => {
     logCommand(cmd.data.name);
   }
 
-  // Registrar comandos globalmente
-  if (client.application?.commands) {
-    await client.application.commands.set(commands.map(c => c.data));
-    console.log(chalk.green('Todos os comandos foram registrados globalmente.'));
+  try {
+    const guild = client.guilds.cache.get(GUILD_ID);
+    if (!guild) return console.error('Servidor não encontrado para registrar comandos!');
+
+    await guild.commands.set(commands.map(c => c.data));
+    console.log(chalk.green('Comandos registrados na guild com sucesso!'));
+  } catch (err) {
+    console.error('Erro ao registrar comandos na guild:', err);
   }
 });
 
-// ---------------------------
-// Login do bot
-if (!process.env.TOKEN) {
-  console.error(chalk.red('❌ TOKEN do bot não definido!'));
-  process.exit(1);
-}
-
-if (!process.env.ACCESS_CODE) {
-  console.error(chalk.red('❌ ACCESS_CODE não definido!'));
-  process.exit(1);
-}
-
-client.login(process.env.TOKEN).catch(err => {
-  console.error(chalk.red('Erro ao logar o bot:'), err);
-});
+// ---------------- Login ----------------
+client.login(process.env.TOKEN);
