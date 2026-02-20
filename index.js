@@ -94,86 +94,57 @@ function addActivityLog(entry) {
   }
 }
 
-// Comandos
-client.commands = new Collection();
+// =======================
+// Limpar comandos atuais e atualizar
+// =======================
 
-client.commands.set('rules', {
-  name: 'rules',
-  description: 'Mostra as regras do servidor',
-  options: [
-    { name: 'code', type: 3, description: 'Código de acesso', required: true }
-  ],
-  execute: async (interaction) => {
-    const code = interaction.options.getString('code');
-    if (code !== ACCESS_CODE) {
-      interaction.reply({ content: 'Código incorreto.', ephemeral: true });
-      return;
-    }
-    const embed = new EmbedBuilder()
-      .setColor('#89CFF0')
-      .setDescription(`As regras gerais têm como objetivo garantir a ordem, o respeito e a boa convivência entre todos.
-
-➤ Ao participar do HostVille Greenville RP, você concorda em agir com educação, responsabilidade e bom senso.
-
-━━━━━━━━━━━━━━━━━━━━
-
-📘 **Para mais informações sobre as regras, acesse o documento abaixo:**
-
-📚 [Regras](https://docs.google.com/document/d/1ZU-oLyI88HEB2RMDunr4NNF1nkGQ3BWmcyYagY0T3dk/edit?usp=drivesdk)
-
-━━━━━━━━━━━━━━━━━━━━
-
-🔗 **Documentos Oficiais**
-
-📄 [Política de Privacidade](https://docs.google.com/document/d/1hoL-0AcJhrTXZAPIschLxoeF3kzAi7knTVPDXdT20nE/edit?usp=drivesdk)
-
-📜 [Termos de Uso](https://docs.google.com/document/d/1ZrScgrEAb7NnBGZW1XLQvBRaGIDrzatq8XBjlVyYP_k/edit?usp=drivesdk)
-
-━━━━━━━━━━━━━━━━━━━━
-✨ Powered by Y2k_Nat`);
-    await interaction.reply({ embeds: [embed] });
+async function clearAndRegisterCommands() {
+  // Deleta todos comandos globais existentes
+  const commands = await client.application.commands.fetch();
+  for (const command of commands.values()) {
+    await client.application.commands.delete(command.id);
+    logInfo(`Comando deletado: /${command.name}`);
   }
-});
 
-client.commands.set('adm', {
-  name: 'adm',
-  description: 'Painel administrativo',
-  options: [
-    { name: 'code', type: 3, description: 'Código de acesso', required: true }
-  ],
-  execute: async (interaction) => {
-    const btnStats = new ButtonBuilder().setCustomId('stats').setLabel('Estatísticas').setStyle(ButtonStyle.Primary);
-    const btnReport = new ButtonBuilder().setCustomId('report').setLabel('Enviar Relatórios').setStyle(ButtonStyle.Secondary);
-    const btnClean = new ButtonBuilder().setCustomId('cleanConsole').setLabel('Clean Console').setStyle(ButtonStyle.Danger);
-    const row = new ActionRowBuilder().addComponents(btnStats, btnReport, btnClean);
-    await interaction.reply({ content: 'Painel Administrativo:', components: [row], ephemeral: true });
-    stats.panelAccesses++;
-  }
-});
+  // Define os comandos atualizados
+  const commandsData = [
+    {
+      name: 'rules',
+      description: 'Mostra as regras do servidor',
+      options: [
+        { name: 'code', type: 3, description: 'Código de acesso', required: true }
+      ],
+    },
+    {
+      name: 'adm',
+      description: 'Painel administrativo',
+      options: [
+        { name: 'code', type: 3, description: 'Código de acesso', required: true }
+      ],
+    },
+    {
+      name: 'serverinfo',
+      description: 'Mostra informações do servidor',
+      options: [
+        { name: 'code', type: 3, description: 'Código de acesso', required: true }
+      ],
+    },
+  ];
 
-client.commands.set('serverinfo', {
-  name: 'serverinfo',
-  description: 'Mostra informações do servidor',
-  options: [
-    { name: 'code', type: 3, description: 'Código de acesso', required: true }
-  ],
-  execute: async (interaction) => {
-    const code = interaction.options.getString('code');
-    if (code !== ACCESS_CODE) {
-      interaction.reply({ content: 'Código incorreto.', ephemeral: true });
-      return;
-    }
-    const guild = interaction.guild;
-    const embed = new EmbedBuilder()
-      .setTitle('Informações do Servidor')
-      .setColor('#89CFF0')
-      .addFields(
-        { name: 'Canais', value: `${guild.channels.cache.size}`, inline: true },
-        { name: 'Membros', value: `${guild.memberCount}`, inline: true },
-        { name: 'Emojis', value: `${guild.emojis.cache.size}`, inline: true }
-      );
-    await interaction.reply({ embeds: [embed] });
-  }
+  // Registra os novos comandos
+  await client.application.commands.set(commandsData);
+  logInfo('Comandos atualizados!');
+}
+
+// =======================
+// Quando o bot estiver pronto
+// =======================
+client.once('ready', async () => {
+  console.log(chalk.green('✅ Bot ligado!'));
+  logInfo('Bot iniciado com sucesso e pronto para uso.');
+
+  // Limpa e registra comandos
+  await clearAndRegisterCommands();
 });
 
 // Eventos de mensagens
@@ -198,7 +169,6 @@ client.on('messageCreate', (message) => {
 // Evento mensagem deletada
 client.on('messageDelete', (message) => {
   if (message.author && message.author.bot) return;
-  // Para evitar crash ao deletar mensagens sem conteúdo (ex: embed, arquivo)
   if (!message.content && !message.embeds?.length && !message.attachments?.size) return;
   logMensagemDeletada(`Mensagem deletada de ${message.author ? message.author.tag : 'Desconhecido'} no canal ${message.channel.name}: ${message.content}`);
   stats.messagesDeleted++;
@@ -240,11 +210,11 @@ client.on('guildMemberRemove', (member) => {
   logLeave(`${member.user.tag} saiu do servidor`);
 });
 
-// Evento de interação
+// Eventos de interação
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand()) {
     stats.totalInputs++;
-    stats.totalCommands++; // Incrementa comandos utilizados
+    stats.totalCommands++;
     logComando(`${interaction.user.tag} usou comando /${interaction.commandName}`);
     const cmd = client.commands.get(interaction.commandName);
     if (cmd) {
