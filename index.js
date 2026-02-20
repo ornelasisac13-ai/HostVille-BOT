@@ -58,13 +58,14 @@ const commands = [
 ];
 
 // Registrar comandos globais quando o bot estiver pronto
-client.once('ready', async () => {
+client.once('clientReady', async () => {  // ← CORREÇÃO AQUI
   console.log(chalk.yellow('Bot está online!'));
   if (client.application?.commands) {
     await client.application.commands.set(commands.map(c => c.data));
     logInfo('Comando /adm registrado globalmente.');
   }
 });
+
 // Listener para botões
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
