@@ -1,10 +1,19 @@
-// index.js
-import { Client, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+// index.js - Parte 1/2
+import { 
+  Client, 
+  GatewayIntentBits, 
+  Partials, 
+  ActionRowBuilder, 
+  ButtonBuilder, 
+  ButtonStyle, 
+  EmbedBuilder 
+} from 'discord.js';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
 
 dotenv.config();
 
+// Inicializa o cliente
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -25,6 +34,7 @@ ${chalk.green('=== Comando Registrado:')} ${chalk.cyan(commandName)}
 // Array de comandos
 const commands = [];
 
+// ---------------------------
 // /rules
 commands.push({
   data: {
@@ -33,7 +43,7 @@ commands.push({
     options: [
       {
         name: 'code',
-        type: 3,
+        type: 3, // STRING
         description: 'Senha de acesso',
         required: true,
       },
@@ -73,10 +83,13 @@ commands.push({
       );
 
     await interaction.channel.send({ embeds: [embed] });
-    await interaction.channel.send({ content: 'https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png' });
+
+    const imageUrl = 'https://image2url.com/r2/default/images/1771466090995-ea6150ee-52be-4f03-953e-f6a41480320e.png';
+    await interaction.channel.send({ content: imageUrl });
   },
 });
 
+// ---------------------------
 // /serverinfo
 commands.push({
   data: {
@@ -96,7 +109,6 @@ commands.push({
     if (code !== process.env.ACCESS_CODE) {
       return interaction.reply({ content: 'Código incorreto!', ephemeral: true });
     }
-
     const guild = interaction.guild;
     const info = `
 Servidor: ${guild.name}
@@ -104,10 +116,11 @@ ID: ${guild.id}
 Total de membros: ${guild.memberCount}
 Criado em: ${guild.createdAt.toDateString()}
 `;
-    return interaction.reply(info);
+    return interaction.reply({ content: info, ephemeral: true });
   },
 });
 
+// ---------------------------
 // /adm
 commands.push({
   data: {
@@ -142,8 +155,8 @@ commands.push({
     await interaction.reply({ content: 'Painel Administrativo:', components: [row], ephemeral: true });
   },
 });
-
-// Listener para botões
+// ---------------------------
+// Listener para interações de botões
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton()) {
     switch (interaction.customId) {
@@ -154,7 +167,7 @@ client.on('interactionCreate', async (interaction) => {
           .setColor('#00FF00')
           .addFields(
             { name: 'Ping', value: `${client.ws.ping}ms`, inline: true },
-            { name: 'Uptime', value: `${Math.floor(uptimeSeconds/3600)}h ${Math.floor((uptimeSeconds%3600)/60)}m ${uptimeSeconds%60}s`, inline: true },
+            { name: 'Uptime', value: `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`, inline: true },
             { name: 'Servidores', value: `${client.guilds.cache.size}`, inline: true },
             { name: 'Usuários', value: `${client.users.cache.size}`, inline: true }
           );
@@ -175,16 +188,35 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-// Quando o bot estiver pronto
-client.once('ready', async () => {
+// ---------------------------
+// Evento clientReady (Discord.js v15+)
+client.once('clientReady', async () => {
   console.log(chalk.yellow('Bot está online!'));
-  for (const cmd of commands) logCommand(cmd.data.name);
 
-  // Registrar comandos globais
+  // Log de comandos registrados
+  for (const cmd of commands) {
+    logCommand(cmd.data.name);
+  }
+
+  // Registrar comandos globalmente
   if (client.application?.commands) {
     await client.application.commands.set(commands.map(c => c.data));
+    console.log(chalk.green('Todos os comandos foram registrados globalmente.'));
   }
 });
 
-// Login
-client.login(process.env.TOKEN);
+// ---------------------------
+// Login do bot
+if (!process.env.TOKEN) {
+  console.error(chalk.red('❌ TOKEN do bot não definido!'));
+  process.exit(1);
+}
+
+if (!process.env.ACCESS_CODE) {
+  console.error(chalk.red('❌ ACCESS_CODE não definido!'));
+  process.exit(1);
+}
+
+client.login(process.env.TOKEN).catch(err => {
+  console.error(chalk.red('Erro ao logar o bot:'), err);
+});
