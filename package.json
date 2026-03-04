@@ -6,12 +6,14 @@
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "postinstall": "npm config set production false"
+    "dev": "node --watch index.js"
   },
   "keywords": [
     "discord",
     "bot",
-    "discord.js"
+    "discord.js",
+    "console",
+    "admin-panel"
   ],
   "author": "Isac",
   "license": "MIT",
