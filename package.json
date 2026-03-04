@@ -1,14 +1,25 @@
 {
   "name": "meu-bot-discord",
   "version": "1.0.0",
-  "description": "Bot Discord com logs no console",
+  "description": "Bot Discord avançado com painel, logs e menu interativo",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node --watch index.js"
   },
-  "keywords": ["discord", "bot"],
-  "author": "",
+  "keywords": [
+    "discord",
+    "bot",
+    "discord.js",
+    "console",
+    "admin-panel"
+  ],
+  "author": "Isac",
   "license": "MIT",
+  "engines": {
+    "node": ">=18.17.0"
+  },
   "dependencies": {
     "chalk": "^4.1.2",
     "discord.js": "^14.14.1",
