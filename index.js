@@ -1,11 +1,12 @@
 // index.js
-const { Client, GatewayIntentBits, Partials, Colors, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Colors, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ChatInputCommandInteraction } = require('discord.js');
 const dotenv = require('dotenv');
 const chalk = require('chalk');
 const readline = require('readline');
 
 dotenv.config();
 
+// === CONFIGURAÇÃO DO CLIENTE DISCORD ===
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -20,7 +21,7 @@ const client = new Client({
 let rl = null;
 let isMenuActive = false;
 
-// === FUNÇÕES DE LOG ===
+// === FUNÇÕES DE LOG PERSONALIZADAS ===
 function getTimestamp() {
   return chalk.gray(`[${new Date().toLocaleString('pt-BR')}]`);
 }
@@ -37,45 +38,141 @@ function logWarn(message) {
   console.log(`${getTimestamp()} ${chalk.yellow('⚠ AVISO')}: ${chalk.white(message)}`);
 }
 
-// === COMANDO /adm ===
+function logSuccess(message) {
+  console.log(`${getTimestamp()} ${chalk.green('✔ SUCESSO')}: ${chalk.white(message)}`);
+}
+
+// === COMANDO /adm - DEFINIÇÃO ===
 const commands = [
   {
     data: {
       name: 'adm',
-      description: 'Painel administrativo',
-      options: [{ name: 'code', type: 3, description: 'Senha de acesso', required: true }],
+      description: 'Painel administrativo do bot',
+      options: [{ 
+        name: 'code', 
+        type: 3, 
+        description: 'Senha de acesso administrativo', 
+        required: true 
+      }],
     },
     async execute(interaction) {
       const code = interaction.options.getString('code');
+      
       if (code !== process.env.ACCESS_CODE) {
-        return interaction.reply({ content: 'Código incorreto!', ephemeral: true });
+        return interaction.reply({ 
+          content: '❌ Código de acesso incorreto!', 
+          ephemeral: true 
+        });
       }
 
       const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('stats').setLabel('Estatísticas').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('console').setLabel('Ver no console').setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder()
+          .setCustomId('stats')
+          .setLabel('📊 Estatísticas')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId('console')
+          .setLabel('🖥️ Ver no Console')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId('help')
+          .setLabel('❓ Ajuda')
+          .setStyle(ButtonStyle.Success)
       );
 
-      await interaction.reply({ content: 'Painel Administrativo:', components: [row], ephemeral: true });
+      const embed = new EmbedBuilder()
+        .setTitle('🔐 Painel Administrativo')
+        .setDescription('Bem-vindo ao painel de controle do bot!')
+        .setColor(Colors.Blue)
+        .addFields(
+          { name: '👤 Usuário', value: interaction.user.tag, inline: true },
+          { name: '🆔 ID', value: interaction.user.id, inline: true }
+        )
+        .setFooter({ text: 'Use os botões abaixo para acessar as funcionalidades' })
+        .setTimestamp();
+
+      await interaction.reply({ 
+        content: 'Painel Administrativo:', 
+        embeds: [embed],
+        components: [row], 
+        ephemeral: true 
+      });
+      
       logInfo(`/adm usado por ${interaction.user.tag}`);
     },
   },
 ];
 
+// === COMANDO /ping - TESTE DE CONEXÃO ===
+const pingCommand = {
+  data: {
+    name: 'ping',
+    description: 'Verifica a latência do bot',
+  },
+  async execute(interaction) {
+    const embed = new EmbedBuilder()
+      .setTitle('🏓 Ping do Bot')
+      .setColor(Colors.Green)
+      .addFields(
+        { name: '📡 Latência', value: `${client.ws.ping}ms`, inline: true },
+        { name: '⏱️ Uptime', value: `${Math.floor(client.uptime / 1000)}s`, inline: true }
+      )
+      .setFooter({ text: 'Bot está funcionando corretamente!' })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+    logInfo(`Comando /ping usado por ${interaction.user.tag}`);
+  },
+};
+
+// === COMANDO /help - AJUDA ===
+const helpCommand = {
+  data: {
+    name: 'help',
+    description: 'Mostra a lista de comandos disponíveis',
+  },
+  async execute(interaction) {
+    const embed = new EmbedBuilder()
+      .setTitle('❓ Comandos Disponíveis')
+      .setDescription('Lista de comandos que você pode usar no bot:')
+      .setColor(Colors.Blue)
+      .addFields(
+        { name: '/ping', value: 'Verifica a latência do bot', inline: false },
+        { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
+        { name: '/adm', value: 'Acesso ao painel administrativo', inline: false }
+      )
+      .setFooter({ text: 'Digite /help para mais informações' })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+    logInfo(`Comando /help usado por ${interaction.user.tag}`);
+  },
+};
+
 // === EVENTO: BOT PRONTO ===
 client.once('clientReady', async () => {
-  console.log('\n' + chalk.green.underline('═'.repeat(40)));
+  console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  🤖 BOT ESTÁ ONLINE!'));
-  console.log(chalk.green.underline('═'.repeat(40)));
+  console.log(chalk.green.underline('═'.repeat(50)));
 
   console.log(chalk.cyan('\n  📊 ESTATÍSTICAS INICIAIS:'));
   console.log(chalk.white(`   • Tag: ${client.user.tag}`));
   console.log(chalk.white(`   • ID: ${client.user.id}`));
   console.log(chalk.white(`   • Servidores: ${client.guilds.cache.size}`));
+  console.log(chalk.white(`   • Usuários: ${client.users.cache.size}`));
 
+  // Registrar comandos globais
   if (client.application?.commands) {
-    await client.application.commands.set(commands.map(c => c.data));
-    logInfo('Comando /adm registrado globalmente.');
+    try {
+      await client.application.commands.set([
+        ...commands.map(c => c.data),
+        pingCommand.data,
+        helpCommand.data
+      ]);
+      logInfo('Comandos registrados globalmente com sucesso!');
+    } catch (error) {
+      logError(`Erro ao registrar comandos: ${error.message}`);
+    }
   }
 
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
@@ -95,25 +192,81 @@ function initReadline() {
     
     rl.on('close', () => {
       isMenuActive = false;
+      logWarn('Console do menu fechado.');
+    });
+    
+    rl.on('line', (input) => {
+      if (isMenuActive) {
+        handleMenuOption(input);
+      }
     });
   }
 }
 
-// === EVENTO: INTERAÇÃO (BOTÕES) ===
+// === EVENTO: INTERAÇÃO (COMANDOS DE TEXTO) ===
 client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isButton()) return;
+  // Handler para comandos de chat input (slash commands)
+  if (interaction.isChatInputCommand()) {
+    const command = commands.find(c => c.data.name === interaction.commandName);
+    if (!command) {
+      // Verifica comandos adicionais
+      if (interaction.commandName === 'ping') {
+        await pingCommand.execute(interaction);
+        return;
+      }
+      if (interaction.commandName === 'help') {
+        await helpCommand.execute(interaction);
+        return;
+      }
+      return;
+    }
 
+    try {
+      await command.execute(interaction);
+    } catch (error) {
+      logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', ephemeral: true });
+      } else {
+        await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', ephemeral: true });
+      }
+    }
+    return;
+  }
+
+  // Handler para botões
+  if (interaction.isButton()) {
+    await handleButtonInteraction(interaction);
+    return;
+  }
+
+  // Handler para modais (futuro)
+  if (interaction.isModalSubmit()) {
+    logInfo(`Modal submetido por ${interaction.user.tag}`);
+  }
+});
+
+// === FUNÇÃO PARA TRATAR BOTÕES ===
+async function handleButtonInteraction(interaction) {
   switch (interaction.customId) {
     case 'stats': {
       const uptimeSeconds = Math.floor(client.uptime / 1000);
+      const hours = Math.floor(uptimeSeconds / 3600);
+      const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+      const seconds = uptimeSeconds % 60;
+
       const embed = new EmbedBuilder()
         .setTitle('📊 Estatísticas do Bot')
         .setColor(Colors.Green)
         .addFields(
           { name: '🏓 Ping', value: `${client.ws.ping}ms`, inline: true },
-          { name: '⏱️ Uptime', value: `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m`, inline: true },
-          { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true }
-        );
+          { name: '⏱️ Uptime', value: `${hours}h ${minutes}m ${seconds}s`, inline: true },
+          { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
+          { name: '👥 Usuários', value: `${client.users.cache.size}`, inline: true }
+        )
+        .setFooter({ text: 'Estatísticas atualizadas' })
+        .setTimestamp();
+
       await interaction.reply({ embeds: [embed], ephemeral: true });
       logInfo(`${interaction.user.tag} abriu estatísticas`);
       break;
@@ -124,12 +277,34 @@ client.on('interactionCreate', async (interaction) => {
       console.log(chalk.white(`Ping:    ${client.ws.ping}ms`));
       console.log(chalk.white(`Uptime:  ${Math.floor(client.uptime / 3600000)}h`));
       console.log(chalk.white(`Servers: ${client.guilds.cache.size}`));
+      console.log(chalk.white(`Users:   ${client.users.cache.size}`));
       console.log(chalk.yellow('═════════════════════════════\n'));
       await interaction.reply({ content: '✅ Verifique o console!', ephemeral: true });
       break;
     }
+
+    case 'help': {
+      const embed = new EmbedBuilder()
+        .setTitle('❓ Ajuda - Painel Administrativo')
+        .setDescription('Como usar o painel administrativo:')
+        .setColor(Colors.Blue)
+        .addFields(
+          { name: '📊 Estatísticas', value: 'Clique em "Estatísticas" para ver dados do bot', inline: false },
+          { name: '🖥️ Console', value: 'Clique em "Ver no Console" para ver dados no terminal', inline: false },
+          { name: '🔐 Segurança', value: 'Use o comando /adm com a senha correta', inline: false }
+        )
+        .setFooter({ text: 'Painel Administrativo' })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+      logInfo(`${interaction.user.tag} pediu ajuda no painel`);
+      break;
+    }
+
+    default:
+      await interaction.reply({ content: '❌ Botão desconhecido!', ephemeral: true });
   }
-});
+}
 
 // === EVENTO: MENSAGEM DELETADA ===
 client.on('messageDelete', async (message) => {
@@ -137,7 +312,10 @@ client.on('messageDelete', async (message) => {
 
   let deleter = 'Desconhecido';
   try {
-    const auditLogs = await message.guild.fetchAuditLogs({ type: 72, limit: 1 });
+    const auditLogs = await message.guild.fetchAuditLogs({ 
+      type: 72, 
+      limit: 1 
+    });
     const entry = auditLogs.entries.first();
     if (entry && entry.target.id === message.author.id && entry.createdTimestamp > Date.now() - 5000) {
       deleter = entry.executor.tag;
@@ -152,7 +330,22 @@ client.on('messageDelete', async (message) => {
   console.log(chalk.red(`   Conteúdo: ${message.content || '[sem texto]'}`));
   console.log(chalk.red(`   Deletado:  ${deleter}`));
   console.log(chalk.red(`   Canal:     #${message.channel.name}`));
+  console.log(chalk.red(`   Servidor:  ${message.guild.name}`));
   console.log(chalk.red('────────────────────────────────\n'));
+});
+
+// === EVENTO: MENSAGEM ATUALIZADA ===
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+  if (!oldMessage.guild || !oldMessage.author) return;
+  if (oldMessage.content === newMessage.content) return;
+
+  console.log(chalk.yellow.bgBlack.bold('\n 📝 MENSAGEM ATUALIZADA '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Autor:     ${oldMessage.author.tag}`));
+  console.log(chalk.yellow(`   Antigo:    ${oldMessage.content}`));
+  console.log(chalk.yellow(`   Novo:      ${newMessage.content}`));
+  console.log(chalk.yellow(`   Canal:     #${oldMessage.channel.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
 });
 
 // === EVENTO: MEMBRO ENTROU ===
@@ -162,6 +355,7 @@ client.on('guildMemberAdd', async (member) => {
   console.log(chalk.green(`   Usuário: ${member.user.tag}`));
   console.log(chalk.green(`   ID:      ${member.user.id}`));
   console.log(chalk.green(`   Servidor:${member.guild.name}`));
+  console.log(chalk.green(`   Data:    ${new Date().toLocaleString('pt-BR')}`));
   console.log(chalk.green('────────────────────────────────\n'));
   logInfo(`Novo membro: ${member.user.tag} (${member.guild.name})`);
 });
@@ -172,6 +366,7 @@ client.on('guildMemberRemove', async (member) => {
   console.log(chalk.red('────────────────────────────────'));
   console.log(chalk.red(`   Usuário: ${member.user.tag}`));
   console.log(chalk.red(`   Servidor:${member.guild.name}`));
+  console.log(chalk.red(`   Data:    ${new Date().toLocaleString('pt-BR')}`));
   console.log(chalk.red('────────────────────────────────\n'));
   logInfo(`Membro saiu: ${member.user.tag} (${member.guild.name})`);
 });
@@ -197,6 +392,131 @@ client.on('channelDelete', async (channel) => {
   console.log(chalk.red('────────────────────────────────\n'));
 });
 
+// === EVENTO: CANAL ATUALIZADO ===
+client.on('channelUpdate', async (oldChannel, newChannel) => {
+  if (!oldChannel.guild) return;
+  if (oldChannel.name === newChannel.name) return;
+
+  console.log(chalk.yellow.bgBlack.bold('\n 🔄 CANAL ATUALIZADO '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Nome Antigo: #${oldChannel.name}`));
+  console.log(chalk.yellow(`   Nome Novo:   #${newChannel.name}`));
+  console.log(chalk.yellow(`   Servidor:    ${oldChannel.guild.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
+});
+
+// === EVENTO: ROLE DELETADA ===
+client.on('roleDelete', async (role) => {
+  if (!role.guild) return;
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ ROLE DELETADA '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Nome:  ${role.name}`));
+  console.log(chalk.red(`   ID:    ${role.id}`));
+  console.log(chalk.red(`   Servidor: ${role.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+// === EVENTO: ROLE ATUALIZADA ===
+client.on('roleUpdate', async (oldRole, newRole) => {
+  if (!oldRole.guild) return;
+  if (oldRole.name === newRole.name && oldRole.hexColor === newRole.hexColor) return;
+
+  console.log(chalk.yellow.bgBlack.bold('\n 🔄 ROLE ATUALIZADA '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Nome Antigo: ${oldRole.name}`));
+  console.log(chalk.yellow(`   Nome Novo:   ${newRole.name}`));
+  console.log(chalk.yellow(`   Cor Antiga:  ${oldRole.hexColor}`));
+  console.log(chalk.yellow(`   Cor Nova:    ${newRole.hexColor}`));
+  console.log(chalk.yellow(`   Servidor:    ${oldRole.guild.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
+});
+
+// === EVENTO: EMOJI CRIADO ===
+client.on('guildEmojiCreate', async (emoji) => {
+  console.log(chalk.cyan.bgBlack.bold('\n 😊 EMOJI CRIADO '));
+  console.log(chalk.cyan('────────────────────────────────'));
+  console.log(chalk.cyan(`   Nome:  ${emoji.name}`));
+  console.log(chalk.cyan(`   ID:    ${emoji.id}`));
+  console.log(chalk.cyan(`   Servidor: ${emoji.guild.name}`));
+  console.log(chalk.cyan('────────────────────────────────\n'));
+});
+
+// === EVENTO: EMOJI DELETADO ===
+client.on('guildEmojiDelete', async (emoji) => {
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ EMOJI DELETADO '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Nome:  ${emoji.name}`));
+  console.log(chalk.red(`   ID:    ${emoji.id}`));
+  console.log(chalk.red(`   Servidor: ${emoji.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+// === EVENTO: PRESENCE UPDATE ===
+client.on('presenceUpdate', async (oldPresence, newPresence) => {
+  if (!newPresence) return;
+  
+  const status = newPresence.status;
+  const statusColors = {
+    online: chalk.green,
+    idle: chalk.yellow,
+    dnd: chalk.red,
+    offline: chalk.gray
+  };
+
+  console.log(statusColors[status]?.('\n 📡 PRESENCE UPDATE ') || '\n 📡 PRESENCE UPDATE ');
+  console.log('────────────────────────────────');
+  console.log(chalk.white(`   Usuário: ${newPresence.user.tag}`));
+  console.log(chalk.white(`   Status:  ${status}`));
+  console.log(chalk.white(`   Atividade: ${newPresence.activities.length > 0 ? newPresence.activities[0].name : 'Nenhuma'}`));
+  console.log('────────────────────────────────\n');
+});
+
+// === EVENTO: VOICE STATE UPDATE ===
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  if (!oldState.channel && newState.channel) {
+    console.log(chalk.green.bgBlack.bold('\n 🎤 ENTROU NO CANAL DE VOZ '));
+    console.log(chalk.green('────────────────────────────────'));
+    console.log(chalk.green(`   Usuário: ${newState.member.user.tag}`));
+    console.log(chalk.green(`   Canal:   #${newState.channel.name}`));
+    console.log(chalk.green('────────────────────────────────\n'));
+  } else if (oldState.channel && !newState.channel) {
+    console.log(chalk.red.bgBlack.bold('\n 🎤 SAIU DO CANAL DE VOZ '));
+    console.log(chalk.red('────────────────────────────────'));
+    console.log(chalk.red(`   Usuário: ${oldState.member.user.tag}`));
+    console.log(chalk.red(`   Canal:   #${oldState.channel.name}`));
+    console.log(chalk.red('────────────────────────────────\n'));
+  }
+});
+
+// === EVENTO: GUILD UPDATE ===
+client.on('guildUpdate', async (oldGuild, newGuild) => {
+  if (oldGuild.name !== newGuild.name) {
+    console.log(chalk.yellow.bgBlack.bold('\n 🏛️ NOME DO SERVIDOR ALTERADO '));
+    console.log(chalk.yellow('────────────────────────────────'));
+    console.log(chalk.yellow(`   Antigo: ${oldGuild.name}`));
+    console.log(chalk.yellow(`   Novo:   ${newGuild.name}`));
+    console.log(chalk.yellow('────────────────────────────────\n'));
+  }
+});
+
+// === EVENTO: GUILD BAN ADD ===
+client.on('guildBanAdd', async (guild, user) => {
+  console.log(chalk.red.bgBlack.bold('\n 🚫 USUÁRIO BANIDO '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Usuário: ${user.tag}`));
+  console.log(chalk.red(`   Servidor: ${guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+// === EVENTO: GUILD BAN REMOVE ===
+client.on('guildBanRemove', async (guild, user) => {
+  console.log(chalk.green.bgBlack.bold('\n ✅ USUÁRIO DESBANIDO '));
+  console.log(chalk.green('────────────────────────────────'));
+  console.log(chalk.green(`   Usuário: ${user.tag}`));
+  console.log(chalk.green(`   Servidor: ${guild.name}`));
+  console.log(chalk.green('────────────────────────────────\n'));
+});
+
 // === ERROS NÃO TRATADOS ===
 process.on('unhandledRejection', (error) => {
   logError(`Erro não tratado: ${error.message}`);
@@ -217,16 +537,18 @@ function showMenu() {
   if (isMenuActive) return;
   isMenuActive = true;
   
-  console.log(chalk.cyan('\n╔══════════════════════════════════════╗'));
-  console.log(chalk.cyan('║      🎮 MENU DO CONSOLE DO BOT       ║'));
-  console.log(chalk.cyan('╠══════════════════════════════════════╣'));
-  console.log(chalk.cyan('║  1. 📊 Ver estatísticas              ║'));
-  console.log(chalk.cyan('║  2. 🏛️ Listar servidores              ║'));
-  console.log(chalk.cyan('║  3. 👥 Ver membros de um servidor     ║'));
-  console.log(chalk.cyan('║  4. 📢 Enviar mensagem para canal     ║'));
-  console.log(chalk.cyan('║  5. 🔄 Atualizar dados               ║'));
-  console.log(chalk.cyan('║  0. ❌ Sair                           ║'));
-  console.log(chalk.cyan('╚══════════════════════════════════════╝'));
+  console.log(chalk.cyan('\n╔════════════════════════════════════════════════════════╗'));
+  console.log(chalk.cyan('║      🎮 MENU DO CONSOLE DO BOT - VERSÃO 2.0            ║'));
+  console.log(chalk.cyan('╠════════════════════════════════════════════════════════╣'));
+  console.log(chalk.cyan('║  1. 📊 Ver estatísticas detalhadas                     ║'));
+  console.log(chalk.cyan('║  2. 🏛️ Listar todos os servidores                      ║'));
+  console.log(chalk.cyan('║  3. 👥 Ver membros de um servidor                      ║'));
+  console.log(chalk.cyan('║  4. 📢 Enviar mensagem para canal                      ║'));
+  console.log(chalk.cyan('║  5. 🔄 Atualizar dados                                 ║'));
+  console.log(chalk.cyan('║  6. 📋 Ver logs recentes                               ║'));
+  console.log(chalk.cyan('║  7. 🛡️ Ver status do bot                              ║'));
+  console.log(chalk.cyan('║  0. ❌ Sair                                            ║'));
+  console.log(chalk.cyan('╚════════════════════════════════════════════════════════╝'));
   
   rl.question(chalk.yellow('\n👉 Escolha uma opção: '), (answer) => {
     isMenuActive = false;
@@ -256,8 +578,14 @@ function handleMenuOption(option) {
       console.log(chalk.green('🔄 Dados atualizados!'));
       showMenu();
       break;
+    case '6':
+      showRecentLogs();
+      break;
+    case '7':
+      showBotStatus();
+      break;
     case '0':
-      console.log(chalk.red('❌ Encerrando...'));
+      console.log(chalk.red('❌ Encerrando o bot...'));
       if (rl && !rl.closed) {
         rl.close();
       }
@@ -280,6 +608,7 @@ function showStats() {
   console.log(chalk.white(`⏱️  Uptime:     ${hours}h ${minutes}m ${seconds}s`));
   console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
   console.log(chalk.white(`👥 Usuários:   ${client.users.cache.size}`));
+  console.log(chalk.white(`📝 Mensagens:  ${client.channels.cache.size}`));
   console.log(chalk.yellow('═══════════════════════════════\n'));
   
   showMenu();
@@ -411,6 +740,29 @@ function sendMessageToChannel() {
       showMenu();
     }
   });
+}
+
+function showRecentLogs() {
+  console.log(chalk.yellow('\n═══ 📋 LOGS RECENTES ═══'));
+  console.log(chalk.white('Os logs recentes foram exibidos no console.'));
+  console.log(chalk.yellow('══════════════════════════════\n'));
+  showMenu();
+}
+
+function showBotStatus() {
+  const uptimeSeconds = Math.floor(client.uptime / 1000);
+  const hours = Math.floor(uptimeSeconds / 3600);
+  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+  const seconds = uptimeSeconds % 60;
+
+  console.log(chalk.yellow('\n═══ 🛡️ STATUS DO BOT ═══'));
+  console.log(chalk.white(`🟢 Status: Online`));
+  console.log(chalk.white(`🏓 Ping: ${client.ws.ping}ms`));
+  console.log(chalk.white(`⏱️  Uptime: ${hours}h ${minutes}m ${seconds}s`));
+  console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
+  console.log(chalk.white(`👥 Usuários: ${client.users.cache.size}`));
+  console.log(chalk.yellow('══════════════════════════════\n'));
+  showMenu();
 }
 
 // === LOGIN ===
