@@ -6,14 +6,16 @@
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "install:all": "npm install"
   },
   "keywords": [
     "discord",
     "bot",
     "discord.js",
     "console",
-    "admin-panel"
+    "admin-panel",
+    "chatbot"
   ],
   "author": "Isac",
   "license": "MIT",
@@ -24,5 +26,8 @@
     "chalk": "^4.1.2",
     "discord.js": "^14.14.1",
     "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }
