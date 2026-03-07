@@ -547,7 +547,7 @@ function showMenu() {
   console.log(chalk.cyan('║  6.  Ver logs recentes                                          ║'));
   console.log(chalk.cyan('║  7.  Ver status do bot                                          ║'));
   console.log(chalk.cyan('║  0.  Sair                                                       ║'));
-  console.log(chalk.cyan('╚════════════════════════Y2k═Nat═════════════════════════╝'));
+  console.log(chalk.cyan('╚═════════════════════════Y2k═Nat════════════════════════╝'));
   
   rl.question(chalk.yellow('\n👉 Escolha uma opção: '), (answer) => {
     isMenuActive = false;
