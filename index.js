@@ -538,8 +538,8 @@ function showMenu() {
   isMenuActive = true;
   
   console.log(chalk.cyan('\n╔═══════════════════════════════════════════════════════╗'));
-  console.log(chalk.cyan('║                    HostVille-BOT Versão 4.1.2                    ║'));
-  console.log(chalk.cyan('╠════════════════════════════════════════════════════════╣'));
+  console.log(chalk.cyan('║                  HostVille-BOT Versão 4.1.2                    ║'));
+  console.log(chalk.cyan('╠═══════════════════════════════════════════════════════╣'));
   console.log(chalk.cyan('║  1.  Ver estatísticas detalhadas                               ║'));
   console.log(chalk.cyan('║  2.  Listar todos os servidores                                ║'));
   console.log(chalk.cyan('║  3.  Ver membros de um servidor                                ║'));
