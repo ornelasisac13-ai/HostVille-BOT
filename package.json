@@ -1,6 +1,6 @@
 {
   "name": "Hostville-Bot_",
-  "version": "4.1.2-relaese",
+  "version": "4.1.2-hf",
   "description": "Bot Discord avançado com painel, logs e menu interativo",
   "main": "index.js",
   "type": "commonjs",
