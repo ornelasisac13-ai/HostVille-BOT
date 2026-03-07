@@ -9,7 +9,6 @@ const {
   ButtonStyle, 
   EmbedBuilder, 
   ChatInputCommandInteraction,
-  InteractionReplyFlags,
   ChannelType
 } = require('discord.js');
 const dotenv = require('dotenv');
@@ -25,7 +24,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildPresences // Mantido para compatibilidade futura
+    GatewayIntentBits.GuildPresences
   ],
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
 });
@@ -74,7 +73,7 @@ const commands = [
       if (code !== process.env.ACCESS_CODE) {
         return interaction.reply({ 
           content: '❌ Código de acesso incorreto!', 
-          flags: InteractionReplyFlags.Ephemeral 
+          flags: 64 // 64 = Ephemeral
         });
       }
 
@@ -108,7 +107,7 @@ const commands = [
         content: 'Painel Administrativo:', 
         embeds: [embed],
         components: [row], 
-        flags: InteractionReplyFlags.Ephemeral 
+        flags: 64 // 64 = Ephemeral
       });
       
       logInfo(`/adm usado por ${interaction.user.tag}`);
@@ -133,7 +132,7 @@ const pingCommand = {
       .setFooter({ text: 'Bot está funcionando corretamente!' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed], flags: 64 });
     logInfo(`Comando /ping usado por ${interaction.user.tag}`);
   },
 };
@@ -157,12 +156,12 @@ const helpCommand = {
       .setFooter({ text: 'Digite /help para mais informações' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral });
+    await interaction.reply({ embeds: [embed], flags: 64 });
     logInfo(`Comando /help usado por ${interaction.user.tag}`);
   },
 };
 // === EVENTO: BOT PRONTO (CORRIGIDO - usa clientReady) ===
-client.once('clientReady', async () => { // 1️⃣ Correção: Evento 'clientReady'
+client.once('clientReady', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
@@ -172,7 +171,7 @@ client.once('clientReady', async () => { // 1️⃣ Correção: Evento 'clientRe
   console.log(chalk.white(`   • ID: ${client.user.id}`));
   console.log(chalk.white(`   • Servidores: ${client.guilds.cache.size}`));
   
-  // Registrar comandos em TODOS os servidores (2️⃣ Correção)
+  // Registrar comandos em TODOS os servidores
   if (client.guilds.cache.size > 0) {
     try {
       for (const guild of client.guilds.cache.values()) {
@@ -242,9 +241,9 @@ client.on('interactionCreate', async (interaction) => {
     } catch (error) {
       logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: InteractionReplyFlags.Ephemeral });
+        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
       } else {
-        await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: InteractionReplyFlags.Ephemeral });
+        await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
       }
     }
     return;
@@ -383,7 +382,6 @@ client.on('roleDelete', async (role) => {
   console.log(chalk.red(`   Servidor: ${role.guild.name}`));
   console.log(chalk.red('────────────────────────────────\n'));
 });
-
 // === EVENTO: ROLE ATUALIZADA ===
 client.on('roleUpdate', async (oldRole, newRole) => {
   if (!oldRole.guild) return;
@@ -558,7 +556,7 @@ function showStats() {
   console.log(chalk.white(`⏱️  Uptime:     ${hours}h ${minutes}m ${seconds}s`));
   console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
   console.log(chalk.white(`👥 Usuários:   ${client.users.cache.size}`));
-  console.log(chalk.white(`📁 Canais: ${client.channels.cache.size}`)); // 5️⃣ Correção: Label "Canais" em vez de "Mensagens"
+  console.log(chalk.white(`📁 Canais: ${client.channels.cache.size}`)); // Correção: Label "Canais" em vez de "Mensagens"
   console.log(chalk.yellow('═══════════════════════════════\n'));
   
   showMenu();
@@ -652,7 +650,7 @@ function sendMessageToChannel() {
     
     if (guildIndex >= 0 && guildIndex < guilds.length) {
       const guild = guilds[guildIndex];
-      // 3️⃣ Correção: Uso de ChannelType.GuildText
+      // Correção: Uso de ChannelType.GuildText
       const channels = guild.channels.cache.filter(
         c => c.type === ChannelType.GuildText
       );
@@ -727,7 +725,7 @@ async function handleButtonInteraction(interaction) {
       const minutes = Math.floor((uptimeSeconds % 3600) / 60);
       const seconds = uptimeSeconds % 60;
 
-      // 4️⃣ Correção: Adicionar Presença do Bot nas Estatísticas
+      // Adicionar Presença do Bot nas Estatísticas
       const presence = client.user.presence;
       const status = presence ? presence.status : 'offline';
       const activity = presence && presence.activities.length > 0 ? presence.activities[0].name : 'Nenhuma';
@@ -737,8 +735,8 @@ async function handleButtonInteraction(interaction) {
         .setColor(Colors.Green)
         .addFields(
           { name: '🏓 Ping', value: `${client.ws.ping}ms`, inline: true },
-          { name: '⏱️ Uptime', value: `${hours}h ${minutes}m ${seconds}s`, inline: true },
-          { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
+          { name: '⏱️ Uptime', value: `${hours}h ${minutes}m ${seconds}s`, inline: true
+                     { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
           { name: '👥 Usuários', value: `${client.users.cache.size}`, inline: true },
           { name: '🟢 Status', value: status, inline: true },
           { name: '🎵 Atividade', value: activity, inline: true }
@@ -746,7 +744,7 @@ async function handleButtonInteraction(interaction) {
         .setFooter({ text: 'Estatísticas atualizadas' })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral });
+      await interaction.reply({ embeds: [embed], flags: 64 });
       logInfo(`${interaction.user.tag} abriu estatísticas`);
       break;
     }
@@ -758,7 +756,7 @@ async function handleButtonInteraction(interaction) {
       console.log(chalk.white(`Servers: ${client.guilds.cache.size}`));
       console.log(chalk.white(`Users:   ${client.users.cache.size}`));
       console.log(chalk.yellow('═════════════════════════════\n'));
-      await interaction.reply({ content: '✅ Verifique o console!', flags: InteractionReplyFlags.Ephemeral });
+      await interaction.reply({ content: '✅ Verifique o console!', flags: 64 });
       break;
     }
 
@@ -775,13 +773,13 @@ async function handleButtonInteraction(interaction) {
         .setFooter({ text: 'Painel Administrativo' })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral });
+      await interaction.reply({ embeds: [embed], flags: 64 });
       logInfo(`${interaction.user.tag} pediu ajuda no painel`);
       break;
     }
 
     default:
-      await interaction.reply({ content: '❌ Botão desconhecido!', flags: InteractionReplyFlags.Ephemeral });
+      await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
   }
 }
 
