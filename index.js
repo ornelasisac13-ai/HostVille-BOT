@@ -159,8 +159,7 @@ client.once('clientReady', async () => {
   console.log(chalk.white(`   • Tag: ${client.user.tag}`));
   console.log(chalk.white(`   • ID: ${client.user.id}`));
   console.log(chalk.white(`   • Servidores: ${client.guilds.cache.size}`));
-  console.log(chalk.white(`   • Usuários: ${client.users.cache.size}`));
-
+  
   // Registrar comandos globais
   if (client.application?.commands) {
     try {
