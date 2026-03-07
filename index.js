@@ -382,6 +382,7 @@ client.on('roleDelete', async (role) => {
   console.log(chalk.red(`   Servidor: ${role.guild.name}`));
   console.log(chalk.red('────────────────────────────────\n'));
 });
+
 // === EVENTO: ROLE ATUALIZADA ===
 client.on('roleUpdate', async (oldRole, newRole) => {
   if (!oldRole.guild) return;
@@ -735,8 +736,8 @@ async function handleButtonInteraction(interaction) {
         .setColor(Colors.Green)
         .addFields(
           { name: '🏓 Ping', value: `${client.ws.ping}ms`, inline: true },
-          { name: '⏱️ Uptime', value: `${hours}h ${minutes}m ${seconds}s`, inline: true
-                     { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
+          { name: '⏱️ Uptime', value: `${hours}h ${minutes}m ${seconds}s`, inline: true },
+          { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
           { name: '👥 Usuários', value: `${client.users.cache.size}`, inline: true },
           { name: '🟢 Status', value: status, inline: true },
           { name: '🎵 Atividade', value: activity, inline: true }
