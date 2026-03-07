@@ -546,7 +546,7 @@ function showMenu() {
   console.log(chalk.cyan('║  4. 📢 Enviar mensagem para canal                      ║'));
   console.log(chalk.cyan('║  5. 🔄 Atualizar dados                                 ║'));
   console.log(chalk.cyan('║  6. 📋 Ver logs recentes                               ║'));
-  console.log(chalk.cyan('║  7. 🛡️ Ver status do bot                              ║'));
+  console.log(chalk.cyan('║  7. 🛡️ Ver status do bot                               ║'));
   console.log(chalk.cyan('║  0. ❌ Sair                                            ║'));
   console.log(chalk.cyan('╚════════════════════════════════════════════════════════╝'));
   
