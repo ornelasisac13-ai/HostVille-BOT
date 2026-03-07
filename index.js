@@ -1,4 +1,4 @@
-// index.js
+// index.js - PARTE 1
 const { Client, GatewayIntentBits, Partials, Colors, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ChatInputCommandInteraction } = require('discord.js');
 const dotenv = require('dotenv');
 const chalk = require('chalk');
@@ -149,8 +149,8 @@ const helpCommand = {
   },
 };
 
-// === EVENTO: BOT PRONTO ===
-client.once('clientReady', async () => {
+// === EVENTO: BOT PRONTO (CORRIGIDO) ===
+client.once('ready', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
@@ -160,18 +160,22 @@ client.once('clientReady', async () => {
   console.log(chalk.white(`   • ID: ${client.user.id}`));
   console.log(chalk.white(`   • Servidores: ${client.guilds.cache.size}`));
   
-  // Registrar comandos globais
-  if (client.application?.commands) {
+  // Registrar comandos por servidor (aparece em 2-5 segundos)
+  if (client.guilds.cache.size > 0) {
     try {
-      await client.application.commands.set([
+      const guild = client.guilds.cache.first();
+      await guild.commands.set([
         ...commands.map(c => c.data),
         pingCommand.data,
         helpCommand.data
       ]);
+      logInfo(`Comandos registrados no servidor: ${guild.name}!`);
       logInfo('Comandos registrados globalmente com sucesso!');
     } catch (error) {
       logError(`Erro ao registrar comandos: ${error.message}`);
     }
+  } else {
+    logWarn('Nenhum servidor encontrado. Comandos não registrados.');
   }
 
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
@@ -402,6 +406,18 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
   console.log(chalk.yellow(`   Nome Novo:   #${newChannel.name}`));
   console.log(chalk.yellow(`   Servidor:    ${oldChannel.guild.name}`));
   console.log(chalk.yellow('────────────────────────────────\n'));
+});
+
+// === EVENTO: ROLE CRIADA ===
+client.on('roleCreate', async (role) => {
+  if (!role.guild) return;
+  console.log(chalk.magenta.bgBlack.bold('\n 🎭 ROLE CRIADA '));
+  console.log(chalk.magenta('────────────────────────────────'));
+  console.log(chalk.magenta(`   Nome:  ${role.name}`));
+  console.log(chalk.magenta(`   ID:    ${role.id}`));
+  console.log(chalk.magenta(`   Cor:   ${role.hexColor}`));
+  console.log(chalk.magenta(`   Servidor: ${role.guild.name}`));
+  console.log(chalk.magenta('────────────────────────────────\n'));
 });
 
 // === EVENTO: ROLE DELETADA ===
