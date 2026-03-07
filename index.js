@@ -25,7 +25,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildPresences // 1️⃣ Correção: Intent para PresenceUpdate
+    GatewayIntentBits.GuildPresences // Mantido para compatibilidade futura
   ],
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
 });
@@ -74,7 +74,7 @@ const commands = [
       if (code !== process.env.ACCESS_CODE) {
         return interaction.reply({ 
           content: '❌ Código de acesso incorreto!', 
-          flags: InteractionReplyFlags.Ephemeral // 4️⃣ Correção: Uso de Flags
+          flags: InteractionReplyFlags.Ephemeral 
         });
       }
 
@@ -108,7 +108,7 @@ const commands = [
         content: 'Painel Administrativo:', 
         embeds: [embed],
         components: [row], 
-        flags: InteractionReplyFlags.Ephemeral // 4️⃣ Correção: Uso de Flags
+        flags: InteractionReplyFlags.Ephemeral 
       });
       
       logInfo(`/adm usado por ${interaction.user.tag}`);
@@ -133,7 +133,7 @@ const pingCommand = {
       .setFooter({ text: 'Bot está funcionando corretamente!' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
+    await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral });
     logInfo(`Comando /ping usado por ${interaction.user.tag}`);
   },
 };
@@ -157,12 +157,12 @@ const helpCommand = {
       .setFooter({ text: 'Digite /help para mais informações' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
+    await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral });
     logInfo(`Comando /help usado por ${interaction.user.tag}`);
   },
 };
-// === EVENTO: BOT PRONTO (CORRIGIDO - usa ready) ===
-client.once('ready', async () => { // 2️⃣ Correção: Evento 'ready'
+// === EVENTO: BOT PRONTO (CORRIGIDO - usa clientReady) ===
+client.once('clientReady', async () => { // 1️⃣ Correção: Evento 'clientReady'
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
@@ -242,9 +242,9 @@ client.on('interactionCreate', async (interaction) => {
     } catch (error) {
       logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
+        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: InteractionReplyFlags.Ephemeral });
       } else {
-        await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
+        await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: InteractionReplyFlags.Ephemeral });
       }
     }
     return;
@@ -261,66 +261,6 @@ client.on('interactionCreate', async (interaction) => {
     logInfo(`Modal submetido por ${interaction.user.tag}`);
   }
 });
-
-// === FUNÇÃO PARA TRATAR BOTÕES ===
-async function handleButtonInteraction(interaction) {
-  switch (interaction.customId) {
-    case 'stats': {
-      const uptimeSeconds = Math.floor(client.uptime / 1000);
-      const hours = Math.floor(uptimeSeconds / 3600);
-      const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-      const seconds = uptimeSeconds % 60;
-
-      const embed = new EmbedBuilder()
-        .setTitle('📊 Estatísticas do Bot')
-        .setColor(Colors.Green)
-        .addFields(
-          { name: '🏓 Ping', value: `${client.ws.ping}ms`, inline: true },
-          { name: '⏱️ Uptime', value: `${hours}h ${minutes}m ${seconds}s`, inline: true },
-          { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
-          { name: '👥 Usuários', value: `${client.users.cache.size}`, inline: true }
-        )
-        .setFooter({ text: 'Estatísticas atualizadas' })
-        .setTimestamp();
-
-      await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
-      logInfo(`${interaction.user.tag} abriu estatísticas`);
-      break;
-    }
-
-    case 'console': {
-      console.log(chalk.yellow('\n═══ ESTATÍSTICAS DO BOT ═══'));
-      console.log(chalk.white(`Ping:    ${client.ws.ping}ms`));
-      console.log(chalk.white(`Uptime:  ${Math.floor(client.uptime / 3600000)}h`));
-      console.log(chalk.white(`Servers: ${client.guilds.cache.size}`));
-      console.log(chalk.white(`Users:   ${client.users.cache.size}`));
-      console.log(chalk.yellow('═════════════════════════════\n'));
-      await interaction.reply({ content: '✅ Verifique o console!', flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
-      break;
-    }
-
-    case 'help': {
-      const embed = new EmbedBuilder()
-        .setTitle('❓ Ajuda - Painel Administrativo')
-        .setDescription('Como usar o painel administrativo:')
-        .setColor(Colors.Blue)
-        .addFields(
-          { name: '📊 Estatísticas', value: 'Clique em "Estatísticas" para ver dados do bot', inline: false },
-          { name: '🖥️ Console', value: 'Clique em "Ver no Console" para ver dados no terminal', inline: false },
-          { name: '🔐 Segurança', value: 'Use o comando /adm com a senha correta', inline: false }
-        )
-        .setFooter({ text: 'Painel Administrativo' })
-        .setTimestamp();
-
-      await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
-      logInfo(`${interaction.user.tag} pediu ajuda no painel`);
-      break;
-    }
-
-    default:
-      await interaction.reply({ content: '❌ Botão desconhecido!', flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
-  }
-}
 
 // === EVENTO: MENSAGEM DELETADA ===
 client.on('messageDelete', async (message) => {
@@ -479,25 +419,8 @@ client.on('guildEmojiDelete', async (emoji) => {
   console.log(chalk.red('────────────────────────────────\n'));
 });
 
-// === EVENTO: PRESENCE UPDATE ===
-client.on('presenceUpdate', async (oldPresence, newPresence) => {
-  if (!newPresence) return;
-  
-  const status = newPresence.status;
-  const statusColors = {
-    online: chalk.green,
-    idle: chalk.yellow,
-    dnd: chalk.red,
-    offline: chalk.gray
-  };
-
-  console.log(statusColors[status]?.('\n 📡 PRESENCE UPDATE ') || '\n 📡 PRESENCE UPDATE ');
-  console.log('────────────────────────────────');
-  console.log(chalk.white(`   Usuário: ${newPresence.user.tag}`));
-  console.log(chalk.white(`   Status:  ${status}`));
-  console.log(chalk.white(`   Atividade: ${newPresence.activities.length > 0 ? newPresence.activities[0].name : 'Nenhuma'}`));
-  console.log('────────────────────────────────\n');
-});
+// === EVENTO: PRESENCE UPDATE (REMOVIDO - Ver Parte 3 para Stats) ===
+// client.on('presenceUpdate', async (oldPresence, newPresence) => { ... } REMOVIDO)
 
 // === EVENTO: VOICE STATE UPDATE ===
 client.on('voiceStateUpdate', async (oldState, newState) => {
@@ -793,6 +716,73 @@ function showBotStatus() {
   console.log(chalk.white(`👥 Usuários: ${client.users.cache.size}`));
   console.log(chalk.yellow('══════════════════════════════\n'));
   showMenu();
+}
+
+// === FUNÇÃO PARA TRATAR BOTÕES (PAINEL ADMIN) ===
+async function handleButtonInteraction(interaction) {
+  switch (interaction.customId) {
+    case 'stats': {
+      const uptimeSeconds = Math.floor(client.uptime / 1000);
+      const hours = Math.floor(uptimeSeconds / 3600);
+      const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+      const seconds = uptimeSeconds % 60;
+
+      // 4️⃣ Correção: Adicionar Presença do Bot nas Estatísticas
+      const presence = client.user.presence;
+      const status = presence ? presence.status : 'offline';
+      const activity = presence && presence.activities.length > 0 ? presence.activities[0].name : 'Nenhuma';
+
+      const embed = new EmbedBuilder()
+        .setTitle('📊 Estatísticas do Bot')
+        .setColor(Colors.Green)
+        .addFields(
+          { name: '🏓 Ping', value: `${client.ws.ping}ms`, inline: true },
+          { name: '⏱️ Uptime', value: `${hours}h ${minutes}m ${seconds}s`, inline: true },
+          { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
+          { name: '👥 Usuários', value: `${client.users.cache.size}`, inline: true },
+          { name: '🟢 Status', value: status, inline: true },
+          { name: '🎵 Atividade', value: activity, inline: true }
+        )
+        .setFooter({ text: 'Estatísticas atualizadas' })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral });
+      logInfo(`${interaction.user.tag} abriu estatísticas`);
+      break;
+    }
+
+    case 'console': {
+      console.log(chalk.yellow('\n═══ ESTATÍSTICAS DO BOT ═══'));
+      console.log(chalk.white(`Ping:    ${client.ws.ping}ms`));
+      console.log(chalk.white(`Uptime:  ${Math.floor(client.uptime / 3600000)}h`));
+      console.log(chalk.white(`Servers: ${client.guilds.cache.size}`));
+      console.log(chalk.white(`Users:   ${client.users.cache.size}`));
+      console.log(chalk.yellow('═════════════════════════════\n'));
+      await interaction.reply({ content: '✅ Verifique o console!', flags: InteractionReplyFlags.Ephemeral });
+      break;
+    }
+
+    case 'help': {
+      const embed = new EmbedBuilder()
+        .setTitle('❓ Ajuda - Painel Administrativo')
+        .setDescription('Como usar o painel administrativo:')
+        .setColor(Colors.Blue)
+        .addFields(
+          { name: '📊 Estatísticas', value: 'Clique em "Estatísticas" para ver dados do bot', inline: false },
+          { name: '🖥️ Console', value: 'Clique em "Ver no Console" para ver dados no terminal', inline: false },
+          { name: '🔐 Segurança', value: 'Use o comando /adm com a senha correta', inline: false }
+        )
+        .setFooter({ text: 'Painel Administrativo' })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral });
+      logInfo(`${interaction.user.tag} pediu ajuda no painel`);
+      break;
+    }
+
+    default:
+      await interaction.reply({ content: '❌ Botão desconhecido!', flags: InteractionReplyFlags.Ephemeral });
+  }
 }
 
 // === LOGIN ===
