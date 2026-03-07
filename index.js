@@ -1,5 +1,17 @@
 // index.js - PARTE 1
-const { Client, GatewayIntentBits, Partials, Colors, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ChatInputCommandInteraction } = require('discord.js');
+const { 
+  Client, 
+  GatewayIntentBits, 
+  Partials, 
+  Colors, 
+  ActionRowBuilder, 
+  ButtonBuilder, 
+  ButtonStyle, 
+  EmbedBuilder, 
+  ChatInputCommandInteraction,
+  InteractionReplyFlags,
+  ChannelType
+} = require('discord.js');
 const dotenv = require('dotenv');
 const chalk = require('chalk');
 const readline = require('readline');
@@ -13,6 +25,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildPresences // 1️⃣ Correção: Intent para PresenceUpdate
   ],
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
 });
@@ -61,7 +74,7 @@ const commands = [
       if (code !== process.env.ACCESS_CODE) {
         return interaction.reply({ 
           content: '❌ Código de acesso incorreto!', 
-          ephemeral: true 
+          flags: InteractionReplyFlags.Ephemeral // 4️⃣ Correção: Uso de Flags
         });
       }
 
@@ -95,7 +108,7 @@ const commands = [
         content: 'Painel Administrativo:', 
         embeds: [embed],
         components: [row], 
-        ephemeral: true 
+        flags: InteractionReplyFlags.Ephemeral // 4️⃣ Correção: Uso de Flags
       });
       
       logInfo(`/adm usado por ${interaction.user.tag}`);
@@ -120,7 +133,7 @@ const pingCommand = {
       .setFooter({ text: 'Bot está funcionando corretamente!' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
     logInfo(`Comando /ping usado por ${interaction.user.tag}`);
   },
 };
@@ -144,13 +157,12 @@ const helpCommand = {
       .setFooter({ text: 'Digite /help para mais informações' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
     logInfo(`Comando /help usado por ${interaction.user.tag}`);
   },
 };
-
-// === EVENTO: BOT PRONTO (CORRIGIDO - usa clientReady) ===
-client.once('clientReady', async () => {
+// === EVENTO: BOT PRONTO (CORRIGIDO - usa ready) ===
+client.once('ready', async () => { // 2️⃣ Correção: Evento 'ready'
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
@@ -160,16 +172,17 @@ client.once('clientReady', async () => {
   console.log(chalk.white(`   • ID: ${client.user.id}`));
   console.log(chalk.white(`   • Servidores: ${client.guilds.cache.size}`));
   
-  // Registrar comandos por servidor (aparece em 2-5 segundos)
+  // Registrar comandos em TODOS os servidores (2️⃣ Correção)
   if (client.guilds.cache.size > 0) {
     try {
-      const guild = client.guilds.cache.first();
-      await guild.commands.set([
-        ...commands.map(c => c.data),
-        pingCommand.data,
-        helpCommand.data
-      ]);
-      logInfo(`Comandos registrados no servidor: ${guild.name}!`);
+      for (const guild of client.guilds.cache.values()) {
+        await guild.commands.set([
+          ...commands.map(c => c.data),
+          pingCommand.data,
+          helpCommand.data
+        ]);
+        logSuccess(`Comandos registrados em: ${guild.name}`);
+      }
       logInfo('Comandos registrados globalmente com sucesso!');
     } catch (error) {
       logError(`Erro ao registrar comandos: ${error.message}`);
@@ -229,9 +242,9 @@ client.on('interactionCreate', async (interaction) => {
     } catch (error) {
       logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', ephemeral: true });
+        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
       } else {
-        await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', ephemeral: true });
+        await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
       }
     }
     return;
@@ -270,7 +283,7 @@ async function handleButtonInteraction(interaction) {
         .setFooter({ text: 'Estatísticas atualizadas' })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
       logInfo(`${interaction.user.tag} abriu estatísticas`);
       break;
     }
@@ -282,7 +295,7 @@ async function handleButtonInteraction(interaction) {
       console.log(chalk.white(`Servers: ${client.guilds.cache.size}`));
       console.log(chalk.white(`Users:   ${client.users.cache.size}`));
       console.log(chalk.yellow('═════════════════════════════\n'));
-      await interaction.reply({ content: '✅ Verifique o console!', ephemeral: true });
+      await interaction.reply({ content: '✅ Verifique o console!', flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
       break;
     }
 
@@ -299,13 +312,13 @@ async function handleButtonInteraction(interaction) {
         .setFooter({ text: 'Painel Administrativo' })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
       logInfo(`${interaction.user.tag} pediu ajuda no painel`);
       break;
     }
 
     default:
-      await interaction.reply({ content: '❌ Botão desconhecido!', ephemeral: true });
+      await interaction.reply({ content: '❌ Botão desconhecido!', flags: InteractionReplyFlags.Ephemeral }); // 4️⃣ Correção: Uso de Flags
   }
 }
 
@@ -394,6 +407,7 @@ client.on('channelDelete', async (channel) => {
   console.log(chalk.red(`   Servidor: ${channel.guild.name}`));
   console.log(chalk.red('────────────────────────────────\n'));
 });
+
 // === EVENTO: CANAL ATUALIZADO ===
 client.on('channelUpdate', async (oldChannel, newChannel) => {
   if (!oldChannel.guild) return;
@@ -497,7 +511,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     console.log(chalk.red.bgBlack.bold('\n 🎤 SAIU DO CANAL DE VOZ '));
     console.log(chalk.red('────────────────────────────────'));
     console.log(chalk.red(`   Usuário: ${oldState.member.user.tag}`));
-    console.log(chalk.red(`   Canal:   #${oldState.channel.name}`));
+    console.log(chalk.red(`   Canal:   ${oldState.channel.name}`));
     console.log(chalk.red('────────────────────────────────\n'));
   }
 });
@@ -542,7 +556,6 @@ process.on('uncaughtException', (error) => {
   console.error(error);
   process.exit(1);
 });
-
 // ==========================================
 //        MENU INTERATIVO NO CONSOLE
 // ==========================================
@@ -622,7 +635,7 @@ function showStats() {
   console.log(chalk.white(`⏱️  Uptime:     ${hours}h ${minutes}m ${seconds}s`));
   console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
   console.log(chalk.white(`👥 Usuários:   ${client.users.cache.size}`));
-  console.log(chalk.white(`📝 Mensagens:  ${client.channels.cache.size}`));
+  console.log(chalk.white(`📁 Canais: ${client.channels.cache.size}`)); // 5️⃣ Correção: Label "Canais" em vez de "Mensagens"
   console.log(chalk.yellow('═══════════════════════════════\n'));
   
   showMenu();
@@ -716,7 +729,10 @@ function sendMessageToChannel() {
     
     if (guildIndex >= 0 && guildIndex < guilds.length) {
       const guild = guilds[guildIndex];
-      const channels = Array.from(guild.channels.cache.filter(c => c.type === 0).values());
+      // 3️⃣ Correção: Uso de ChannelType.GuildText
+      const channels = guild.channels.cache.filter(
+        c => c.type === ChannelType.GuildText
+      );
       
       if (channels.length === 0) {
         console.log(chalk.red('Nenhum canal de texto encontrado.'));
