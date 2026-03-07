@@ -152,7 +152,7 @@ const helpCommand = {
 // === EVENTO: BOT PRONTO ===
 client.once('clientReady', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
-  console.log(chalk.green('  🤖 BOT ESTÁ ONLINE!'));
+  console.log(chalk.green('   BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
 
   console.log(chalk.cyan('\n  📊 ESTATÍSTICAS INICIAIS:'));
@@ -548,7 +548,7 @@ function showMenu() {
   console.log(chalk.cyan('║  6.  Ver logs recentes                                         ║'));
   console.log(chalk.cyan('║  7.  Ver status do bot                                         ║'));
   console.log(chalk.cyan('║  0.  Sair                                                      ║'));
-  console.log(chalk.cyan('╚════════════════════════════════════════════════════════╝'));
+  console.log(chalk.cyan('╚════════════════════════Y2k═Nat═════════════════════════╝'));
   
   rl.question(chalk.yellow('\n👉 Escolha uma opção: '), (answer) => {
     isMenuActive = false;
