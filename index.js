@@ -149,8 +149,8 @@ const helpCommand = {
   },
 };
 
-// === EVENTO: BOT PRONTO (CORRIGIDO) ===
-client.once('ready', async () => {
+// === EVENTO: BOT PRONTO (CORRIGIDO - usa clientReady) ===
+client.once('clientReady', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
@@ -394,7 +394,6 @@ client.on('channelDelete', async (channel) => {
   console.log(chalk.red(`   Servidor: ${channel.guild.name}`));
   console.log(chalk.red('────────────────────────────────\n'));
 });
-
 // === EVENTO: CANAL ATUALIZADO ===
 client.on('channelUpdate', async (oldChannel, newChannel) => {
   if (!oldChannel.guild) return;
