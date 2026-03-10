@@ -73,7 +73,7 @@ const commands = [
       if (code !== process.env.ACCESS_CODE) {
         return interaction.reply({ 
           content: '❌ Código de acesso incorreto!', 
-          flags: 64 // 64 = Ephemeral
+          flags: 64
         });
       }
 
@@ -107,7 +107,7 @@ const commands = [
         content: 'Painel Administrativo:', 
         embeds: [embed],
         components: [row], 
-        flags: 64 // 64 = Ephemeral
+        flags: 64
       });
       
       logInfo(`/adm usado por ${interaction.user.tag}`);
@@ -151,7 +151,8 @@ const helpCommand = {
       .addFields(
         { name: '/ping', value: 'Verifica a latência do bot', inline: false },
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
-        { name: '/adm', value: 'Acesso ao painel administrativo', inline: false }
+        { name: '/adm', value: 'Acesso ao painel administrativo', inline: false },
+        { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false }
       )
       .setFooter({ text: 'Digite /help para mais informações' })
       .setTimestamp();
@@ -161,7 +162,7 @@ const helpCommand = {
   },
 };
 
-// === COMANDO /private - MENSAGEM DA STAFF ===
+// === COMANDO /private - MENSAGEM DA STAFF (COM SENHA) ===
 const privateCommand = {
   data: {
     name: 'private',
@@ -182,12 +183,20 @@ const privateCommand = {
     ]
   },
   async execute(interaction) {
+    // Verifica se o usuário tem a senha de acesso
+    if (interaction.user.id !== process.env.OWNER_ID) {
+      return interaction.reply({
+        content: '❌ Você não tem permissão para usar este comando!',
+        flags: 64
+      });
+    }
+
     const user = interaction.options.getUser('user');
     const message = interaction.options.getString('message');
 
     try {
       await interaction.channel.send(
-        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\n${message}`
+        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\nMensagem aqui:\n${message}`
       );
 
       await interaction.reply({
@@ -789,9 +798,7 @@ async function handleButtonInteraction(interaction) {
           { name: '🎵 Atividade', value: activity, inline: true }
         )
         .setFooter({ text: 'Estatísticas atualizadas' })
-        .setTimestamp();
-
-      await interaction.reply({ embeds: [embed], flags: 64 });
+        .setTimestamp();      await interaction.reply({ embeds: [embed], flags: 64 });
       logInfo(`${interaction.user.tag} abriu estatísticas`);
       break;
     }
