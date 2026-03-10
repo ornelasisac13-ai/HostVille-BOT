@@ -203,7 +203,7 @@ const privateCommand = {
 
     try {
       await interaction.channel.send(
-        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\nMensagem aqui:\n${message}`
+        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\n${message}`
       );
 
       await interaction.reply({
