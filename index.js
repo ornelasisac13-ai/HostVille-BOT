@@ -434,7 +434,7 @@ client.on('roleDelete', async (role) => {
 });
 
 // === EVENTO: ROLE ATUALIZADA ===
-client.on('roleUpdate', async (oldRole, new Role) => {
+client.on('roleUpdate', async (oldRole, newRole) => {
   if (!oldRole.guild) return;
   if (oldRole.name === newRole.name && oldRole.hexColor === newRole.hexColor) return;
 
