@@ -73,7 +73,7 @@ const commands = [
       if (code !== process.env.ACCESS_CODE) {
         return interaction.reply({ 
           content: '❌ Código de acesso incorreto!', 
-          flags: 64
+          flags: 64 // 64 = Ephemeral
         });
       }
 
@@ -107,7 +107,7 @@ const commands = [
         content: 'Painel Administrativo:', 
         embeds: [embed],
         components: [row], 
-        flags: 64
+        flags: 64 // 64 = Ephemeral
       });
       
       logInfo(`/adm usado por ${interaction.user.tag}`);
@@ -151,8 +151,7 @@ const helpCommand = {
       .addFields(
         { name: '/ping', value: 'Verifica a latência do bot', inline: false },
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
-        { name: '/adm', value: 'Acesso ao painel administrativo', inline: false },
-        { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false }
+        { name: '/adm', value: 'Acesso ao painel administrativo', inline: false }
       )
       .setFooter({ text: 'Digite /help para mais informações' })
       .setTimestamp();
@@ -161,67 +160,6 @@ const helpCommand = {
     logInfo(`Comando /help usado por ${interaction.user.tag}`);
   },
 };
-
-// === COMANDO /private - MENSAGEM DA STAFF (COM SENHA ACCESS_CODE) ===
-const privateCommand = {
-  data: {
-    name: 'private',
-    description: 'Enviar mensagem da staff',
-    options: [
-      {
-        name: 'user',
-        description: 'Usuário que receberá a mensagem',
-        type: 6,
-        required: true
-      },
-      {
-        name: 'message',
-        description: 'Mensagem a ser enviada',
-        type: 3,
-        required: true
-      },
-      {
-        name: 'code',
-        description: 'Código de acesso (ACCESS_CODE)',
-        type: 3,
-        required: true
-      }
-    ]
-  },
-  async execute(interaction) {
-    const user = interaction.options.getUser('user');
-    const message = interaction.options.getString('message');
-    const code = interaction.options.getString('code');
-
-    // Verifica se o código está correto
-    if (code !== process.env.ACCESS_CODE) {
-      return interaction.reply({
-        content: '❌ Código de acesso incorreto!',
-        flags: 64
-      });
-    }
-
-    try {
-      await interaction.channel.send(
-        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\nMensagem aqui:\n${message}`
-      );
-
-      await interaction.reply({
-        content:
-          `✅ Mensagem enviada\n\nPara ${user}\n\nMensagem enviada:\n${message}`,
-        flags: 64
-      });
-
-      logInfo(`${interaction.user.tag} enviou mensagem para ${user.tag}`);
-    } catch (error) {
-      await interaction.reply({
-        content: '❌ Erro ao enviar a mensagem.',
-        flags: 64
-      });
-    }
-  }
-};
-
 // === EVENTO: BOT PRONTO (CORRIGIDO - usa clientReady) ===
 client.once('clientReady', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
@@ -240,8 +178,7 @@ client.once('clientReady', async () => {
         await guild.commands.set([
           ...commands.map(c => c.data),
           pingCommand.data,
-          helpCommand.data,
-          privateCommand.data
+          helpCommand.data
         ]);
         logSuccess(`Comandos registrados em: ${guild.name}`);
       }
@@ -259,6 +196,7 @@ client.once('clientReady', async () => {
   initReadline();
   showMenu();
 });
+
 // === INICIALIZAR READLINE ===
 function initReadline() {
   if (!rl) {
@@ -293,10 +231,6 @@ client.on('interactionCreate', async (interaction) => {
       }
       if (interaction.commandName === 'help') {
         await helpCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'private') {
-        await privateCommand.execute(interaction);
         return;
       }
       return;
@@ -429,7 +363,6 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 // === EVENTO: ROLE CRIADA ===
 client.on('roleCreate', async (role) => {
   if (!role.guild) return;
-
   console.log(chalk.magenta.bgBlack.bold('\n 🎭 ROLE CRIADA '));
   console.log(chalk.magenta('────────────────────────────────'));
   console.log(chalk.magenta(`   Nome:  ${role.name}`));
@@ -438,6 +371,7 @@ client.on('roleCreate', async (role) => {
   console.log(chalk.magenta(`   Servidor: ${role.guild.name}`));
   console.log(chalk.magenta('────────────────────────────────\n'));
 });
+
 // === EVENTO: ROLE DELETADA ===
 client.on('roleDelete', async (role) => {
   if (!role.guild) return;
@@ -483,6 +417,9 @@ client.on('guildEmojiDelete', async (emoji) => {
   console.log(chalk.red(`   Servidor: ${emoji.guild.name}`));
   console.log(chalk.red('────────────────────────────────\n'));
 });
+
+// === EVENTO: PRESENCE UPDATE (REMOVIDO - Ver Parte 3 para Stats) ===
+// client.on('presenceUpdate', async (oldPresence, newPresence) => { ... } REMOVIDO)
 
 // === EVENTO: VOICE STATE UPDATE ===
 client.on('voiceStateUpdate', async (oldState, newState) => {
@@ -541,7 +478,6 @@ process.on('uncaughtException', (error) => {
   console.error(error);
   process.exit(1);
 });
-
 // ==========================================
 //        MENU INTERATIVO NO CONSOLE
 // ==========================================
@@ -621,7 +557,7 @@ function showStats() {
   console.log(chalk.white(`⏱️  Uptime:     ${hours}h ${minutes}m ${seconds}s`));
   console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
   console.log(chalk.white(`👥 Usuários:   ${client.users.cache.size}`));
-  console.log(chalk.white(`📁 Canais: ${client.channels.cache.size}`));
+  console.log(chalk.white(`📁 Canais: ${client.channels.cache.size}`)); // Correção: Label "Canais" em vez de "Mensagens"
   console.log(chalk.yellow('═══════════════════════════════\n'));
   
   showMenu();
@@ -715,6 +651,7 @@ function sendMessageToChannel() {
     
     if (guildIndex >= 0 && guildIndex < guilds.length) {
       const guild = guilds[guildIndex];
+      // Correção: Uso de ChannelType.GuildText
       const channels = guild.channels.cache.filter(
         c => c.type === ChannelType.GuildText
       );
@@ -789,6 +726,7 @@ async function handleButtonInteraction(interaction) {
       const minutes = Math.floor((uptimeSeconds % 3600) / 60);
       const seconds = uptimeSeconds % 60;
 
+      // Adicionar Presença do Bot nas Estatísticas
       const presence = client.user.presence;
       const status = presence ? presence.status : 'offline';
       const activity = presence && presence.activities.length > 0 ? presence.activities[0].name : 'Nenhuma';
@@ -805,7 +743,9 @@ async function handleButtonInteraction(interaction) {
           { name: '🎵 Atividade', value: activity, inline: true }
         )
         .setFooter({ text: 'Estatísticas atualizadas' })
-        .setTimestamp();      await interaction.reply({ embeds: [embed], flags: 64 });
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], flags: 64 });
       logInfo(`${interaction.user.tag} abriu estatísticas`);
       break;
     }
