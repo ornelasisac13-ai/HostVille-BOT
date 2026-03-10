@@ -162,7 +162,7 @@ const helpCommand = {
   },
 };
 
-// === COMANDO /private - MENSAGEM DA STAFF (COM SENHA) ===
+// === COMANDO /private - MENSAGEM DA STAFF (COM SENHA ACCESS_CODE) ===
 const privateCommand = {
   data: {
     name: 'private',
@@ -179,20 +179,27 @@ const privateCommand = {
         description: 'Mensagem a ser enviada',
         type: 3,
         required: true
+      },
+      {
+        name: 'code',
+        description: 'Código de acesso (ACCESS_CODE)',
+        type: 3,
+        required: true
       }
     ]
   },
   async execute(interaction) {
-    // Verifica se o usuário tem a senha de acesso
-    if (interaction.user.id !== process.env.OWNER_ID) {
+    const user = interaction.options.getUser('user');
+    const message = interaction.options.getString('message');
+    const code = interaction.options.getString('code');
+
+    // Verifica se o código está correto
+    if (code !== process.env.ACCESS_CODE) {
       return interaction.reply({
-        content: '❌ Você não tem permissão para usar este comando!',
+        content: '❌ Código de acesso incorreto!',
         flags: 64
       });
     }
-
-    const user = interaction.options.getUser('user');
-    const message = interaction.options.getString('message');
 
     try {
       await interaction.channel.send(
@@ -422,6 +429,7 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 // === EVENTO: ROLE CRIADA ===
 client.on('roleCreate', async (role) => {
   if (!role.guild) return;
+
   console.log(chalk.magenta.bgBlack.bold('\n 🎭 ROLE CRIADA '));
   console.log(chalk.magenta('────────────────────────────────'));
   console.log(chalk.magenta(`   Nome:  ${role.name}`));
@@ -430,7 +438,6 @@ client.on('roleCreate', async (role) => {
   console.log(chalk.magenta(`   Servidor: ${role.guild.name}`));
   console.log(chalk.magenta('────────────────────────────────\n'));
 });
-
 // === EVENTO: ROLE DELETADA ===
 client.on('roleDelete', async (role) => {
   if (!role.guild) return;
