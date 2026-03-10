@@ -182,7 +182,7 @@ const privateCommand = {
       },
       {
         name: 'code',
-        description: 'Código de acesso (ACCESS_CODE)',
+        description: 'Código de acesso',
         type: 3,
         required: true
       }
