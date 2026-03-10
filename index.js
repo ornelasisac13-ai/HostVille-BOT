@@ -160,6 +160,52 @@ const helpCommand = {
     logInfo(`Comando /help usado por ${interaction.user.tag}`);
   },
 };
+
+// === COMANDO /private - MENSAGEM DA STAFF ===
+const privateCommand = {
+  data: {
+    name: 'private',
+    description: 'Enviar mensagem da staff',
+    options: [
+      {
+        name: 'user',
+        description: 'Usuário que receberá a mensagem',
+        type: 6,
+        required: true
+      },
+      {
+        name: 'message',
+        description: 'Mensagem a ser enviada',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  async execute(interaction) {
+    const user = interaction.options.getUser('user');
+    const message = interaction.options.getString('message');
+
+    try {
+      await interaction.channel.send(
+        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\nMensagem aqui:\n${message}`
+      );
+
+      await interaction.reply({
+        content:
+          `✅ Mensagem enviada\n\nPara ${user}\n\nMensagem enviada:\n${message}`,
+        flags: 64
+      });
+
+      logInfo(`${interaction.user.tag} enviou mensagem para ${user.tag}`);
+    } catch (error) {
+      await interaction.reply({
+        content: '❌ Erro ao enviar a mensagem.',
+        flags: 64
+      });
+    }
+  }
+};
+
 // === EVENTO: BOT PRONTO (CORRIGIDO - usa clientReady) ===
 client.once('clientReady', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
@@ -178,7 +224,8 @@ client.once('clientReady', async () => {
         await guild.commands.set([
           ...commands.map(c => c.data),
           pingCommand.data,
-          helpCommand.data
+          helpCommand.data,
+          privateCommand.data
         ]);
         logSuccess(`Comandos registrados em: ${guild.name}`);
       }
@@ -196,7 +243,6 @@ client.once('clientReady', async () => {
   initReadline();
   showMenu();
 });
-
 // === INICIALIZAR READLINE ===
 function initReadline() {
   if (!rl) {
@@ -231,6 +277,10 @@ client.on('interactionCreate', async (interaction) => {
       }
       if (interaction.commandName === 'help') {
         await helpCommand.execute(interaction);
+        return;
+      }
+      if (interaction.commandName === 'private') {
+        await privateCommand.execute(interaction);
         return;
       }
       return;
@@ -384,7 +434,7 @@ client.on('roleDelete', async (role) => {
 });
 
 // === EVENTO: ROLE ATUALIZADA ===
-client.on('roleUpdate', async (oldRole, newRole) => {
+client.on('roleUpdate', async (oldRole, new Role) => {
   if (!oldRole.guild) return;
   if (oldRole.name === newRole.name && oldRole.hexColor === newRole.hexColor) return;
 
@@ -417,9 +467,6 @@ client.on('guildEmojiDelete', async (emoji) => {
   console.log(chalk.red(`   Servidor: ${emoji.guild.name}`));
   console.log(chalk.red('────────────────────────────────\n'));
 });
-
-// === EVENTO: PRESENCE UPDATE (REMOVIDO - Ver Parte 3 para Stats) ===
-// client.on('presenceUpdate', async (oldPresence, newPresence) => { ... } REMOVIDO)
 
 // === EVENTO: VOICE STATE UPDATE ===
 client.on('voiceStateUpdate', async (oldState, newState) => {
@@ -478,6 +525,7 @@ process.on('uncaughtException', (error) => {
   console.error(error);
   process.exit(1);
 });
+
 // ==========================================
 //        MENU INTERATIVO NO CONSOLE
 // ==========================================
@@ -557,7 +605,7 @@ function showStats() {
   console.log(chalk.white(`⏱️  Uptime:     ${hours}h ${minutes}m ${seconds}s`));
   console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
   console.log(chalk.white(`👥 Usuários:   ${client.users.cache.size}`));
-  console.log(chalk.white(`📁 Canais: ${client.channels.cache.size}`)); // Correção: Label "Canais" em vez de "Mensagens"
+  console.log(chalk.white(`📁 Canais: ${client.channels.cache.size}`));
   console.log(chalk.yellow('═══════════════════════════════\n'));
   
   showMenu();
@@ -651,7 +699,6 @@ function sendMessageToChannel() {
     
     if (guildIndex >= 0 && guildIndex < guilds.length) {
       const guild = guilds[guildIndex];
-      // Correção: Uso de ChannelType.GuildText
       const channels = guild.channels.cache.filter(
         c => c.type === ChannelType.GuildText
       );
@@ -726,7 +773,6 @@ async function handleButtonInteraction(interaction) {
       const minutes = Math.floor((uptimeSeconds % 3600) / 60);
       const seconds = uptimeSeconds % 60;
 
-      // Adicionar Presença do Bot nas Estatísticas
       const presence = client.user.presence;
       const status = presence ? presence.status : 'offline';
       const activity = presence && presence.activities.length > 0 ? presence.activities[0].name : 'Nenhuma';
