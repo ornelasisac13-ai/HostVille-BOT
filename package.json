@@ -1,7 +1,7 @@
 {
-  "name": "𝙷𝚘𝚜𝚝𝚅𝚒𝚕𝚕𝚎-𝙱𝙾𝚃_",
-  "version": "𝟺.𝟷.𝟸-𝚑𝚏",
-  "description": "Bot Discord avançado com painel, logs e menu interativo",
+  "name": "hostville-bot",
+  "version": "4.1.2-hf",
+  "description": "Bot Discord avançado com painel, monitoramento e automoderação com IA",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
@@ -13,9 +13,9 @@
     "discord",
     "bot",
     "discord.js",
-    "console",
-    "admin-panel",
-    "chatbot"
+    "automod",
+    "ai-moderation",
+    "admin-panel"
   ],
   "author": "Isac",
   "license": "MIT",
@@ -25,7 +25,8 @@
   "dependencies": {
     "chalk": "^4.1.2",
     "discord.js": "^14.14.1",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "openai": "^4.56.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
