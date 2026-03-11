@@ -447,7 +447,7 @@ const privateCommand = {
     try {
       // Envia mensagem no canal
       await interaction.channel.send(
-        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\\n${message}`
+        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\n${message}`
       );
 
       // Envia mensagem privada para o usuário
