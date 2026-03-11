@@ -298,7 +298,6 @@ const privateCommand = {
     }
   }
 };
-
 // ===============================
 // EVENTO: MENSAGEM CRIADA (MODERAÇÃO)
 // ===============================
@@ -372,7 +371,8 @@ client.once('clientReady', async () => {
         await guild.commands.set([
           ...commands.map(c => c.data),
           pingCommand.data,
-          helpCommand.data
+          helpCommand.data,
+          privateCommand.data
         ]);
         logSuccess(`Comandos registrados em: ${guild.name}`);
       }
@@ -434,12 +434,15 @@ client.on('interactionCreate', async (interaction) => {
         await helpCommand.execute(interaction);
         return;
       }
+      if (interaction.commandName === 'private') {
+        await privateCommand.execute(interaction);
+        return;
+      }
       return;
     }
 
     try {
-      await command.execute(interaction);
-    } catch (error) {
+      await command.execute(interaction);    } catch (error) {
       logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
@@ -767,7 +770,6 @@ function showBotStatus() {
   console.log(chalk.yellow('══════════════════════════════\n'));
   showMenu();
 }
-
 // ===============================
 // EVENTOS DE LOG (MENSAGENS, CANAIS, ETC)
 // ===============================
@@ -817,7 +819,7 @@ client.on('guildMemberAdd', async (member) => {
   console.log(chalk.green('────────────────────────────────'));
   console.log(chalk.green(`   Usuário: ${member.user.tag}`));
   console.log(chalk.green(`   ID:      ${member.user.id}`));
-  console.log(chalk.green(`   Servidor:${member.guild.name}`));
+  console.log(chalk.green(`   Servidor: ${member.guild.name}`));
   console.log(chalk.green(`   Data:    ${new Date().toLocaleString('pt-BR')}`));
   console.log(chalk.green('────────────────────────────────\n'));
   logInfo(`Novo membro: ${member.user.tag} (${member.guild.name})`);
@@ -827,7 +829,7 @@ client.on('guildMemberRemove', async (member) => {
   console.log(chalk.red.bgBlack.bold('\n ❌ MEMBRO SAIU '));
   console.log(chalk.red('────────────────────────────────'));
   console.log(chalk.red(`   Usuário: ${member.user.tag}`));
-  console.log(chalk.red(`   Servidor:${member.guild.name}`));
+  console.log(chalk.red(`   Servidor: ${member.guild.name}`));
   console.log(chalk.red(`   Data:    ${new Date().toLocaleString('pt-BR')}`));
   console.log(chalk.red('────────────────────────────────\n'));
   logInfo(`Membro saiu: ${member.user.tag} (${member.guild.name})`);
@@ -883,100 +885,97 @@ client.on('roleDelete', async (role) => {
   console.log(chalk.red(`   ID:    ${role.id}`));
   console.log(chalk.red(`   Servidor: ${role.guild.name}`));
   console.log(chalk.red('────────────────────────────────\n'));
-  });
+});
 
-  // === EVENTO: ROLE ATUALIZADA ===
-  client.on('roleUpdate', async (oldRole, newRole) => {
-    if (!oldRole.guild) return;
-    if (oldRole.name === newRole.name && oldRole.hexColor === newRole.hexColor) return;
+client.on('roleUpdate', async (oldRole, newRole) => {
+  if (!oldRole.guild) return;
+  if (oldRole.name === newRole.name && oldRole.hexColor === newRole.hexColor) return;
 
-    console.log(chalk.yellow.bgBlack.bold('\n 🔄 ROLE ATUALIZADA '));
-    console.log(chalk.yellow('────────────────────────────────'));
-    console.log(chalk.yellow(`   Nome Antigo: ${oldRole.name}`));
-    console.log(chalk.yellow(`   Nome Novo:   ${newRole.name}`));
-    console.log(chalk.yellow(`   Cor Antiga:  ${oldRole.hexColor}`));
-    console.log(chalk.yellow(`   Cor Nova:    ${newRole.hexColor}`));
-    console.log(chalk.yellow(`   Servidor:    ${oldRole.guild.name}`));
-    console.log(chalk.yellow('────────────────────────────────\n'));
-  });
+  console.log(chalk.yellow.bgBlack.bold('\n 🔄 ROLE ATUALIZADA '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Nome Antigo: ${oldRole.name}`));
+  console.log(chalk.yellow(`   Nome Novo:   ${newRole.name}`));
+  console.log(chalk.yellow(`   Cor Antiga:  ${oldRole.hexColor}`));
+  console.log(chalk.yellow(`   Cor Nova:    ${newRole.hexColor}`));
+  console.log(chalk.yellow(`   Servidor:    ${oldRole.guild.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
+});
 
-  // === EVENTO: EMOJI CRIADO ===
-  client.on('guildEmojiCreate', async (emoji) => {
-    console.log(chalk.cyan.bgBlack.bold('\n 😊 EMOJI CRIADO '));
-    console.log(chalk.cyan('────────────────────────────────'));
-    console.log(chalk.cyan(`   Nome:  ${emoji.name}`));
-    console.log(chalk.cyan(`   ID:    ${emoji.id}`));
-    console.log(chalk.cyan(`   Servidor: ${emoji.guild.name}`));
-    console.log(chalk.cyan('────────────────────────────────\n'));
-  });
+client.on('guildEmojiCreate', async (emoji) => {
+  console.log(chalk.cyan.bgBlack.bold('\n 😊 EMOJI CRIADO '));
+  console.log(chalk.cyan('────────────────────────────────'));
+  console.log(chalk.cyan(`   Nome:  ${emoji.name}`));
+  console.log(chalk.cyan(`   ID:    ${emoji.id}`));
+  console.log(chalk.cyan(`   Servidor: ${emoji.guild.name}`));
+  console.log(chalk.cyan('────────────────────────────────\n'));
+});
 
-  // === EVENTO: EMOJI DELETADO ===
-  client.on('guildEmojiDelete', async (emoji) => {
-    console.log(chalk.red.bgBlack.bold('\n 🗑️ EMOJI DELETADO '));
-    console.log(chalk.red('────────────────────────────────'));
-    console.log(chalk.red(`   Nome:  ${emoji.name}`));
-    console.log(chalk.red(`   ID:    ${emoji.id}`));
-    console.log(chalk.red(`   Servidor: ${emoji.guild.name}`));
-    console.log(chalk.red('────────────────────────────────\n'));
-  });
+client.on('guildEmojiDelete', async (emoji) => {
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ EMOJI DELETADO '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Nome:  ${emoji.name}`));
+  console.log(chalk.red(`   ID:    ${emoji.id}`));
+  console.log(chalk.red(`   Servidor: ${emoji.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
 
-  // === EVENTO: VOICE STATE UPDATE ===
-  client.on('voiceStateUpdate', async (oldState, newState) => {
-    if (!oldState.channel && newState.channel) {
-      console.log(chalk.green.bgBlack.bold('\n 🎤 ENTROU NO CANAL DE VOZ '));
-      console.log(chalk.green('────────────────────────────────'));
-      console.log(chalk.green(`   Usuário: ${newState.member.user.tag}`));
-      console.log(chalk.green(`   Canal:   #${newState.channel.name}`));
-      console.log(chalk.green('────────────────────────────────\n'));
-    } else if (oldState.channel && !newState.channel) {
-      console.log(chalk.red.bgBlack.bold('\n 🎤 SAIU DO CANAL DE VOZ '));
-      console.log(chalk.red('────────────────────────────────'));
-      console.log(chalk.red(`   Usuário: ${oldState.member.user.tag}`));
-      console.log(chalk.red(`   Canal:   ${oldState.channel.name}`));
-      console.log(chalk.red('────────────────────────────────\n'));
-    }
-  });
-
-  // === EVENTO: GUILD UPDATE ===
-  client.on('guildUpdate', async (oldGuild, newGuild) => {
-    if (oldGuild.name !== newGuild.name) {
-      console.log(chalk.yellow.bgBlack.bold('\n 🏛️ NOME DO SERVIDOR ALTERADO '));
-      console.log(chalk.yellow('────────────────────────────────'));
-      console.log(chalk.yellow(`   Antigo: ${oldGuild.name}`));
-      console.log(chalk.yellow(`   Novo:   ${newGuild.name}`));
-      console.log(chalk.yellow('────────────────────────────────\n'));
-    }
-  });
-
-  // === EVENTO: GUILD BAN ADD ===
-  client.on('guildBanAdd', async (guild, user) => {
-    console.log(chalk.red.bgBlack.bold('\n 🚫 USUÁRIO BANIDO '));
-    console.log(chalk.red('────────────────────────────────'));
-    console.log(chalk.red(`   Usuário: ${user.tag}`));
-    console.log(chalk.red(`   Servidor: ${guild.name}`));
-    console.log(chalk.red('────────────────────────────────\n'));
-  });
-
-  // === EVENTO: GUILD BAN REMOVE ===
-  client.on('guildBanRemove', async (guild, user) => {
-    console.log(chalk.green.bgBlack.bold('\n ✅ USUÁRIO DESBANIDO '));
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  if (!oldState.channel && newState.channel) {
+    console.log(chalk.green.bgBlack.bold('\n 🎤 ENTROU NO CANAL DE VOZ '));
     console.log(chalk.green('────────────────────────────────'));
-    console.log(chalk.green(`   Usuário: ${user.tag}`));
-    console.log(chalk.green(`   Servidor: ${guild.name}`));
+    console.log(chalk.green(`   Usuário: ${newState.member.user.tag}`));
+    console.log(chalk.green(`   Canal:   #${newState.channel.name}`));
     console.log(chalk.green('────────────────────────────────\n'));
-  });
+  } else if (oldState.channel && !newState.channel) {
+    console.log(chalk.red.bgBlack.bold('\n 🎤 SAIU DO CANAL DE VOZ '));
+    console.log(chalk.red('────────────────────────────────'));
+    console.log(chalk.red(`   Usuário: ${oldState.member.user.tag}`));
+    console.log(chalk.red(`   Canal:   ${oldState.channel.name}`));
+    console.log(chalk.red('────────────────────────────────\n'));
+  }
+});
 
-  // === ERROS NÃO TRATADOS ===
-  process.on('unhandledRejection', (error) => {
-    logError(`Erro não tratado: ${error.message}`);
-    console.error(error);
-  });
+client.on('guildUpdate', async (oldGuild, newGuild) => {
+  if (oldGuild.name !== newGuild.name) {
+    console.log(chalk.yellow.bgBlack.bold('\n 🏛️ NOME DO SERVIDOR ALTERADO '));
+    console.log(chalk.yellow('────────────────────────────────'));
+    console.log(chalk.yellow(`   Antigo: ${oldGuild.name}`));
+    console.log(chalk.yellow(`   Novo:   ${newGuild.name}`));
+    console.log(chalk.yellow('────────────────────────────────\n'));
+  }
+});
 
-  process.on('uncaughtException', (error) => {
-    logError(`Exceção não tratada: ${error.message}`);
-    console.error(error);
-    process.exit(1);
-  });
+client.on('guildBanAdd', async (guild, user) => {
+  console.log(chalk.red.bgBlack.bold('\n 🚫 USUÁRIO BANIDO '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Usuário: ${user.tag}`));
+  console.log(chalk.red(`   Servidor: ${guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
 
-  // === LOGIN DO BOT ===
-  client.login(process.env.TOKEN);
+client.on('guildBanRemove', async (guild, user) => {
+  console.log(chalk.green.bgBlack.bold('\n ✅ USUÁRIO DESBANIDO '));
+  console.log(chalk.green('────────────────────────────────'));
+  console.log(chalk.green(`   Usuário: ${user.tag}`));
+  console.log(chalk.green(`   Servidor: ${guild.name}`));
+  console.log(chalk.green('────────────────────────────────\n'));
+});
+
+// ===============================
+// ERROS NÃO TRATADOS
+// ===============================
+process.on('unhandledRejection', (error) => {
+  logError(`Erro não tratado: ${error.message}`);
+  console.error(error);
+});
+
+process.on('uncaughtException', (error) => {
+  logError(`Exceção não tratada: ${error.message}`);
+  console.error(error);
+  process.exit(1);
+});
+
+// ===============================
+// LOGIN DO BOT
+// ===============================
+client.login(process.env.TOKEN);
