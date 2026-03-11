@@ -122,8 +122,9 @@ function isAdmin(member) {
 }
 
 // ===============================
-// COMANDOS DO BOT
+// COMANDOS DO BOT - ATUALIZADOS
 // ===============================
+
 const commands = [
   {
     data: {
@@ -184,6 +185,7 @@ const commands = [
   },
 ];
 
+// === COMANDO /PING - TESTE DE CONEXÃO ===
 const pingCommand = {
   data: {
     name: 'ping',
@@ -205,6 +207,7 @@ const pingCommand = {
   },
 };
 
+// === COMANDO /HELP - AJUDA ===
 const helpCommand = {
   data: {
     name: 'help',
@@ -218,7 +221,8 @@ const helpCommand = {
       .addFields(
         { name: '/ping', value: 'Verifica a latência do bot', inline: false },
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
-        { name: '/adm', value: 'Acesso ao painel administrativo', inline: false }
+        { name: '/adm', value: 'Acesso ao painel administrativo', inline: false },
+        { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false }
       )
       .setFooter({ text: 'Digite /help para mais informações' })
       .setTimestamp();
@@ -226,6 +230,73 @@ const helpCommand = {
     await interaction.reply({ embeds: [embed], flags: 64 });
     logInfo(`Comando /help usado por ${interaction.user.tag}`);
   },
+};
+
+// === COMANDO /PRIVATE - MENSAGEM DA STAFF (COM SENHA ACCESS_CODE) ===
+const privateCommand = {
+  data: {
+    name: 'private',
+    description: 'Enviar mensagem da staff',
+    options: [
+      {
+        name: 'user',
+        description: 'Usuário que receberá a mensagem',
+        type: 6,
+        required: true
+      },
+      {
+        name: 'message',
+        description: 'Mensagem a ser enviada',
+        type: 3,
+        required: true
+      },
+      {
+        name: 'code',
+        description: 'Código de acesso (ACCESS_CODE)',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  async execute(interaction) {
+    const user = interaction.options.getUser('user');
+    const message = interaction.options.getString('message');
+    const code = interaction.options.getString('code');
+
+    // Verifica se o código está correto
+    if (code !== CONFIG.ACCESS_CODE) {
+      return interaction.reply({
+        content: '❌ Código de acesso incorreto!',
+        flags: 64
+      });
+    }
+
+    try {
+      // Envia mensagem no canal
+      await interaction.channel.send(
+        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\nMensagem aqui:\n${message}`
+      );
+
+      // Envia mensagem privada para o usuário
+      await user.send({
+        content: `📬 **Mensagem da Staff**\n\n${message}`
+      });
+
+      await interaction.reply({
+        content:
+          `✅ Mensagem enviada\n\nPara ${user}\n\nMensagem enviada:\n${message}`,
+        flags: 64
+      });
+
+      logInfo(`${interaction.user.tag} enviou mensagem para ${user.tag}`);
+    } catch (error) {
+      await interaction.reply({
+        content: '❌ Erro ao enviar a mensagem. Verifique se o usuário tem DMs abertos.',
+        flags: 64
+      });
+      logError(`Erro ao enviar mensagem privada: ${error.message}`);
+    }
+  }
 };
 
 // ===============================
