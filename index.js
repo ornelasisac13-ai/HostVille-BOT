@@ -48,14 +48,8 @@ const client = new Client({
   ]
 });
 
-// interface de console
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
-
 // === VARIÁVEL GLOBAL PARA CONTROLAR O READLINE ===
-let rl = null;
+let rl = null;        // apenas uma declaração
 let isMenuActive = false;
 
 // === FUNÇÕES DE LOG PERSONALIZADAS ===
