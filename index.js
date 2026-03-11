@@ -1,5 +1,5 @@
 // ===============================
-// BOT MODERAÇÃO COMPLETA - VERSÃO INTEGRADA
+// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA
 // ===============================
 const { 
   Client, 
