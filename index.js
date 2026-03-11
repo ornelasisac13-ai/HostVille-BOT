@@ -1,4 +1,3 @@
-// index.js - PARTE 1
 const { 
   Client, 
   GatewayIntentBits, 
@@ -32,31 +31,7 @@ const TOKEN = process.env.TOKEN;
 const ACCESS_CODE = process.env.ACCESS_CODE;
 const OWNER_ID = process.env.OWNER_ID;
 
-// criar cliente do discord
-const client = new Client({
-
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers
-  ],
-
-  partials: [
-    Partials.Message,
-    Partials.Channel,
-    Partials.Reaction
-  ]
-
-});
-
-// interface de console
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
-
-// === CONFIGURAÇÃO DO CLIENTE DISCORD ===
+// criar cliente do discord (somente UMA vez)
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -65,7 +40,18 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildPresences
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
+  partials: [
+    Partials.Message,
+    Partials.Channel,
+    Partials.GuildMember,
+    Partials.Reaction
+  ]
+});
+
+// interface de console
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
 });
 
 // === VARIÁVEL GLOBAL PARA CONTROLAR O READLINE ===
