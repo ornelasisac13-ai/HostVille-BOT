@@ -11,11 +11,50 @@ const {
   ChatInputCommandInteraction,
   ChannelType
 } = require('discord.js');
+
 const dotenv = require('dotenv');
 const chalk = require('chalk');
 const readline = require('readline');
 
+// carregar variáveis do .env
 dotenv.config();
+
+// sistema de IA
+const {
+  isOffensive,
+  enableAI,
+  disableAI,
+  getAIStatus
+} = require('./aiModeration');
+
+// variáveis do bot
+const TOKEN = process.env.TOKEN;
+const ACCESS_CODE = process.env.ACCESS_CODE;
+const OWNER_ID = process.env.OWNER_ID;
+
+// criar cliente do discord
+const client = new Client({
+
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers
+  ],
+
+  partials: [
+    Partials.Message,
+    Partials.Channel,
+    Partials.Reaction
+  ]
+
+});
+
+// interface de console
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 
 // === CONFIGURAÇÃO DO CLIENTE DISCORD ===
 const client = new Client({
