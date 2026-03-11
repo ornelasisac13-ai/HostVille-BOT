@@ -1,30 +1,15 @@
-const { 
-  Client, 
-  GatewayIntentBits, 
-  Partials, 
-  Colors, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
-  ButtonStyle, 
-  EmbedBuilder, 
-  ChatInputCommandInteraction,
-  ChannelType
-} = require('discord.js');
+// ==========================================
+//       PARTE 1: CONFIGURAÇÕES E IA
+// ==========================================
 
+const { REST, Routes, SlashCommandBuilder, Client, GatewayIntentBits, Partials, Colors, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ChatInputCommandInteraction, ChannelType } = require("discord.js");
+const OpenAI = require("openai");
 const dotenv = require('dotenv');
 const chalk = require('chalk');
 const readline = require('readline');
 
 // carregar variáveis do .env
 dotenv.config();
-
-// sistema de IA
-const {
-  isOffensive,
-  enableAI,
-  disableAI,
-  getAIStatus
-} = require('./aiModeration');
 
 // variáveis do bot
 const TOKEN = process.env.TOKEN;
@@ -48,11 +33,147 @@ const client = new Client({
   ]
 });
 
+// ==========================================
+//       SISTEMA DE IA DE MODERAÇÃO
+// ==========================================
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_KEY });
+
+// estado da IA
+let aiEnabled = false;
+
+// lista de palavras suspeitas
+const suspiciousWords = [
+  "idiota", "burro", "estúpido", "retardado", "lixo", "imbecil", "inútil",
+  "merda", "filho da puta", "fdp", "vai se foder", "vai tomar no cu", "vtnc", "arrombado", "otário", "desgraçado",
+  "seu merda", "seu lixo", "seu inútil", "seu retardado",
+  "cala a boca", "ninguém gosta de você", "se mata", "vai morrer"
+];
+
+// filtro rápido
+function quickFilter(text) {
+  if (!text) return false;
+  const msg = text.toLowerCase();
+  return suspiciousWords.some(word => msg.includes(word));
+}
+
+// análise com IA
+async function analyzeWithAI(text) {
+  try {
+    const response = await openai.responses.create({
+      model: "gpt-4.1-mini",
+      input: `Responda apenas TRUE ou FALSE.
+A mensagem abaixo contém insulto, ameaça ou discurso de ódio?
+Mensagem:
+${text}`
+    });
+    const result = response.output_text.trim().toLowerCase();
+    return result.includes("true");
+  } catch (err) {
+    console.log("❌ ERRO NA IA:", err);
+    return false;
+  }
+}
+
+// verificação final
+async function isOffensive(text) {
+  if (!aiEnabled) return false;
+  if (!text || text.length < 5) return false;
+  if (!quickFilter(text)) return false;
+  const result = await analyzeWithAI(text);
+  if (result) console.log("⚠️ Mensagem ofensiva detectada:", text);
+  return result;
+}
+
+// ativar IA
+function enableAI(user = "Sistema") {
+  try {
+    aiEnabled = true;
+    console.log("\n🧠 ================================");
+    console.log("🧠 IA DE MODERAÇÃO ATIVADA");
+    console.log("👤 Ativado por:", user);
+    console.log("🧠 ================================\n");
+    return true;
+  } catch (err) {
+    console.log("❌ ERRO AO ATIVAR IA:", err);
+    return false;
+  }
+}
+
+// desativar IA
+function disableAI(user = "Sistema") {
+  try {
+    aiEnabled = false;
+    console.log("\n🛑 ================================");
+    console.log("🛑 IA DE MODERAÇÃO DESATIVADA");
+    console.log("👤 Desativado por:", user);
+    console.log("🛑 ================================\n");
+    return true;
+  } catch (err) {
+    console.log("❌ ERRO AO DESATIVAR IA:", err);
+    return false;
+  }
+}
+
+// status da IA
+function getAIStatus() {
+  return aiEnabled;
+}
+
+// criar comandos de IA
+function getAICommands() {
+  return [
+    new SlashCommandBuilder()
+      .setName("activeai")
+      .setDescription("Ativa a IA de moderação")
+      .addStringOption(option =>
+        option.setName("code")
+              .setDescription("Código de acesso")
+              .setRequired(true)
+      ),
+    new SlashCommandBuilder()
+      .setName("desactiveai")
+      .setDescription("Desativa a IA de moderação")
+      .addStringOption(option =>
+        option.setName("code")
+              .setDescription("Código de acesso")
+              .setRequired(true)
+      )
+  ];
+}
+
+// lidar com interações da IA
+async function handleAICommand(interaction, ACCESS_CODE) {
+  if (!interaction.isChatInputCommand()) return;
+
+  const { commandName, options, user } = interaction;
+  const code = options.getString("code");
+
+  if (code !== ACCESS_CODE) {
+    await interaction.reply({ content: "❌ Código inválido.", ephemeral: true });
+    console.log(`⚠️ ${user.tag} tentou usar ${commandName} com código incorreto.`);
+    return;
+  }
+
+  if (commandName === "activeai") {
+    const success = enableAI(user.tag);
+    await interaction.reply({ content: success ? "🧠 IA ativada!" : "❌ Erro ao ativar IA." });
+  }
+
+  if (commandName === "desactiveai") {
+    const success = disableAI(user.tag);
+    await interaction.reply({ content: success ? "🛑 IA desativada!" : "❌ Erro ao desativar IA." });
+  }
+}
+
+// ==========================================
+//       FUNÇÕES DE LOG PERSONALIZADAS
+// ==========================================
+
 // === VARIÁVEL GLOBAL PARA CONTROLAR O READLINE ===
 let rl = null;        // apenas uma declaração
 let isMenuActive = false;
 
-// === FUNÇÕES DE LOG PERSONALIZADAS ===
 function getTimestamp() {
   return chalk.gray(`[${new Date().toLocaleString('pt-BR')}]`);
 }
@@ -72,6 +193,9 @@ function logWarn(message) {
 function logSuccess(message) {
   console.log(`${getTimestamp()} ${chalk.green('✔ SUCESSO')}: ${chalk.white(message)}`);
 }
+// ==========================================
+//       PARTE 2: COMANDOS E EVENTOS
+// ==========================================
 
 // === COMANDO /adm - DEFINIÇÃO ===
 const commands = [
@@ -171,7 +295,9 @@ const helpCommand = {
         { name: '/ping', value: 'Verifica a latência do bot', inline: false },
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
         { name: '/adm', value: 'Acesso ao painel administrativo', inline: false },
-        { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false }
+        { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
+        { name: '/activeai', value: 'Ativa a IA de moderação', inline: false },
+        { name: '/desactiveai', value: 'Desativa a IA de moderação', inline: false }
       )
       .setFooter({ text: 'Digite /help para mais informações' })
       .setTimestamp();
@@ -252,16 +378,19 @@ client.once('clientReady', async () => {
   console.log(chalk.white(`   • ID: ${client.user.id}`));
   console.log(chalk.white(`   • Servidores: ${client.guilds.cache.size}`));
   
-  // Registrar comandos em TODOS os servidores
+  // Registrar comandos em TODOS os servidores (incluindo IA)
   if (client.guilds.cache.size > 0) {
     try {
+      const allCommands = [
+        ...commands.map(c => c.data),
+        pingCommand.data,
+        helpCommand.data,
+        privateCommand.data,
+        ...getAICommands()
+      ];
+
       for (const guild of client.guilds.cache.values()) {
-        await guild.commands.set([
-          ...commands.map(c => c.data),
-          pingCommand.data,
-          helpCommand.data,
-          privateCommand.data
-        ]);
+        await guild.commands.set(allCommands);
         logSuccess(`Comandos registrados em: ${guild.name}`);
       }
       logInfo('Comandos registrados globalmente com sucesso!');
@@ -278,24 +407,70 @@ client.once('clientReady', async () => {
   initReadline();
   showMenu();
 });
-// === INICIALIZAR READLINE ===
-function initReadline() {
-  if (!rl) {
-    rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    
-    rl.on('close', () => {
-      isMenuActive = false;
-      logWarn('Console do menu fechado.');
-    });
-    
-    rl.on('line', (input) => {
-      if (isMenuActive) {
-        handleMenuOption(input);
-      }
-    });
+
+// === FUNÇÃO PARA TRATAR BOTÕES (PAINEL ADMIN) ===
+async function handleButtonInteraction(interaction) {
+  switch (interaction.customId) {
+    case 'stats': {
+      const uptimeSeconds = Math.floor(client.uptime / 1000);
+      const hours = Math.floor(uptimeSeconds / 3600);
+      const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+      const seconds = uptimeSeconds % 60;
+
+      const presence = client.user.presence;
+      const status = presence ? presence.status : 'offline';
+      const activity = presence && presence.activities.length > 0 ? presence.activities[0].name : 'Nenhuma';
+
+      const embed = new EmbedBuilder()
+        .setTitle('📊 Estatísticas do Bot')
+        .setColor(Colors.Green)
+        .addFields(
+          { name: '🏓 Ping', value: `${client.ws.ping}ms`, inline: true },
+          { name: '⏱️ Uptime', value: `${hours}h ${minutes}m ${seconds}s`, inline: true },
+          { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
+          { name: '👥 Usuários', value: `${client.users.cache.size}`, inline: true },
+          { name: '🟢 Status', value: status, inline: true },
+          { name: '🎵 Atividade', value: activity, inline: true }
+        )
+        .setFooter({ text: 'Estatísticas atualizadas' })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], flags: 64 });
+      logInfo(`${interaction.user.tag} abriu estatísticas`);
+      break;
+    }
+
+    case 'console': {
+      console.log(chalk.yellow('\n═══ ESTATÍSTICAS DO BOT ═══'));
+      console.log(chalk.white(`Ping:    ${client.ws.ping}ms`));
+      console.log(chalk.white(`Uptime:  ${Math.floor(client.uptime / 3600000)}h`));
+      console.log(chalk.white(`Servers: ${client.guilds.cache.size}`));
+      console.log(chalk.white(`Users:   ${client.users.cache.size}`));
+      console.log(chalk.yellow('═════════════════════════════\n'));
+      await interaction.reply({ content: '✅ Verifique o console!', flags: 64 });
+      break;
+    }
+
+    case 'help': {
+      const embed = new EmbedBuilder()
+        .setTitle('❓ Ajuda - Painel Administrativo')
+        .setDescription('Como usar o painel administrativo:')
+        .setColor(Colors.Blue)
+        .addFields(
+          { name: '📊 Estatísticas', value: 'Clique em "Estatísticas" para ver dados do bot', inline: false },
+          { name: '🖥️ Console', value: 'Clique em "Ver no Console" para ver dados no terminal', inline: false },
+          { name: '🔐 Segurança', value: 'Use o comando /adm com a senha correta', inline: false }
+        )
+        .setFooter({ text: 'Painel Administrativo' })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], flags: 64 });
+      logInfo(`${interaction.user.tag} pediu ajuda no painel`);
+      break;
+    }
+
+    default:
+      await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
   }
 }
 
@@ -304,6 +479,13 @@ client.on('interactionCreate', async (interaction) => {
   // Handler para comandos de chat input (slash commands)
   if (interaction.isChatInputCommand()) {
     const command = commands.find(c => c.data.name === interaction.commandName);
+    
+    // Verifica comandos de IA
+    if (interaction.commandName === 'activeai' || interaction.commandName === 'desactiveai') {
+      await handleAICommand(interaction, ACCESS_CODE);
+      return;
+    }
+
     if (!command) {
       // Verifica comandos adicionais
       if (interaction.commandName === 'ping') {
@@ -343,6 +525,30 @@ client.on('interactionCreate', async (interaction) => {
   // Handler para modais (futuro)
   if (interaction.isModalSubmit()) {
     logInfo(`Modal submetido por ${interaction.user.tag}`);
+  }
+});
+
+// === EVENTO: MENSAGEM CRIADA (MODERAÇÃO) ===
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+  if (!message.guild) return;
+
+  // Verifica se a IA está ativa e se a mensagem é ofensiva
+  if (aiEnabled) {
+    const isOffensive = await analyzeWithAI(message.content);
+    if (isOffensive) {
+      // Ação de moderação: deletar mensagem e avisar
+      try {
+        await message.delete();
+        await message.channel.send({
+          content: `⚠️ **Mensagem removida!**\n\n${message.author}, sua mensagem foi removida por conter conteúdo ofensivo detectado pela IA.`,
+          allowedMentions: { parse: ['users'] }
+        });
+        logWarn(`Mensagem de ${message.author.tag} removida por moderação IA.`);
+      } catch (err) {
+        logError(`Erro ao moderar mensagem: ${err.message}`);
+      }
+    }
   }
 });
 
@@ -457,6 +663,7 @@ client.on('roleCreate', async (role) => {
   console.log(chalk.magenta(`   Servidor: ${role.guild.name}`));
   console.log(chalk.magenta('────────────────────────────────\n'));
 });
+
 // === EVENTO: ROLE DELETADA ===
 client.on('roleDelete', async (role) => {
   if (!role.guild) return;
@@ -549,22 +756,36 @@ client.on('guildBanRemove', async (guild, user) => {
   console.log(chalk.green('────────────────────────────────\n'));
 });
 
-// === ERROS NÃO TRATADOS ===
-process.on('unhandledRejection', (error) => {
-  logError(`Erro não tratado: ${error.message}`);
-  console.error(error);
-});
-
-process.on('uncaughtException', (error) => {
-  logError(`Exceção não tratada: ${error.message}`);
-  console.error(error);
-  process.exit(1);
-});
-
 // ==========================================
-//        MENU INTERATIVO NO CONSOLE
+//       FIM DA PARTE 2 (EVENTOS)
 // ==========================================
 
+// ==========================================
+//       PARTE 3: MENU, ERROS E LOGIN
+// ==========================================
+
+// === INICIALIZAR READLINE ===
+function initReadline() {
+  if (!rl) {
+    rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    
+    rl.on('close', () => {
+      isMenuActive = false;
+      logWarn('Console do menu fechado.');
+    });
+    
+    rl.on('line', (input) => {
+      if (isMenuActive) {
+        handleMenuOption(input);
+      }
+    });
+  }
+}
+
+// === MENU INTERATIVO NO CONSOLE ===
 function showMenu() {
   if (isMenuActive) return;
   isMenuActive = true;
@@ -799,69 +1020,19 @@ function showBotStatus() {
   showMenu();
 }
 
-// === FUNÇÃO PARA TRATAR BOTÕES (PAINEL ADMIN) ===
-async function handleButtonInteraction(interaction) {
-  switch (interaction.customId) {
-    case 'stats': {
-      const uptimeSeconds = Math.floor(client.uptime / 1000);
-      const hours = Math.floor(uptimeSeconds / 3600);
-      const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-      const seconds = uptimeSeconds % 60;
+// === ERROS NÃO TRATADOS ===
+process.on('unhandledRejection', (error) => {
+  logError(`Erro não tratado: ${error.message}`);
+  console.error(error);
+});
 
-      const presence = client.user.presence;
-      const status = presence ? presence.status : 'offline';
-      const activity = presence && presence.activities.length > 0 ? presence.activities[0].name : 'Nenhuma';
+process.on('uncaughtException', (error) => {
+  logError(`Exceção não tratada: ${error.message}`);
+  console.error(error);
+  process.exit(1);
+});
 
-      const embed = new EmbedBuilder()
-        .setTitle('📊 Estatísticas do Bot')
-        .setColor(Colors.Green)
-        .addFields(
-          { name: '🏓 Ping', value: `${client.ws.ping}ms`, inline: true },
-          { name: '⏱️ Uptime', value: `${hours}h ${minutes}m ${seconds}s`, inline: true },
-          { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
-          { name: '👥 Usuários', value: `${client.users.cache.size}`, inline: true },
-          { name: '🟢 Status', value: status, inline: true },
-          { name: '🎵 Atividade', value: activity, inline: true }
-        )
-        .setFooter({ text: 'Estatísticas atualizadas' })
-        .setTimestamp();      await interaction.reply({ embeds: [embed], flags: 64 });
-      logInfo(`${interaction.user.tag} abriu estatísticas`);
-      break;
-    }
-
-    case 'console': {
-      console.log(chalk.yellow('\n═══ ESTATÍSTICAS DO BOT ═══'));
-      console.log(chalk.white(`Ping:    ${client.ws.ping}ms`));
-      console.log(chalk.white(`Uptime:  ${Math.floor(client.uptime / 3600000)}h`));
-      console.log(chalk.white(`Servers: ${client.guilds.cache.size}`));
-      console.log(chalk.white(`Users:   ${client.users.cache.size}`));
-      console.log(chalk.yellow('═════════════════════════════\n'));
-      await interaction.reply({ content: '✅ Verifique o console!', flags: 64 });
-      break;
-    }
-
-    case 'help': {
-      const embed = new EmbedBuilder()
-        .setTitle('❓ Ajuda - Painel Administrativo')
-        .setDescription('Como usar o painel administrativo:')
-        .setColor(Colors.Blue)
-        .addFields(
-          { name: '📊 Estatísticas', value: 'Clique em "Estatísticas" para ver dados do bot', inline: false },
-          { name: '🖥️ Console', value: 'Clique em "Ver no Console" para ver dados no terminal', inline: false },
-          { name: '🔐 Segurança', value: 'Use o comando /adm com a senha correta', inline: false }
-        )
-        .setFooter({ text: 'Painel Administrativo' })
-        .setTimestamp();
-
-      await interaction.reply({ embeds: [embed], flags: 64 });
-      logInfo(`${interaction.user.tag} pediu ajuda no painel`);
-      break;
-    }
-
-    default:
-      await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
-  }
-}
-
-// === LOGIN ===
+// ==========================================
+//       LOGIN FINAL
+// ==========================================
 client.login(process.env.TOKEN);
