@@ -78,7 +78,7 @@ const offensiveWords = [
 "abusado", "folgado", "atrevido", "arrogante", "pretensioso",
 "metido", "convencido", "soberbo", "orgulhoso", "vaidoso",
 "futil", "oco", "teimoso", "birrento",
-"pentelho", "maçante", "enfadonho"
+"pentelho", "maçante", "enfadonho", "mrd", "merda"
 ];
 
 // ===============================
@@ -363,9 +363,9 @@ client.on("messageCreate", async (message) => {
           .setDescription(`Sua mensagem foi removida por conter palavras ofensivas.`)
           .setColor(Colors.Red)
           .addFields(
-            { name: 'Usuário', value: message.author.toString(), inline: false },
-            { name: 'Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: false },
-            { name: 'Palavra', value: `**${foundWord || "desconhecida"}**`, inline: false }
+            { name: '👤 Usuário', value: message.author.toString(), inline: false },
+            { name: '🗓 Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: false },
+            { name: '🚫 Palavra', value: `**${foundWord || "desconhecida"}**`, inline: false }
           )
           .setFooter({ text: 'Caso isso tenha sido um erro, contate a staff.' })
           .setTimestamp()
