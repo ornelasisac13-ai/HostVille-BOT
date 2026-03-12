@@ -46,7 +46,40 @@ const CONFIG = {
 // LISTA DE PALAVRAS OFENSIVAS
 // ===============================
 const offensiveWords = [
-  ];
+"idiota", "burro", "estúpido", "estupido", "retardado", "lixo",
+"merda", "fdp", "otário", "otario", "desgraçado", "desgracado",
+"vtnc", "imbecil", "inútil", "inutil",
+"arrombado", "viado", "bicha", "piranha", "prostituta", "corno", "babaca",
+"palhaço", "palhaco", "nojento", "escroto", "cretino", "canalha",
+"maldito", "peste", "verme", "trouxa", "otária", "otaria",
+"burra", "cacete", "caralho", "merdinha",
+"vagabundo", "vagabunda", "cuzao", "idiotinha", "fodido", "bosta",
+"porra", "prr", "poha", "krl", "krlh", "caramba",
+"fds", "foda", "fudeu", "fodase", "fodassi",
+"pqp", "puta", "vsf", "tnc", "tmnc", "cuzão", "cú", "cu",
+"buceta", "bct", "xota", "xoxota", "ppk", "perereca",
+"rapariga", "putinha", "putão", "putona", "puto",
+"b0sta", "bostinha", "inutel", "idiot4", "burrinho",
+"stupido", "estupida", "retardada", "nojenta", "escrota",
+"trouxinha", "verminoso", "pestinha", "cretina", "maldita",
+"corninho", "chifrudo", "vagaba", "piriguete",
+"viadinho", "boiola", "bichinha", "baitola",
+"sapatão", "sapata", "galinha", "cachorra", "cachorro",
+"vaca", "égua", "cabra", "mula", "jumento", "asno", "anta",
+"besta", "bocó", "boçal", "bronco", "ignorante", "analfabeto",
+"pilantra", "malandro", "safado", "tarado", "pervertido", "depravado",
+"asqueroso", "repugnante", "horrivel", "feio", "crápula", "infeliz",
+"miseravel", "coitado", "nulo", "aborto", "lixinho", "traste",
+"praga", "desgraça", "fudido", "lascado", "ferrado", "danado",
+"capeta", "demonio", "diabo", "satanás", "lucifer", "animal",
+"bicho", "monstro", "abominavel", "marginal", "delinquente",
+"criminoso", "bandido", "ladrão", "assaltante", "golpista",
+"enganador", "trapaceiro", "manipulador", "abusador",
+"abusado", "folgado", "atrevido", "arrogante", "pretensioso",
+"metido", "convencido", "soberbo", "orgulhoso", "vaidoso",
+"futil", "oco", "teimoso", "birrento",
+"pentelho", "maçante", "enfadonho"
+];
 
 // ===============================
 // FUNÇÕES DE LOG PERSONALIZADAS
@@ -71,12 +104,13 @@ function logSuccess(message) {
   console.log(`${getTimestamp()} ${chalk.green('✔ SUCESSO')}: ${chalk.white(message)}`);
 }
 
-function logModeration(message, user, content, channel) {
+function logModeration(message, user, content, channel, foundWord) {
   console.log(chalk.red.bgBlack.bold('\n 🛡️ MENSAGEM MODERADA '));
   console.log(chalk.red('────────────────────────────────'));
   console.log(chalk.red(`   Usuário:   ${user.tag}`));
   console.log(chalk.red(`   ID:        ${user.id}`));
   console.log(chalk.red(`   Conteúdo:  ${content}`));
+  console.log(chalk.red(`   Palavra:   "${foundWord}"`));
   console.log(chalk.red(`   Canal:     #${channel.name}`));
   console.log(chalk.red(`   Motivo:    ${message}`));
   console.log(chalk.red('────────────────────────────────\n'));
@@ -89,6 +123,15 @@ function containsOffensiveWord(text) {
   if (!text) return false;
   const msg = text.toLowerCase();
   return offensiveWords.some(word => msg.includes(word));
+}
+
+// ===============================
+// FUNÇÃO PARA ENCONTRAR A PALAVRA OFENSIVA
+// ===============================
+function findOffensiveWord(text) {
+  if (!text) return null;
+  const msg = text.toLowerCase();
+  return offensiveWords.find(word => msg.includes(word));
 }
 
 // ===============================
@@ -292,6 +335,9 @@ client.on("messageCreate", async (message) => {
 
   // Verifica se a mensagem contém palavra ofensiva
   if (containsOffensiveWord(message.content)) {
+    // Encontra qual palavra específica foi usada
+    const foundWord = findOffensiveWord(message.content);
+    
     try {
       // Verifica se o bot tem permissão para deletar
       const permissions = message.channel.permissionsFor(client.user);
@@ -324,8 +370,8 @@ client.on("messageCreate", async (message) => {
         ]
       });
 
-      // Log detalhado
-      logModeration("Palavras ofensivas detectadas", message.author, message.content, message.channel);
+      // Log detalhado com a palavra específica
+      logModeration("Palavras ofensivas detectadas", message.author, message.content, message.channel, foundWord || "desconhecida");
 
     } catch (err) {
       logError(`Erro ao moderar mensagem: ${err.message}`);
@@ -336,7 +382,7 @@ client.on("messageCreate", async (message) => {
 // ===============================
 // EVENTO: BOT PRONTO
 // ===============================
-client.once('clientReady', async () => {
+client.once('ready', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
