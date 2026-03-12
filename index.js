@@ -356,16 +356,16 @@ client.on("messageCreate", async (message) => {
       // Deleta a mensagem
       await message.delete();
 
-      // Avisa o usuário no chat com a palavra específica
+      // Avisa o usuário no chat com a palavra específica - FORMATADO CONFORME SOLICITADO
       await message.channel.send({
         embeds: [new EmbedBuilder()
           .setTitle('🚫 Mensagem Removida')
-          .setDescription(`Sua mensagem foi removida por conter a palavra: **${foundWord || "ofensiva"}**`)
+          .setDescription(`Sua mensagem foi removida por conter palavras ofensivas.`)
           .setColor(Colors.Red)
           .addFields(
-            { name: '👤 Usuário', value: message.author.tag, inline: true },
-            { name: '📅 Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: true },
-            { name: '🚫 Palavra', value: `**${foundWord || "desconhecida"}**`, inline: true }
+            { name: 'Usuário', value: message.author.toString(), inline: false },
+            { name: 'Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: false },
+            { name: 'Palavra', value: `**${foundWord || "desconhecida"}**`, inline: false }
           )
           .setFooter({ text: 'Caso isso tenha sido um erro, contate a staff.' })
           .setTimestamp()
