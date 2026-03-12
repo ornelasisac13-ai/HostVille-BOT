@@ -355,15 +355,16 @@ client.on("messageCreate", async (message) => {
       // Deleta a mensagem
       await message.delete();
 
-      // Avisa o usuário no chat
+      // Avisa o usuário no chat com a palavra específica
       await message.channel.send({
         embeds: [new EmbedBuilder()
           .setTitle('🚫 Mensagem Removida')
-          .setDescription('Sua mensagem foi removida, pois continha palavras ofensivas.')
+          .setDescription(`Sua mensagem foi removida por conter a palavra: **${foundWord || "ofensiva"}**`)
           .setColor(Colors.Red)
           .addFields(
             { name: '👤 Usuário', value: message.author.tag, inline: true },
-            { name: '📅 Data', value: new Date().toLocaleString('pt-BR'), inline: true }
+            { name: '📅 Data', value: new Date().toLocaleString('pt-BR'), inline: true },
+            { name: '🚫 Palavra', value: `**${foundWord || "desconhecida"}**`, inline: true }
           )
           .setFooter({ text: 'Caso isso tenha sido um erro, contate a staff.' })
           .setTimestamp()
@@ -380,7 +381,7 @@ client.on("messageCreate", async (message) => {
 });
 
 // ===============================
-// EVENTO: BOT PRONTO
+// EVENTO: BOT PRONTO (CORRIGIDO PARA 'ready')
 // ===============================
 client.once('ready', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
