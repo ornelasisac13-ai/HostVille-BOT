@@ -82,10 +82,11 @@ const offensiveWords = [
 ];
 
 // ===============================
-// FUNÇÕES DE LOG PERSONALIZADAS
+// FUNÇÕES DE LOG PERSONALIZADAS (CORRIGIDO PARA GMT-3)
 // ===============================
 function getTimestamp() {
-  return chalk.gray(`[${new Date().toLocaleString('pt-BR')}]`);
+  const dataBrasil = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  return chalk.gray(`[${dataBrasil}]`);
 }
 
 function logInfo(message) {
@@ -363,7 +364,7 @@ client.on("messageCreate", async (message) => {
           .setColor(Colors.Red)
           .addFields(
             { name: '👤 Usuário', value: message.author.tag, inline: true },
-            { name: '📅 Data', value: new Date().toLocaleString('pt-BR'), inline: true },
+            { name: '📅 Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: true },
             { name: '🚫 Palavra', value: `**${foundWord || "desconhecida"}**`, inline: true }
           )
           .setFooter({ text: 'Caso isso tenha sido um erro, contate a staff.' })
@@ -381,7 +382,7 @@ client.on("messageCreate", async (message) => {
 });
 
 // ===============================
-// EVENTO: BOT PRONTO (CORRIGIDO PARA clientReady)
+// EVENTO: BOT PRONTO
 // ===============================
 client.once('clientReady', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
@@ -849,7 +850,7 @@ client.on('guildMemberAdd', async (member) => {
   console.log(chalk.green(`   Usuário: ${member.user.tag}`));
   console.log(chalk.green(`   ID:      ${member.user.id}`));
   console.log(chalk.green(`   Servidor: ${member.guild.name}`));
-  console.log(chalk.green(`   Data:    ${new Date().toLocaleString('pt-BR')}`));
+  console.log(chalk.green(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
   console.log(chalk.green('────────────────────────────────\n'));
   logInfo(`Novo membro: ${member.user.tag} (${member.guild.name})`);
 });
@@ -859,7 +860,7 @@ client.on('guildMemberRemove', async (member) => {
   console.log(chalk.red('────────────────────────────────'));
   console.log(chalk.red(`   Usuário: ${member.user.tag}`));
   console.log(chalk.red(`   Servidor: ${member.guild.name}`));
-  console.log(chalk.red(`   Data:    ${new Date().toLocaleString('pt-BR')}`));
+  console.log(chalk.red(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
   console.log(chalk.red('────────────────────────────────\n'));
   logInfo(`Membro saiu: ${member.user.tag} (${member.guild.name})`);
 });
