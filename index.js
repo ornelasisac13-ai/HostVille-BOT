@@ -11,7 +11,9 @@ const {
   ButtonStyle, 
   EmbedBuilder, 
   ChannelType,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder
 } = require('discord.js');
 const dotenv = require('dotenv');
 const chalk = require('chalk');
@@ -50,6 +52,8 @@ const CONFIG = {
 // VARIÁVEIS GLOBAIS
 // ===============================
 const serverMonitoring = new Map(); // Key: guildId, Value: boolean (true = monitoramento ativo)
+const pendingActions = new Map(); // Armazena ações pendentes para seleção de servidor
+
 const stats = {
   messagesDeleted: 0,
   warnsGiven: 0,
@@ -315,7 +319,7 @@ function findOffensiveWord(text) {
 }
 
 // ===============================
-// FUNÇÃO PARA VERIFICAR PERMISSÕES DE ADMIN (NÃO USADA NOS COMANDOS)
+// FUNÇÃO PARA VERIFICAR PERMISSÕES DE ADMIN
 // ===============================
 function isAdmin(member) {
   if (!member) return false;
@@ -324,6 +328,48 @@ function isAdmin(member) {
   return member.roles.cache.some(role => 
     CONFIG.adminRoles.includes(role.id) || CONFIG.adminRoles.includes(role.name)
   );
+}
+
+// ===============================
+// FUNÇÃO PARA ATIVAR/DESATIVAR MONITORAMENTO
+// ===============================
+function setServerMonitoring(guildId, status, user) {
+  serverMonitoring.set(guildId, status);
+  
+  // Log no console
+  const action = status ? 'ATIVADO' : 'DESATIVADO';
+  console.log(chalk.cyan.bgBlack.bold(`\n 🛡️ MONITORAMENTO ${action}`));
+  console.log(chalk.cyan('────────────────────────────────'));
+  console.log(chalk.cyan(`   Servidor: ${client.guilds.cache.get(guildId)?.name || guildId}`));
+  console.log(chalk.cyan(`   ID:       ${guildId}`));
+  console.log(chalk.cyan(`   Staff:    ${user.tag}`));
+  console.log(chalk.cyan(`   Data:     ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
+  console.log(chalk.cyan('────────────────────────────────\n'));
+}
+
+// ===============================
+// FUNÇÃO PARA CRIAR EMBED DE STATUS
+// ===============================
+function createStatusEmbed(guild, action, user) {
+  const isActive = action === 'on';
+  const color = isActive ? Colors.Green : Colors.Red;
+  const statusText = isActive ? '🟢 **ATIVO**' : '🔴 **INATIVO**';
+  
+  const embed = new EmbedBuilder()
+    .setTitle(`🛡️ Monitoramento ${isActive ? 'Ativado' : 'Desativado'}`)
+    .setColor(color)
+    .addFields(
+      { name: '🛡️ Status', value: statusText, inline: true },
+      { name: '🛠 Staff', value: user.toString(), inline: true },
+      { name: '🗓 Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: false }
+    )
+    .setTimestamp();
+  
+  if (guild) {
+    embed.addFields({ name: '🏛️ Servidor', value: guild.name, inline: true });
+  }
+  
+  return embed;
 }
 
 // ===============================
@@ -433,7 +479,7 @@ const helpCommand = {
         { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
         { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false }
       )
-      .setFooter({ text: 'Comandos de texto: !clear, !clearAll, !MonitorOn, !MonitorOff' })
+      .setFooter({ text: 'Comandos de texto na DM: !clear, !clearAll, !MonitorOn, !MonitorOff' })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], flags: 64 });
@@ -562,7 +608,79 @@ client.on("messageCreate", async (message) => {
   // VERIFICAÇÃO DE MENSAGEM NA DM
   if (message.channel.type === ChannelType.DM) {
     
-    // COMANDO !clearAll (COM SENHA) - NÃO APARECE NO HELP
+    // COMANDO !MonitorOn na DM
+    if (message.content.startsWith('!MonitorOn')) {
+      const args = message.content.split(' ');
+      const password = args[1];
+      
+      if (!password) {
+        return message.reply('❌ Use: `!MonitorOn ACCESS_CODE`');
+      }
+      
+      if (password !== CONFIG.ACCESS_CODE) {
+        return message.reply('❌ Código de acesso incorreto!');
+      }
+      
+      // Criar botões para escolher ação
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('monitor_all_on')
+            .setLabel('Todos os Servidores ⚠️')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('🌐'),
+          new ButtonBuilder()
+            .setCustomId('monitor_select_on')
+            .setLabel('Selecionar um Servidor')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🔍')
+        );
+      
+      await message.reply({
+        content: '🛡️ **Escolha uma opção para ATIVAR o monitoramento:**',
+        components: [row]
+      });
+      
+      return;
+    }
+    
+    // COMANDO !MonitorOff na DM
+    if (message.content.startsWith('!MonitorOff')) {
+      const args = message.content.split(' ');
+      const password = args[1];
+      
+      if (!password) {
+        return message.reply('❌ Use: `!MonitorOff ACCESS_CODE`');
+      }
+      
+      if (password !== CONFIG.ACCESS_CODE) {
+        return message.reply('❌ Código de acesso incorreto!');
+      }
+      
+      // Criar botões para escolher ação
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('monitor_all_off')
+            .setLabel('Todos os Servidores ⚠️')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('🌐'),
+          new ButtonBuilder()
+            .setCustomId('monitor_select_off')
+            .setLabel('Selecionar um Servidor')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🔍')
+        );
+      
+      await message.reply({
+        content: '🛡️ **Escolha uma opção para DESATIVAR o monitoramento:**',
+        components: [row]
+      });
+      
+      return;
+    }
+    
+    // COMANDO !clearAll
     if (message.content.startsWith('!clearAll')) {
       
       // Extrai a senha
@@ -637,7 +755,7 @@ client.on("messageCreate", async (message) => {
       return;
     }
     
-    // COMANDO !clear (SEM SENHA)
+    // COMANDO !clear
     if (message.content.startsWith('!clear')) {
       
       try {
@@ -666,14 +784,13 @@ client.on("messageCreate", async (message) => {
         
         const collector = confirmMsg.createMessageComponentCollector({ 
           filter, 
-          time: 60000, // 60 segundos
+          time: 60000,
           max: 1
         });
         
         collector.on('collect', async (interaction) => {
           try {
             if (interaction.customId === 'confirm_clear') {
-              // Responde a interação imediatamente
               await interaction.update({ content: '🔄 Limpando mensagens...', components: [] });
               
               let deletedCount = 0;
@@ -703,10 +820,8 @@ client.on("messageCreate", async (message) => {
                   
                 } while (fetchedMessages.size >= 100);
                 
-                // Mensagem que aparece SÓ NO CONSOLE
                 console.log(chalk.green.bgBlack.bold(`\n🧹 ${deletedCount} mensagens foram limpas do histórico da DM de ${message.author.tag}!`));
                 
-                // Envia mensagem de confirmação separada
                 await message.channel.send('✅ **Mensagens limpas com sucesso!**');
                 
                 logInfo(`${message.author.tag} limpou ${deletedCount} mensagens na DM`);
@@ -734,9 +849,7 @@ client.on("messageCreate", async (message) => {
                 content: '⏰ Tempo esgotado. Operação cancelada.',
                 components: [] 
               });
-            } catch (error) {
-              // Se não conseguir editar, ignora
-            }
+            } catch (error) {}
           }
         });
         
@@ -761,86 +874,16 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // ===== COMANDOS DE TEXTO NO SERVIDOR =====
-  
-  // COMANDO !MonitorOn
-  if (message.content.startsWith('!MonitorOn')) {
-    // Verificar APENAS a senha, não o cargo
-    const args = message.content.split(' ');
-    const password = args[1];
-    
-    if (!password) {
-      return message.reply('❌ Use: `!MonitorOn ACCESS_CODE`');
-    }
-    
-    if (password !== CONFIG.ACCESS_CODE) {
-      return message.reply('❌ Código de acesso incorreto!');
-    }
-    
-    // Ativar monitoramento para este servidor
-    serverMonitoring.set(message.guild.id, true);
-    
-    const embed = new EmbedBuilder()
-      .setTitle('✅ Monitoramento Ativado')
-      .setDescription('O monitoramento de palavras ofensivas foi **ativado** neste servidor.')
-      .setColor(Colors.Green)
-      .addFields(
-        { name: '🛡️ Status', value: '🟢 **ATIVO**', inline: true },
-        { name: '👮 Staff', value: message.author.toString(), inline: true },
-        { name: '📅 Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: true }
-      )
-      .setTimestamp();
-    
-    await message.reply({ embeds: [embed] });
-    logInfo(`Monitoramento ATIVADO em ${message.guild.name} por ${message.author.tag}`);
-    return;
-  }
-  
-  // COMANDO !MonitorOff
-  if (message.content.startsWith('!MonitorOff')) {
-    // Verificar APENAS a senha, não o cargo
-    const args = message.content.split(' ');
-    const password = args[1];
-    
-    if (!password) {
-      return message.reply('❌ Use: `!MonitorOff ACCESS_CODE`');
-    }
-    
-    if (password !== CONFIG.ACCESS_CODE) {
-      return message.reply('❌ Código de acesso incorreto!');
-    }
-    
-    // Desativar monitoramento para este servidor
-    serverMonitoring.set(message.guild.id, false);
-    
-    const embed = new EmbedBuilder()
-      .setTitle('⏸️ Monitoramento Desativado')
-      .setDescription('O monitoramento de palavras ofensivas foi **desativado** neste servidor.')
-      .setColor(Colors.Red)
-      .addFields(
-        { name: '🛡️ Status', value: '🔴 **INATIVO**', inline: true },
-        { name: '👮 Staff', value: message.author.toString(), inline: true },
-        { name: '📅 Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: true }
-      )
-      .setTimestamp();
-    
-    await message.reply({ embeds: [embed] });
-    logInfo(`Monitoramento DESATIVADO em ${message.guild.name} por ${message.author.tag}`);
-    return;
-  }
-
   // MODERAÇÃO EM CANAIS DE SERVIDOR
   // Verificar se o monitoramento está ativo para este servidor
-  const isMonitoringActive = serverMonitoring.get(message.guild.id) !== false; // Padrão: true se não configurado
+  const isMonitoringActive = serverMonitoring.get(message.guild.id) !== false;
   
   if (!isMonitoringActive) {
-    return; // Monitoramento desativado, não faz nada
+    return;
   }
   
-  // Ignora membros com cargos de Admin/Staff
   if (isAdmin(message.member)) return;
 
-  // Verifica se a mensagem contém palavra ofensiva
   if (containsOffensiveWord(message.content)) {
     const foundWord = findOffensiveWord(message.content);
     
@@ -858,7 +901,6 @@ client.on("messageCreate", async (message) => {
 
       await message.delete();
       
-      // Incrementar estatística
       stats.messagesDeleted++;
 
       await message.channel.send({
@@ -885,7 +927,7 @@ client.on("messageCreate", async (message) => {
 });
 
 // ===============================
-// EVENTO: BOT PRONTO (CORRIGIDO PARA clientReady)
+// EVENTO: BOT PRONTO
 // ===============================
 client.once('clientReady', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
@@ -924,48 +966,24 @@ client.once('clientReady', async () => {
   }
 
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
+  console.log(chalk.yellow('  📝 COMANDOS NA DM:'));
+  console.log(chalk.yellow('  • !clear - Limpa mensagens da DM'));
+  console.log(chalk.yellow('  • !clearAll SUA_SENHA - Limpa TODAS as DMs'));
+  console.log(chalk.yellow('  • !MonitorOn SUA_SENHA - Ativar monitoramento'));
+  console.log(chalk.yellow('  • !MonitorOff SUA_SENHA - Desativar monitoramento\n'));
   
-  // Iniciar sistema de relatórios diários
   scheduleDailyReport();
   
-  // Inicia o menu interativo
   initReadline();
   showMenu();
 });
 
 // ===============================
-// INICIALIZAR READLINE
-// ===============================
-let rl = null;
-let isMenuActive = false;
-
-function initReadline() {
-  if (!rl) {
-    rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    
-    rl.on('close', () => {
-      isMenuActive = false;
-      logWarn('Console do menu fechado.');
-    });
-    
-    rl.on('line', (input) => {
-      if (isMenuActive) {
-        handleMenuOption(input);
-      }
-    });
-  }
-}
-
-// ===============================
-// EVENTO: INTERAÇÃO (COMANDOS SLASH E BOTÕES)
+// EVENTO: INTERAÇÃO (BOTÕES E MENUS)
 // ===============================
 client.on('interactionCreate', async (interaction) => {
-  // Handler para comandos de chat input (slash commands)
+  // Handler para comandos de chat input
   if (interaction.isChatInputCommand()) {
-    // Registrar comando usado para estatísticas
     const cmdName = interaction.commandName;
     stats.commandsUsed[cmdName] = (stats.commandsUsed[cmdName] || 0) + 1;
     
@@ -994,11 +1012,6 @@ client.on('interactionCreate', async (interaction) => {
       await command.execute(interaction);
     } catch (error) {
       logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
-      } else {
-        await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
-      }
     }
     return;
   }
@@ -1011,15 +1024,142 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
     
-    // Botões do comando !clear - O handler está no coletor
+    // Botões do !clear
     if (interaction.customId === 'confirm_clear' || interaction.customId === 'cancel_clear') {
       return;
     }
     
-    // Se chegou aqui, botão desconhecido
+    // Botões de monitoramento
+    if (interaction.customId.startsWith('monitor_')) {
+      await handleMonitorButtons(interaction);
+      return;
+    }
+    
     await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
   }
+  
+  // Handler para menus de seleção
+  if (interaction.isStringSelectMenu()) {
+    if (interaction.customId === 'select_server_monitor') {
+      await handleServerSelection(interaction);
+      return;
+    }
+  }
 });
+
+// ===============================
+// HANDLER PARA BOTÕES DE MONITORAMENTO
+// ===============================
+async function handleMonitorButtons(interaction) {
+  const [action, target] = interaction.customId.split('_').slice(1);
+  const isOn = action === 'on';
+  const actionText = isOn ? 'ATIVAR' : 'DESATIVAR';
+  
+  try {
+    if (target === 'all') {
+      // Ação para todos os servidores
+      await interaction.update({ content: `🔄 ${actionText} monitoramento em TODOS os servidores...`, components: [] });
+      
+      let count = 0;
+      for (const [guildId, guild] of client.guilds.cache) {
+        setServerMonitoring(guildId, isOn, interaction.user);
+        count++;
+      }
+      
+      const embed = createStatusEmbed(null, action, interaction.user);
+      embed.setDescription(`✅ Monitoramento ${isOn ? 'ativado' : 'desativado'} em **${count} servidores**!`);
+      
+      await interaction.followUp({ embeds: [embed], flags: 64 });
+      
+    } else if (target === 'select') {
+      // Criar menu de seleção de servidores
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId('select_server_monitor')
+        .setPlaceholder('Selecione um servidor')
+        .addOptions(
+          client.guilds.cache.map(guild => {
+            const status = serverMonitoring.get(guild.id) ? '🟢 ATIVO' : '🔴 INATIVO';
+            return new StringSelectMenuOptionBuilder()
+              .setLabel(guild.name)
+              .setDescription(`${guild.memberCount} membros - ${status}`)
+              .setValue(guild.id)
+              .setEmoji('🏛️');
+          }).slice(0, 25) // Discord limita a 25 opções
+        );
+      
+      // Se tiver mais de 25 servidores, adicionar opção de página
+      if (client.guilds.cache.size > 25) {
+        selectMenu.addOptions(
+          new StringSelectMenuOptionBuilder()
+            .setLabel('📌 Mais servidores...')
+            .setDescription('Use o comando novamente para ver mais')
+            .setValue('more')
+            .setEmoji('📌')
+        );
+      }
+      
+      const row = new ActionRowBuilder().addComponents(selectMenu);
+      
+      // Armazenar a ação pendente
+      pendingActions.set(interaction.user.id, { action: isOn ? 'on' : 'off' });
+      
+      await interaction.update({
+        content: `🔍 **Selecione o servidor para ${actionText} o monitoramento:**`,
+        components: [row]
+      });
+    }
+  } catch (error) {
+    logError(`Erro no handleMonitorButtons: ${error.message}`);
+    await interaction.reply({ content: '❌ Erro ao processar comando.', flags: 64 });
+  }
+}
+
+// ===============================
+// HANDLER PARA SELEÇÃO DE SERVIDOR
+// ===============================
+async function handleServerSelection(interaction) {
+  const selectedValue = interaction.values[0];
+  const pending = pendingActions.get(interaction.user.id);
+  
+  if (!pending) {
+    return interaction.reply({ content: '❌ Nenhuma ação pendente encontrada.', flags: 64, ephemeral: true });
+  }
+  
+  const isOn = pending.action === 'on';
+  const actionText = isOn ? 'ATIVADO' : 'DESATIVADO';
+  
+  try {
+    if (selectedValue === 'more') {
+      return interaction.reply({ 
+        content: '📌 **Use o comando novamente para ver mais servidores.**\nDigite `!MonitorOn` ou `!MonitorOff` novamente.', 
+        flags: 64 
+      });
+    }
+    
+    const guild = client.guilds.cache.get(selectedValue);
+    if (!guild) {
+      return interaction.reply({ content: '❌ Servidor não encontrado.', flags: 64 });
+    }
+    
+    // Atualizar status
+    setServerMonitoring(selectedValue, isOn, interaction.user);
+    
+    const embed = createStatusEmbed(guild, pending.action, interaction.user);
+    
+    await interaction.update({ 
+      content: `✅ **Monitoramento ${actionText} em ${guild.name}!**`,
+      embeds: [embed],
+      components: [] 
+    });
+    
+    // Limpar ação pendente
+    pendingActions.delete(interaction.user.id);
+    
+  } catch (error) {
+    logError(`Erro no handleServerSelection: ${error.message}`);
+    await interaction.reply({ content: '❌ Erro ao processar seleção.', flags: 64 });
+  }
+}
 
 // ===============================
 // EVENTO: BOTÃO INTERAÇÃO (PAINEL ADMIN)
@@ -1086,13 +1226,12 @@ async function handleButtonInteraction(interaction) {
 // ===============================
 // MENU INTERATIVO NO CONSOLE
 // ===============================
-
 function showMenu() {
   if (isMenuActive) return;
   isMenuActive = true;
   
   console.log(chalk.cyan('\n╔═══════════════════════════════════════════════════════╗'));
-  console.log(chalk.cyan('║                  𝙷𝚘𝚜𝚝𝚅𝚒𝚕𝚕𝚎-𝙱𝙾𝚃 𝚅𝚎𝚛𝚜ã𝚘 𝟺.𝟷.𝟸                     ║'));
+  console.log(chalk.cyan('║                  𝙱𝙾𝚃 𝙼𝙾𝙳𝙴𝚁𝙰ÇÃ𝙾 𝚅𝟻.𝟶                        ║'));
   console.log(chalk.cyan('╠═══════════════════════════════════════════════════════╣'));
   console.log(chalk.cyan('║  1.  Ver estatísticas detalhadas                                ║'));
   console.log(chalk.cyan('║  2.  Listar todos os servidores                                 ║'));
@@ -1103,7 +1242,7 @@ function showMenu() {
   console.log(chalk.cyan('║  7.  Ver status do bot                                          ║'));
   console.log(chalk.cyan('║  8.  Gerar relatório manual                                     ║'));
   console.log(chalk.cyan('║  0.  Sair                                                       ║'));
-  console.log(chalk.cyan('╚═════════════════════════𝚈𝟸𝚔═𝙽𝚊𝚝════════════════════════╝'));
+  console.log(chalk.cyan('╚═══════════════════════════════════════════════════════╝'));
   
   rl.question(chalk.yellow('\n👉 Escolha uma opção: '), (answer) => {
     isMenuActive = false;
@@ -1180,7 +1319,7 @@ function listServers() {
   } else {
     client.guilds.cache.forEach((guild, index) => {
       const monitorStatus = serverMonitoring.get(guild.id) ? '🟢 ATIVO' : '🔴 INATIVO';
-      console.log(chalk.white(`${index + 1}. ${guild.name} (${guild.memberCount} membros) - ID: ${guild.id} - ${monitorStatus}`));
+      console.log(chalk.white(`${index + 1}. ${guild.name} (${guild.memberCount} membros) - ${monitorStatus}`));
     });
   }
   
@@ -1213,7 +1352,6 @@ async function generateManualReport() {
     console.log(chalk.white(`👥 Membros novos: ${stats.membersJoined}`));
     console.log(chalk.white(`👋 Membros que saíram: ${stats.membersLeft}`));
     
-    // Enviar para o console em formato de texto
     console.log(chalk.cyan('\n📋 Comandos mais usados:'));
     const sortedCommands = Object.entries(stats.commandsUsed).sort((a, b) => b[1] - a[1]).slice(0, 5);
     if (sortedCommands.length > 0) {
@@ -1263,8 +1401,7 @@ function listMembersInServer() {
         members.forEach((member) => {
           if (count < 10) {
             const status = member.user.bot ? chalk.blue('[BOT]') : chalk.green('[USER]');
-            const status2 = member.manageable ? chalk.yellow(' [MOD]') : '';
-            console.log(`  ${status}${status2} ${member.user.tag} - ${member.user.id}`);
+            console.log(`  ${status} ${member.user.tag} - ${member.user.id}`);
             count++;
           }
         });
@@ -1370,25 +1507,19 @@ function showBotStatus() {
 }
 
 // ===============================
-// EVENTOS DE LOG (MENSAGENS, CANAIS, ETC)
+// EVENTOS DE LOG
 // ===============================
-
 client.on('messageDelete', async (message) => {
   if (!message.guild || !message.author) return;
 
   let deleter = 'Desconhecido';
   try {
-    const auditLogs = await message.guild.fetchAuditLogs({ 
-      type: 72, 
-      limit: 1 
-    });
+    const auditLogs = await message.guild.fetchAuditLogs({ type: 72, limit: 1 });
     const entry = auditLogs.entries.first();
     if (entry && entry.target.id === message.author.id && entry.createdTimestamp > Date.now() - 5000) {
       deleter = entry.executor.tag;
     }
-  } catch (e) {
-    logWarn('Não foi possível buscar logs de auditoria');
-  }
+  } catch (e) {}
 
   console.log(chalk.red.bgBlack.bold('\n 🗑️ MENSAGEM DELETADA '));
   console.log(chalk.red('────────────────────────────────'));
@@ -1436,132 +1567,6 @@ client.on('guildMemberRemove', async (member) => {
   console.log(chalk.red(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
   console.log(chalk.red('────────────────────────────────\n'));
   logInfo(`Membro saiu: ${member.user.tag} (${member.guild.name})`);
-});
-
-client.on('channelCreate', async (channel) => {
-  if (!channel.guild) return;
-  console.log(chalk.blue.bgBlack.bold('\n 📁 CANAL CRIADO '));
-  console.log(chalk.blue('────────────────────────────────'));
-  console.log(chalk.blue(`   Nome:  #${channel.name}`));
-  console.log(chalk.blue(`   Tipo:  ${channel.type}`));
-  console.log(chalk.blue(`   Servidor: ${channel.guild.name}`));
-  console.log(chalk.blue('────────────────────────────────\n'));
-});
-
-client.on('channelDelete', async (channel) => {
-  if (!channel.guild) return;
-  console.log(chalk.red.bgBlack.bold('\n 🗑️ CANAL DELETADO '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Nome:  #${channel.name}`));
-  console.log(chalk.red(`   Servidor: ${channel.guild.name}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-});
-
-client.on('channelUpdate', async (oldChannel, newChannel) => {
-  if (!oldChannel.guild) return;
-  if (oldChannel.name === newChannel.name) return;
-
-  console.log(chalk.yellow.bgBlack.bold('\n 🔄 CANAL ATUALIZADO '));
-  console.log(chalk.yellow('────────────────────────────────'));
-  console.log(chalk.yellow(`   Nome Antigo: #${oldChannel.name}`));
-  console.log(chalk.yellow(`   Nome Novo:   #${newChannel.name}`));
-  console.log(chalk.yellow(`   Servidor:    ${oldChannel.guild.name}`));
-  console.log(chalk.yellow('────────────────────────────────\n'));
-});
-
-client.on('roleCreate', async (role) => {
-  if (!role.guild) return;
-  console.log(chalk.magenta.bgBlack.bold('\n 🎭 ROLE CRIADA '));
-  console.log(chalk.magenta('────────────────────────────────'));
-  console.log(chalk.magenta(`   Nome:  ${role.name}`));
-  console.log(chalk.magenta(`   ID:    ${role.id}`));
-  console.log(chalk.magenta(`   Cor:   ${role.hexColor}`));
-  console.log(chalk.magenta(`   Servidor: ${role.guild.name}`));
-  console.log(chalk.magenta('────────────────────────────────\n'));
-});
-
-client.on('roleDelete', async (role) => {
-  if (!role.guild) return;
-  console.log(chalk.red.bgBlack.bold('\n 🗑️ ROLE DELETADA '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Nome:  ${role.name}`));
-  console.log(chalk.red(`   ID:    ${role.id}`));
-  console.log(chalk.red(`   Servidor: ${role.guild.name}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-});
-
-client.on('roleUpdate', async (oldRole, newRole) => {
-  if (!oldRole.guild) return;
-  if (oldRole.name === newRole.name && oldRole.hexColor === newRole.hexColor) return;
-
-  console.log(chalk.yellow.bgBlack.bold('\n 🔄 ROLE ATUALIZADA '));
-  console.log(chalk.yellow('────────────────────────────────'));
-  console.log(chalk.yellow(`   Nome Antigo: ${oldRole.name}`));
-  console.log(chalk.yellow(`   Nome Novo:   ${newRole.name}`));
-  console.log(chalk.yellow(`   Cor Antiga:  ${oldRole.hexColor}`));
-  console.log(chalk.yellow(`   Cor Nova:    ${newRole.hexColor}`));
-  console.log(chalk.yellow(`   Servidor:    ${oldRole.guild.name}`));
-  console.log(chalk.yellow('────────────────────────────────\n'));
-});
-
-client.on('guildEmojiCreate', async (emoji) => {
-  console.log(chalk.cyan.bgBlack.bold('\n 😊 EMOJI CRIADO '));
-  console.log(chalk.cyan('────────────────────────────────'));
-  console.log(chalk.cyan(`   Nome:  ${emoji.name}`));
-  console.log(chalk.cyan(`   ID:    ${emoji.id}`));
-  console.log(chalk.cyan(`   Servidor: ${emoji.guild.name}`));
-  console.log(chalk.cyan('────────────────────────────────\n'));
-});
-
-client.on('guildEmojiDelete', async (emoji) => {
-  console.log(chalk.red.bgBlack.bold('\n 🗑️ EMOJI DELETADO '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Nome:  ${emoji.name}`));
-  console.log(chalk.red(`   ID:    ${emoji.id}`));
-  console.log(chalk.red(`   Servidor: ${emoji.guild.name}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-});
-
-client.on('voiceStateUpdate', async (oldState, newState) => {
-  if (!oldState.channel && newState.channel) {
-    console.log(chalk.green.bgBlack.bold('\n 🎤 ENTROU NO CANAL DE VOZ '));
-    console.log(chalk.green('────────────────────────────────'));
-    console.log(chalk.green(`   Usuário: ${newState.member.user.tag}`));
-    console.log(chalk.green(`   Canal:   #${newState.channel.name}`));
-    console.log(chalk.green('────────────────────────────────\n'));
-  } else if (oldState.channel && !newState.channel) {
-    console.log(chalk.red.bgBlack.bold('\n 🎤 SAIU DO CANAL DE VOZ '));
-    console.log(chalk.red('────────────────────────────────'));
-    console.log(chalk.red(`   Usuário: ${oldState.member.user.tag}`));
-    console.log(chalk.red(`   Canal:   ${oldState.channel.name}`));
-    console.log(chalk.red('────────────────────────────────\n'));
-  }
-});
-
-client.on('guildUpdate', async (oldGuild, newGuild) => {
-  if (oldGuild.name !== newGuild.name) {
-    console.log(chalk.yellow.bgBlack.bold('\n 🏛️ NOME DO SERVIDOR ALTERADO '));
-    console.log(chalk.yellow('────────────────────────────────'));
-    console.log(chalk.yellow(`   Antigo: ${oldGuild.name}`));
-    console.log(chalk.yellow(`   Novo:   ${newGuild.name}`));
-    console.log(chalk.yellow('────────────────────────────────\n'));
-  }
-});
-
-client.on('guildBanAdd', async (guild, user) => {
-  console.log(chalk.red.bgBlack.bold('\n 🚫 USUÁRIO BANIDO '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Usuário: ${user.tag}`));
-  console.log(chalk.red(`   Servidor: ${guild.name}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-});
-
-client.on('guildBanRemove', async (guild, user) => {
-  console.log(chalk.green.bgBlack.bold('\n ✅ USUÁRIO DESBANIDO '));
-  console.log(chalk.green('────────────────────────────────'));
-  console.log(chalk.green(`   Usuário: ${user.tag}`));
-  console.log(chalk.green(`   Servidor: ${guild.name}`));
-  console.log(chalk.green('────────────────────────────────\n'));
 });
 
 // ===============================
