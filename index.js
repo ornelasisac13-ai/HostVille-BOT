@@ -475,22 +475,22 @@ client.on("messageCreate", async (message) => {
                 
               } while (fetchedMessages.size >= 100);
               
-              // Mensagem que aparece SÓ PRA MIM (no console)
+              // Mensagem que aparece SÓ NO CONSOLE
               console.log(chalk.green.bgBlack.bold(`\n🧹 ${deletedCount} mensagens foram limpas do histórico da DM de ${message.author.tag}!`));
               
               // Mensagem para o usuário (sem quantidade)
-              await interaction.editReply({ 
+              await interaction.followUp({ 
                 content: '✅ **Mensagens limpas com sucesso!**',
-                components: [] 
+                flags: 64 
               });
               
               logInfo(`${message.author.tag} limpou ${deletedCount} mensagens na DM`);
               
             } catch (error) {
               logError(`Erro ao limpar DM: ${error.message}`);
-              await interaction.editReply({ 
+              await interaction.followUp({ 
                 content: '❌ Erro ao limpar mensagens. Tente novamente.',
-                components: [] 
+                flags: 64 
               });
             }
             
@@ -642,9 +642,10 @@ function initReadline() {
 }
 
 // ===============================
-// EVENTO: INTERAÇÃO (COMANDOS SLASH)
+// EVENTO: INTERAÇÃO (COMANDOS SLASH E BOTÕES)
 // ===============================
 client.on('interactionCreate', async (interaction) => {
+  // Handler para comandos de chat input (slash commands)
   if (interaction.isChatInputCommand()) {
     const command = commands.find(c => c.data.name === interaction.commandName);
     if (!command) {
@@ -676,14 +677,108 @@ client.on('interactionCreate', async (interaction) => {
     return;
   }
 
+  // Handler para botões
   if (interaction.isButton()) {
-    await handleButtonInteraction(interaction);
-    return;
+    // Botões do painel admin
+    if (interaction.customId === 'stats' || interaction.customId === 'console' || interaction.customId === 'help') {
+      await handleButtonInteraction(interaction);
+      return;
+    }
+    
+    // Botões do comando !clear
+    if (interaction.customId === 'confirm_clear' || interaction.customId === 'cancel_clear') {
+      await handleClearButtons(interaction);
+      return;
+    }
+    
+    // Se chegou aqui, botão desconhecido
+    await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
   }
 });
 
 // ===============================
-// HANDLER DE BOTÕES
+// HANDLER ESPECÍFICO PARA BOTÕES DO !clear
+// ===============================
+async function handleClearButtons(interaction) {
+  try {
+    if (interaction.customId === 'confirm_clear') {
+      await interaction.update({ content: '🔄 Limpando mensagens...', components: [] });
+      
+      let deletedCount = 0;
+      let fetchedMessages;
+      
+      try {
+        // Pega a mensagem original que acionou o comando
+        const messageReference = interaction.message.reference;
+        let originalMessage = null;
+        
+        if (messageReference && messageReference.messageId) {
+          try {
+            originalMessage = await interaction.channel.messages.fetch(messageReference.messageId);
+          } catch (e) {
+            // Ignora se não conseguir buscar
+          }
+        }
+        
+        do {
+          fetchedMessages = await interaction.channel.messages.fetch({ limit: 100 });
+          
+          if (fetchedMessages.size === 0) break;
+          
+          const deletableMessages = fetchedMessages.filter(msg => {
+            // Não deletar a mensagem de confirmação atual
+            if (msg.id === interaction.message.id) return false;
+            // Não deletar a mensagem original do comando !clear
+            if (originalMessage && msg.id === originalMessage.id) return false;
+            return true;
+          });
+          
+          if (deletableMessages.size === 0) break;
+          
+          for (const [id, msg] of deletableMessages) {
+            try {
+              await msg.delete();
+              deletedCount++;
+              await new Promise(resolve => setTimeout(resolve, 200));
+            } catch (err) {
+              logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
+            }
+          }
+          
+        } while (fetchedMessages.size >= 100);
+        
+        // Mensagem que aparece SÓ NO CONSOLE
+        console.log(chalk.green.bgBlack.bold(`\n🧹 ${deletedCount} mensagens foram limpas do histórico da DM de ${interaction.user.tag}!`));
+        
+        // Mensagem para o usuário (sem quantidade)
+        await interaction.followUp({ 
+          content: '✅ **Mensagens limpas com sucesso!**',
+          flags: 64 
+        });
+        
+        logInfo(`${interaction.user.tag} limpou ${deletedCount} mensagens na DM`);
+        
+      } catch (error) {
+        logError(`Erro ao limpar DM: ${error.message}`);
+        await interaction.followUp({ 
+          content: '❌ Erro ao limpar mensagens. Tente novamente.',
+          flags: 64 
+        });
+      }
+      
+    } else if (interaction.customId === 'cancel_clear') {
+      await interaction.update({ content: '❌ Operação cancelada.', components: [] });
+    }
+  } catch (error) {
+    logError(`Erro no handler de botões do clear: ${error.message}`);
+    if (!interaction.replied) {
+      await interaction.reply({ content: '❌ Erro ao processar comando.', flags: 64 });
+    }
+  }
+}
+
+// ===============================
+// EVENTO: BOTÃO INTERAÇÃO (PAINEL ADMIN)
 // ===============================
 async function handleButtonInteraction(interaction) {
   switch (interaction.customId) {
@@ -983,9 +1078,195 @@ function showBotStatus() {
 }
 
 // ===============================
-// EVENTOS DE LOG (MANTIDOS IGUAIS)
+// EVENTOS DE LOG (MENSAGENS, CANAIS, ETC)
 // ===============================
-// ... (todos os eventos de log permanecem iguais ao seu código original)
+
+client.on('messageDelete', async (message) => {
+  if (!message.guild || !message.author) return;
+
+  let deleter = 'Desconhecido';
+  try {
+    const auditLogs = await message.guild.fetchAuditLogs({ 
+      type: 72, 
+      limit: 1 
+    });
+    const entry = auditLogs.entries.first();
+    if (entry && entry.target.id === message.author.id && entry.createdTimestamp > Date.now() - 5000) {
+      deleter = entry.executor.tag;
+    }
+  } catch (e) {
+    logWarn('Não foi possível buscar logs de auditoria');
+  }
+
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ MENSAGEM DELETADA '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Autor:     ${message.author.tag}`));
+  console.log(chalk.red(`   Conteúdo: ${message.content || '[sem texto]'}`));
+  console.log(chalk.red(`   Deletado:  ${deleter}`));
+  console.log(chalk.red(`   Canal:     #${message.channel.name}`));
+  console.log(chalk.red(`   Servidor:  ${message.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+  if (!oldMessage.guild || !oldMessage.author) return;
+  if (oldMessage.content === newMessage.content) return;
+
+  console.log(chalk.yellow.bgBlack.bold('\n 📝 MENSAGEM ATUALIZADA '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Autor:     ${oldMessage.author.tag}`));
+  console.log(chalk.yellow(`   Antigo:    ${oldMessage.content}`));
+  console.log(chalk.yellow(`   Novo:      ${newMessage.content}`));
+  console.log(chalk.yellow(`   Canal:     #${oldMessage.channel.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
+});
+
+client.on('guildMemberAdd', async (member) => {
+  console.log(chalk.green.bgBlack.bold('\n 👤 NOVO MEMBRO '));
+  console.log(chalk.green('────────────────────────────────'));
+  console.log(chalk.green(`   Usuário: ${member.user.tag}`));
+  console.log(chalk.green(`   ID:      ${member.user.id}`));
+  console.log(chalk.green(`   Servidor: ${member.guild.name}`));
+  console.log(chalk.green(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
+  console.log(chalk.green('────────────────────────────────\n'));
+  logInfo(`Novo membro: ${member.user.tag} (${member.guild.name})`);
+});
+
+client.on('guildMemberRemove', async (member) => {
+  console.log(chalk.red.bgBlack.bold('\n ❌ MEMBRO SAIU '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Usuário: ${member.user.tag}`));
+  console.log(chalk.red(`   Servidor: ${member.guild.name}`));
+  console.log(chalk.red(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+  logInfo(`Membro saiu: ${member.user.tag} (${member.guild.name})`);
+});
+
+client.on('channelCreate', async (channel) => {
+  if (!channel.guild) return;
+  console.log(chalk.blue.bgBlack.bold('\n 📁 CANAL CRIADO '));
+  console.log(chalk.blue('────────────────────────────────'));
+  console.log(chalk.blue(`   Nome:  #${channel.name}`));
+  console.log(chalk.blue(`   Tipo:  ${channel.type}`));
+  console.log(chalk.blue(`   Servidor: ${channel.guild.name}`));
+  console.log(chalk.blue('────────────────────────────────\n'));
+});
+
+client.on('channelDelete', async (channel) => {
+  if (!channel.guild) return;
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ CANAL DELETADO '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Nome:  #${channel.name}`));
+  console.log(chalk.red(`   Servidor: ${channel.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('channelUpdate', async (oldChannel, newChannel) => {
+  if (!oldChannel.guild) return;
+  if (oldChannel.name === newChannel.name) return;
+
+  console.log(chalk.yellow.bgBlack.bold('\n 🔄 CANAL ATUALIZADO '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Nome Antigo: #${oldChannel.name}`));
+  console.log(chalk.yellow(`   Nome Novo:   #${newChannel.name}`));
+  console.log(chalk.yellow(`   Servidor:    ${oldChannel.guild.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
+});
+
+client.on('roleCreate', async (role) => {
+  if (!role.guild) return;
+  console.log(chalk.magenta.bgBlack.bold('\n 🎭 ROLE CRIADA '));
+  console.log(chalk.magenta('────────────────────────────────'));
+  console.log(chalk.magenta(`   Nome:  ${role.name}`));
+  console.log(chalk.magenta(`   ID:    ${role.id}`));
+  console.log(chalk.magenta(`   Cor:   ${role.hexColor}`));
+  console.log(chalk.magenta(`   Servidor: ${role.guild.name}`));
+  console.log(chalk.magenta('────────────────────────────────\n'));
+});
+
+client.on('roleDelete', async (role) => {
+  if (!role.guild) return;
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ ROLE DELETADA '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Nome:  ${role.name}`));
+  console.log(chalk.red(`   ID:    ${role.id}`));
+  console.log(chalk.red(`   Servidor: ${role.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('roleUpdate', async (oldRole, newRole) => {
+  if (!oldRole.guild) return;
+  if (oldRole.name === newRole.name && oldRole.hexColor === newRole.hexColor) return;
+
+  console.log(chalk.yellow.bgBlack.bold('\n 🔄 ROLE ATUALIZADA '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Nome Antigo: ${oldRole.name}`));
+  console.log(chalk.yellow(`   Nome Novo:   ${newRole.name}`));
+  console.log(chalk.yellow(`   Cor Antiga:  ${oldRole.hexColor}`));
+  console.log(chalk.yellow(`   Cor Nova:    ${newRole.hexColor}`));
+  console.log(chalk.yellow(`   Servidor:    ${oldRole.guild.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
+});
+
+client.on('guildEmojiCreate', async (emoji) => {
+  console.log(chalk.cyan.bgBlack.bold('\n 😊 EMOJI CRIADO '));
+  console.log(chalk.cyan('────────────────────────────────'));
+  console.log(chalk.cyan(`   Nome:  ${emoji.name}`));
+  console.log(chalk.cyan(`   ID:    ${emoji.id}`));
+  console.log(chalk.cyan(`   Servidor: ${emoji.guild.name}`));
+  console.log(chalk.cyan('────────────────────────────────\n'));
+});
+
+client.on('guildEmojiDelete', async (emoji) => {
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ EMOJI DELETADO '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Nome:  ${emoji.name}`));
+  console.log(chalk.red(`   ID:    ${emoji.id}`));
+  console.log(chalk.red(`   Servidor: ${emoji.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  if (!oldState.channel && newState.channel) {
+    console.log(chalk.green.bgBlack.bold('\n 🎤 ENTROU NO CANAL DE VOZ '));
+    console.log(chalk.green('────────────────────────────────'));
+    console.log(chalk.green(`   Usuário: ${newState.member.user.tag}`));
+    console.log(chalk.green(`   Canal:   #${newState.channel.name}`));
+    console.log(chalk.green('────────────────────────────────\n'));
+  } else if (oldState.channel && !newState.channel) {
+    console.log(chalk.red.bgBlack.bold('\n 🎤 SAIU DO CANAL DE VOZ '));
+    console.log(chalk.red('────────────────────────────────'));
+    console.log(chalk.red(`   Usuário: ${oldState.member.user.tag}`));
+    console.log(chalk.red(`   Canal:   ${oldState.channel.name}`));
+    console.log(chalk.red('────────────────────────────────\n'));
+  }
+});
+
+client.on('guildUpdate', async (oldGuild, newGuild) => {
+  if (oldGuild.name !== newGuild.name) {
+    console.log(chalk.yellow.bgBlack.bold('\n 🏛️ NOME DO SERVIDOR ALTERADO '));
+    console.log(chalk.yellow('────────────────────────────────'));
+    console.log(chalk.yellow(`   Antigo: ${oldGuild.name}`));
+    console.log(chalk.yellow(`   Novo:   ${newGuild.name}`));
+    console.log(chalk.yellow('────────────────────────────────\n'));
+  }
+});
+
+client.on('guildBanAdd', async (guild, user) => {
+  console.log(chalk.red.bgBlack.bold('\n 🚫 USUÁRIO BANIDO '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Usuário: ${user.tag}`));
+  console.log(chalk.red(`   Servidor: ${guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('guildBanRemove', async (guild, user) => {
+  console.log(chalk.green.bgBlack.bold('\n ✅ USUÁRIO DESBANIDO '));
+  console.log(chalk.green('────────────────────────────────'));
+  console.log(chalk.green(`   Usuário: ${user.tag}`));
+  console.log(chalk.green(`   Servidor: ${guild.name}`));
+  console.log(chalk.green('────────────────────────────────\n'));
+});
 
 // ===============================
 // ERROS NÃO TRATADOS
