@@ -28,9 +28,11 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildPresences
+    GatewayIntentBits.GuildPresences,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.DirectMessageTyping
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
+  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User],
 });
 
 // ===============================
@@ -40,6 +42,7 @@ const CONFIG = {
   logChannelId: process.env.LOG_CHANNEL_ID || "",
   adminRoles: process.env.ADMIN_ROLES ? process.env.ADMIN_ROLES.split(',') : [],
   ACCESS_CODE: process.env.ACCESS_CODE || "1234",
+  STAFF_USER_ID: process.env.STAFF_USER_ID || "Y2k_Nat", // ID do usuário staff
 };
 
 // ===============================
@@ -248,7 +251,8 @@ const helpCommand = {
         { name: '/ping', value: 'Verifica a latência do bot', inline: false },
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
         { name: '/adm', value: 'Acesso ao painel administrativo', inline: false },
-        { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false }
+        { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
+        { name: '/clear', value: 'Limpa o histórico de mensagens na DM com o bot (Staff)', inline: false }
       )
       .setFooter({ text: 'Digite /help para mais informações' })
       .setTimestamp();
@@ -324,13 +328,125 @@ const privateCommand = {
     }
   }
 };
+
+// === COMANDO /CLEAR - LIMPAR DM COM O BOT ===
+const clearCommand = {
+  data: {
+    name: 'clear',
+    description: 'Limpa o histórico de mensagens na DM com o bot',
+    options: [
+      {
+        name: 'code',
+        description: 'Código de acesso administrativo',
+        type: 3,
+        required: true
+      },
+      {
+        name: 'amount',
+        description: 'Quantidade de mensagens a limpar (padrão: 50, máximo: 100)',
+        type: 4,
+        required: false
+      }
+    ]
+  },
+  async execute(interaction) {
+    const code = interaction.options.getString('code');
+    const amount = interaction.options.getInteger('amount') || 50;
+    
+    // Limitar para no máximo 100 mensagens
+    const messagesToDelete = Math.min(amount, 100);
+    
+    // Verifica se o código está correto
+    if (code !== CONFIG.ACCESS_CODE) {
+      return interaction.reply({
+        content: '❌ Código de acesso incorreto!',
+        flags: 64
+      });
+    }
+
+    // Verifica se o comando está sendo usado na DM
+    if (interaction.channel.type !== ChannelType.DM) {
+      return interaction.reply({
+        content: '❌ Este comando só pode ser usado na DM com o bot!',
+        flags: 64
+      });
+    }
+
+    try {
+      // Busca mensagens no canal DM
+      const messages = await interaction.channel.messages.fetch({ limit: messagesToDelete });
+      
+      // Filtra apenas mensagens que podem ser deletadas (enviadas pelo bot ou pelo usuário)
+      const deletableMessages = messages.filter(msg => {
+        // Não deletar a mensagem de confirmação que será enviada
+        return msg.id !== interaction.id;
+      });
+
+      if (deletableMessages.size === 0) {
+        return interaction.reply({
+          content: '📭 Não há mensagens para limpar.',
+          flags: 64
+        });
+      }
+
+      // Deleta as mensagens
+      for (const [id, message] of deletableMessages) {
+        try {
+          await message.delete();
+          // Pequeno delay para não sobrecarregar a API
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (err) {
+          logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
+        }
+      }
+
+      await interaction.reply({
+        content: `✅ **${deletableMessages.size} mensagens** foram limpas do histórico da DM!`,
+        flags: 64
+      });
+
+      logInfo(`${interaction.user.tag} limpou ${deletableMessages.size} mensagens na DM`);
+    } catch (error) {
+      logError(`Erro ao limpar DM: ${error.message}`);
+      await interaction.reply({
+        content: '❌ Erro ao limpar as mensagens. Tente novamente.',
+        flags: 64
+      });
+    }
+  }
+};
+
 // ===============================
-// EVENTO: MENSAGEM CRIADA (MODERAÇÃO)
+// EVENTO: MENSAGEM CRIADA (MODERAÇÃO E DM)
 // ===============================
 client.on("messageCreate", async (message) => {
-  // Ignora bots
+  // Ignora mensagens do próprio bot
   if (message.author.bot) return;
 
+  // VERIFICAÇÃO DE MENSAGEM NA DM
+  if (message.channel.type === ChannelType.DM) {
+    // Se a mensagem foi enviada por um usuário na DM (não é comando)
+    if (!message.content.startsWith('/')) {
+      try {
+        // Responde com a mensagem automática
+        await message.reply({
+          content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}> ou ${CONFIG.STAFF_USER_ID}.`
+        });
+        
+        // Também envia uma mensagem separada (opcional)
+        await message.channel.send({
+          content: `📬 **Para falar com a staff, use:**\n\`/private [usuário] [mensagem] [código]\`\nOu contate diretamente: ${CONFIG.STAFF_USER_ID}`
+        });
+        
+        logInfo(`Mensagem automática enviada para ${message.author.tag} na DM`);
+      } catch (error) {
+        logError(`Erro ao responder DM: ${error.message}`);
+      }
+    }
+    return; // Não processa moderação em DMs
+  }
+
+  // MODERAÇÃO EM CANAIS DE SERVIDOR
   // Ignora membros com cargos de Admin/Staff
   if (isAdmin(message.member)) return;
 
@@ -356,7 +472,7 @@ client.on("messageCreate", async (message) => {
       // Deleta a mensagem
       await message.delete();
 
-      // Avisa o usuário no chat com a palavra específica - FORMATADO CONFORME SOLICITADO
+      // Avisa o usuário no chat com a palavra específica
       await message.channel.send({
         embeds: [new EmbedBuilder()
           .setTitle('🚫 Mensagem Removida')
@@ -384,7 +500,7 @@ client.on("messageCreate", async (message) => {
 // ===============================
 // EVENTO: BOT PRONTO
 // ===============================
-client.once('clientReady', async () => {
+client.once('ready', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
@@ -402,7 +518,8 @@ client.once('clientReady', async () => {
           ...commands.map(c => c.data),
           pingCommand.data,
           helpCommand.data,
-          privateCommand.data
+          privateCommand.data,
+          clearCommand.data
         ]);
         logSuccess(`Comandos registrados em: ${guild.name}`);
       }
@@ -468,11 +585,16 @@ client.on('interactionCreate', async (interaction) => {
         await privateCommand.execute(interaction);
         return;
       }
+      if (interaction.commandName === 'clear') {
+        await clearCommand.execute(interaction);
+        return;
+      }
       return;
     }
 
     try {
-      await command.execute(interaction);    } catch (error) {
+      await command.execute(interaction);
+    } catch (error) {
       logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
