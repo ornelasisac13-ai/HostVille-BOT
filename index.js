@@ -383,7 +383,7 @@ client.on("messageCreate", async (message) => {
                     await msg.delete();
                     channelCount++;
                     totalDeleted++;
-                    await new Promise(resolve => setTimeout(resolve, 200));
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Aumentado delay
                   } catch (err) {
                     logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
                   }
@@ -440,71 +440,78 @@ client.on("messageCreate", async (message) => {
         
         const collector = confirmMsg.createMessageComponentCollector({ 
           filter, 
-          time: 30000, // 30 segundos
+          time: 60000, // Aumentado para 60 segundos
           max: 1
         });
         
         collector.on('collect', async (interaction) => {
-          if (interaction.customId === 'confirm_clear') {
-            await interaction.update({ content: '🔄 Limpando mensagens...', components: [] });
-            
-            let deletedCount = 0;
-            let fetchedMessages;
-            
-            try {
-              do {
-                fetchedMessages = await message.channel.messages.fetch({ limit: 100 });
-                
-                if (fetchedMessages.size === 0) break;
-                
-                const deletableMessages = fetchedMessages.filter(msg => 
-                  msg.id !== confirmMsg.id && msg.id !== message.id
-                );
-                
-                if (deletableMessages.size === 0) break;
-                
-                for (const [id, msg] of deletableMessages) {
-                  try {
-                    await msg.delete();
-                    deletedCount++;
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                  } catch (err) {
-                    logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
+          try {
+            if (interaction.customId === 'confirm_clear') {
+              // Responde a interação imediatamente
+              await interaction.update({ content: '🔄 Limpando mensagens...', components: [] });
+              
+              let deletedCount = 0;
+              let fetchedMessages;
+              
+              try {
+                do {
+                  fetchedMessages = await message.channel.messages.fetch({ limit: 100 });
+                  
+                  if (fetchedMessages.size === 0) break;
+                  
+                  const deletableMessages = fetchedMessages.filter(msg => 
+                    msg.id !== confirmMsg.id && msg.id !== message.id
+                  );
+                  
+                  if (deletableMessages.size === 0) break;
+                  
+                  for (const [id, msg] of deletableMessages) {
+                    try {
+                      await msg.delete();
+                      deletedCount++;
+                      await new Promise(resolve => setTimeout(resolve, 500)); // Aumentado delay
+                    } catch (err) {
+                      logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
+                    }
                   }
-                }
+                  
+                } while (fetchedMessages.size >= 100);
                 
-              } while (fetchedMessages.size >= 100);
+                // Mensagem que aparece SÓ NO CONSOLE
+                console.log(chalk.green.bgBlack.bold(`\n🧹 ${deletedCount} mensagens foram limpas do histórico da DM de ${message.author.tag}!`));
+                
+                // Envia mensagem de confirmação separada (não usa a interação original)
+                await message.channel.send('✅ **Mensagens limpas com sucesso!**');
+                
+                logInfo(`${message.author.tag} limpou ${deletedCount} mensagens na DM`);
+                
+              } catch (error) {
+                logError(`Erro ao limpar DM: ${error.message}`);
+                await message.channel.send('❌ Erro ao limpar mensagens. Tente novamente.');
+              }
               
-              // Mensagem que aparece SÓ NO CONSOLE
-              console.log(chalk.green.bgBlack.bold(`\n🧹 ${deletedCount} mensagens foram limpas do histórico da DM de ${message.author.tag}!`));
-              
-              // Mensagem para o usuário (sem quantidade)
-              await interaction.followUp({ 
-                content: '✅ **Mensagens limpas com sucesso!**',
-                flags: 64 
-              });
-              
-              logInfo(`${message.author.tag} limpou ${deletedCount} mensagens na DM`);
-              
-            } catch (error) {
-              logError(`Erro ao limpar DM: ${error.message}`);
-              await interaction.followUp({ 
-                content: '❌ Erro ao limpar mensagens. Tente novamente.',
-                flags: 64 
-              });
+            } else if (interaction.customId === 'cancel_clear') {
+              await interaction.update({ content: '❌ Operação cancelada.', components: [] });
             }
-            
-          } else if (interaction.customId === 'cancel_clear') {
-            await interaction.update({ content: '❌ Operação cancelada.', components: [] });
+          } catch (error) {
+            logError(`Erro no coletor do !clear: ${error.message}`);
+            // Se a interação expirou, tenta enviar mensagem normal
+            if (error.code === 10062) {
+              await message.channel.send('❌ Tempo esgotado. Operação cancelada.');
+            }
           }
         });
         
         collector.on('end', async (collected) => {
           if (collected.size === 0) {
-            await confirmMsg.edit({ 
-              content: '⏰ Tempo esgotado. Operação cancelada.',
-              components: [] 
-            });
+            try {
+              await confirmMsg.edit({ 
+                content: '⏰ Tempo esgotado. Operação cancelada.',
+                components: [] 
+              });
+            } catch (error) {
+              // Se não conseguir editar, ignora
+            }
           }
         });
         
@@ -685,9 +692,9 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
     
-    // Botões do comando !clear
+    // Botões do comando !clear - O handler está no coletor, então não precisamos processar aqui
     if (interaction.customId === 'confirm_clear' || interaction.customId === 'cancel_clear') {
-      await handleClearButtons(interaction);
+      // Não fazer nada aqui, pois o coletor vai processar
       return;
     }
     
@@ -697,85 +704,8 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ===============================
-// HANDLER ESPECÍFICO PARA BOTÕES DO !clear
-// ===============================
-async function handleClearButtons(interaction) {
-  try {
-    if (interaction.customId === 'confirm_clear') {
-      await interaction.update({ content: '🔄 Limpando mensagens...', components: [] });
-      
-      let deletedCount = 0;
-      let fetchedMessages;
-      
-      try {
-        // Pega a mensagem original que acionou o comando
-        const messageReference = interaction.message.reference;
-        let originalMessage = null;
-        
-        if (messageReference && messageReference.messageId) {
-          try {
-            originalMessage = await interaction.channel.messages.fetch(messageReference.messageId);
-          } catch (e) {
-            // Ignora se não conseguir buscar
-          }
-        }
-        
-        do {
-          fetchedMessages = await interaction.channel.messages.fetch({ limit: 100 });
-          
-          if (fetchedMessages.size === 0) break;
-          
-          const deletableMessages = fetchedMessages.filter(msg => {
-            // Não deletar a mensagem de confirmação atual
-            if (msg.id === interaction.message.id) return false;
-            // Não deletar a mensagem original do comando !clear
-            if (originalMessage && msg.id === originalMessage.id) return false;
-            return true;
-          });
-          
-          if (deletableMessages.size === 0) break;
-          
-          for (const [id, msg] of deletableMessages) {
-            try {
-              await msg.delete();
-              deletedCount++;
-              await new Promise(resolve => setTimeout(resolve, 200));
-            } catch (err) {
-              logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
-            }
-          }
-          
-        } while (fetchedMessages.size >= 100);
-        
-        // Mensagem que aparece SÓ NO CONSOLE
-        console.log(chalk.green.bgBlack.bold(`\n🧹 ${deletedCount} mensagens foram limpas do histórico da DM de ${interaction.user.tag}!`));
-        
-        // Mensagem para o usuário (sem quantidade)
-        await interaction.followUp({ 
-          content: '✅ **Mensagens limpas com sucesso!**',
-          flags: 64 
-        });
-        
-        logInfo(`${interaction.user.tag} limpou ${deletedCount} mensagens na DM`);
-        
-      } catch (error) {
-        logError(`Erro ao limpar DM: ${error.message}`);
-        await interaction.followUp({ 
-          content: '❌ Erro ao limpar mensagens. Tente novamente.',
-          flags: 64 
-        });
-      }
-      
-    } else if (interaction.customId === 'cancel_clear') {
-      await interaction.update({ content: '❌ Operação cancelada.', components: [] });
-    }
-  } catch (error) {
-    logError(`Erro no handler de botões do clear: ${error.message}`);
-    if (!interaction.replied) {
-      await interaction.reply({ content: '❌ Erro ao processar comando.', flags: 64 });
-    }
-  }
-}
+// HANDLER ESPECÍFICO PARA BOTÕES DO !clear (REMOVER ESTA FUNÇÃO - NÃO É MAIS USADA)
+// A função handleClearButtons foi removida porque o coletor já processa os botões
 
 // ===============================
 // EVENTO: BOTÃO INTERAÇÃO (PAINEL ADMIN)
