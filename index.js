@@ -373,7 +373,7 @@ function createStatusEmbed(guild, action, user) {
 }
 
 // ===============================
-// INICIALIZAR READLINE (DEFINIR ANTES DE USAR)
+// INICIALIZAR READLINE
 // ===============================
 let rl = null;
 let isMenuActive = false;
@@ -1006,179 +1006,138 @@ client.once('clientReady', async () => {
 });
 
 // ===============================
-// EVENTO: INTERAÇÃO (BOTÕES E MENUS)
-// ===============================
-client.on('interactionCreate', async (interaction) => {
-  // Handler para comandos de chat input
-  if (interaction.isChatInputCommand()) {
-    const cmdName = interaction.commandName;
-    stats.commandsUsed[cmdName] = (stats.commandsUsed[cmdName] || 0) + 1;
-    
-    const command = commands.find(c => c.data.name === interaction.commandName);
-    if (!command) {
-      if (interaction.commandName === 'ping') {
-        await pingCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'help') {
-        await helpCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'private') {
-        await privateCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'report') {
-        await reportCommand.execute(interaction);
-        return;
-      }
-      return;
-    }
-
-    try {
-      await command.execute(interaction);
-    } catch (error) {
-      logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
-      } else {
-        await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
-      }
-    }
-    return;
-  }
-
-  // Handler para botões
-  if (interaction.isButton()) {
-    // Botões do painel admin
-    if (interaction.customId === 'stats' || interaction.customId === 'console' || interaction.customId === 'help') {
-      await handleButtonInteraction(interaction);
-      return;
-    }
-    
-    // Botões do !clear
-    if (interaction.customId === 'confirm_clear' || interaction.customId === 'cancel_clear') {
-      return;
-    }
-    
-    // Botões de monitoramento
-    if (interaction.customId.startsWith('monitor_')) {
-      await handleMonitorButtons(interaction);
-      return;
-    }
-    
-    await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
-  }
-  
-  // Handler para menus de seleção
-  if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === 'select_server_monitor') {
-      await handleServerSelection(interaction);
-      return;
-    }
-  }
-});
-
-// ===============================
-// HANDLER PARA BOTÕES DE MONITORAMENTO
+// HANDLER PARA BOTÕES DE MONITORAMENTO (CORRIGIDO)
 // ===============================
 async function handleMonitorButtons(interaction) {
-  const [action, target] = interaction.customId.split('_').slice(1);
-  const isOn = action === 'on';
-  const actionText = isOn ? 'ATIVAR' : 'DESATIVAR';
+  // Responde imediatamente para evitar timeout
+  await interaction.deferReply({ flags: 64 });
   
   try {
-    if (target === 'all') {
+    // Extrair ação do customId: monitor_all_on, monitor_select_off, etc
+    const parts = interaction.customId.split('_');
+    const action = parts[1]; // 'all' ou 'select'
+    const state = parts[2]; // 'on' ou 'off'
+    const isOn = state === 'on';
+    const actionText = isOn ? 'ATIVAR' : 'DESATIVAR';
+    
+    if (action === 'all') {
       // Ação para todos os servidores
-      await interaction.update({ content: `🔄 ${actionText} monitoramento em TODOS os servidores...`, components: [] });
-      
       let count = 0;
       for (const [guildId, guild] of client.guilds.cache) {
         setServerMonitoring(guildId, isOn, interaction.user);
         count++;
       }
       
-      const embed = createStatusEmbed(null, action, interaction.user);
+      const embed = createStatusEmbed(null, state, interaction.user);
       embed.setDescription(`✅ Monitoramento ${isOn ? 'ativado' : 'desativado'} em **${count} servidores**!`);
       
-      await interaction.followUp({ embeds: [embed], flags: 64 });
+      await interaction.editReply({
+        content: `✅ Operação concluída!`,
+        embeds: [embed]
+      });
       
-    } else if (target === 'select') {
+    } else if (action === 'select') {
       // Criar menu de seleção de servidores
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId('select_server_monitor')
-        .setPlaceholder('Selecione um servidor')
-        .addOptions(
-          client.guilds.cache.map(guild => {
-            const status = serverMonitoring.get(guild.id) ? '🟢 ATIVO' : '🔴 INATIVO';
-            return new StringSelectMenuOptionBuilder()
-              .setLabel(guild.name)
-              .setDescription(`${guild.memberCount} membros - ${status}`)
-              .setValue(guild.id)
-              .setEmoji('🏛️');
-          }).slice(0, 25) // Discord limita a 25 opções
-        );
+      const options = [];
       
-      // Se tiver mais de 25 servidores, adicionar opção de página
+      // Adicionar opções de servidores (máx 25)
+      let count = 0;
+      for (const [guildId, guild] of client.guilds.cache) {
+        if (count >= 25) break;
+        
+        const status = serverMonitoring.get(guildId) ? '🟢 ATIVO' : '🔴 INATIVO';
+        options.push(
+          new StringSelectMenuOptionBuilder()
+            .setLabel(guild.name.substring(0, 100))
+            .setDescription(`${guild.memberCount} membros - ${status}`)
+            .setValue(guildId)
+            .setEmoji('🏛️')
+        );
+        count++;
+      }
+      
+      // Se tiver mais de 25 servidores
       if (client.guilds.cache.size > 25) {
-        selectMenu.addOptions(
+        options.push(
           new StringSelectMenuOptionBuilder()
             .setLabel('📌 Mais servidores...')
-            .setDescription('Use o comando novamente para ver mais')
+            .setDescription('Use o comando novamente para ver outros servidores')
             .setValue('more')
             .setEmoji('📌')
         );
       }
       
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId(`select_server_${state}`)
+        .setPlaceholder('Selecione um servidor')
+        .addOptions(options);
+      
       const row = new ActionRowBuilder().addComponents(selectMenu);
       
       // Armazenar a ação pendente
-      pendingActions.set(interaction.user.id, { action: isOn ? 'on' : 'off' });
+      pendingActions.set(interaction.user.id, { 
+        action: state,
+        messageId: interaction.id 
+      });
       
-      await interaction.update({
+      await interaction.editReply({
         content: `🔍 **Selecione o servidor para ${actionText} o monitoramento:**`,
         components: [row]
       });
     }
   } catch (error) {
     logError(`Erro no handleMonitorButtons: ${error.message}`);
-    await interaction.reply({ content: '❌ Erro ao processar comando.', flags: 64 });
+    await interaction.editReply({ 
+      content: '❌ Erro ao processar comando. Tente novamente.'
+    });
   }
 }
 
 // ===============================
-// HANDLER PARA SELEÇÃO DE SERVIDOR
+// HANDLER PARA SELEÇÃO DE SERVIDOR (CORRIGIDO)
 // ===============================
 async function handleServerSelection(interaction) {
-  const selectedValue = interaction.values[0];
-  const pending = pendingActions.get(interaction.user.id);
-  
-  if (!pending) {
-    return interaction.reply({ content: '❌ Nenhuma ação pendente encontrada.', flags: 64 });
-  }
-  
-  const isOn = pending.action === 'on';
-  const actionText = isOn ? 'ATIVADO' : 'DESATIVADO';
+  // Responde imediatamente para evitar timeout
+  await interaction.deferUpdate();
   
   try {
+    const selectedValue = interaction.values[0];
+    const customId = interaction.customId; // select_server_on ou select_server_off
+    const state = customId.split('_')[2]; // 'on' ou 'off'
+    
+    const pending = pendingActions.get(interaction.user.id);
+    
+    if (!pending) {
+      return interaction.editReply({ 
+        content: '❌ Esta seleção expirou. Use o comando novamente.',
+        components: [] 
+      });
+    }
+    
+    const isOn = state === 'on';
+    const actionText = isOn ? 'ATIVADO' : 'DESATIVADO';
+    
     if (selectedValue === 'more') {
-      return interaction.reply({ 
-        content: '📌 **Use o comando novamente para ver mais servidores.**\nDigite `!MonitorOn` ou `!MonitorOff` novamente.', 
-        flags: 64 
+      return interaction.editReply({ 
+        content: '📌 **Use o comando novamente para ver mais servidores.**\nDigite `!MonitorOn` ou `!MonitorOff` novamente.',
+        components: [] 
       });
     }
     
     const guild = client.guilds.cache.get(selectedValue);
     if (!guild) {
-      return interaction.reply({ content: '❌ Servidor não encontrado.', flags: 64 });
+      return interaction.editReply({ 
+        content: '❌ Servidor não encontrado.',
+        components: [] 
+      });
     }
     
     // Atualizar status
     setServerMonitoring(selectedValue, isOn, interaction.user);
     
-    const embed = createStatusEmbed(guild, pending.action, interaction.user);
+    const embed = createStatusEmbed(guild, state, interaction.user);
     
-    await interaction.update({ 
+    await interaction.editReply({ 
       content: `✅ **Monitoramento ${actionText} em ${guild.name}!**`,
       embeds: [embed],
       components: [] 
@@ -1189,9 +1148,94 @@ async function handleServerSelection(interaction) {
     
   } catch (error) {
     logError(`Erro no handleServerSelection: ${error.message}`);
-    await interaction.reply({ content: '❌ Erro ao processar seleção.', flags: 64 });
+    await interaction.editReply({ 
+      content: '❌ Erro ao processar seleção.',
+      components: [] 
+    });
   }
 }
+
+// ===============================
+// EVENTO: INTERAÇÃO (BOTÕES E MENUS) - CORRIGIDO
+// ===============================
+client.on('interactionCreate', async (interaction) => {
+  try {
+    // Handler para comandos de chat input
+    if (interaction.isChatInputCommand()) {
+      const cmdName = interaction.commandName;
+      stats.commandsUsed[cmdName] = (stats.commandsUsed[cmdName] || 0) + 1;
+      
+      const command = commands.find(c => c.data.name === interaction.commandName);
+      if (!command) {
+        if (interaction.commandName === 'ping') {
+          await pingCommand.execute(interaction);
+          return;
+        }
+        if (interaction.commandName === 'help') {
+          await helpCommand.execute(interaction);
+          return;
+        }
+        if (interaction.commandName === 'private') {
+          await privateCommand.execute(interaction);
+          return;
+        }
+        if (interaction.commandName === 'report') {
+          await reportCommand.execute(interaction);
+          return;
+        }
+        return;
+      }
+
+      try {
+        await command.execute(interaction);
+      } catch (error) {
+        logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
+        } else {
+          await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
+        }
+      }
+      return;
+    }
+
+    // Handler para botões
+    if (interaction.isButton()) {
+      // Botões do painel admin
+      if (interaction.customId === 'stats' || interaction.customId === 'console' || interaction.customId === 'help') {
+        await handleButtonInteraction(interaction);
+        return;
+      }
+      
+      // Botões do !clear
+      if (interaction.customId === 'confirm_clear' || interaction.customId === 'cancel_clear') {
+        // Esses botões são tratados pelo coletor no messageCreate
+        return;
+      }
+      
+      // Botões de monitoramento
+      if (interaction.customId.startsWith('monitor_')) {
+        await handleMonitorButtons(interaction);
+        return;
+      }
+      
+      await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
+    }
+    
+    // Handler para menus de seleção
+    if (interaction.isStringSelectMenu()) {
+      if (interaction.customId.startsWith('select_server_')) {
+        await handleServerSelection(interaction);
+        return;
+      }
+    }
+  } catch (error) {
+    logError(`Erro geral no interactionCreate: ${error.message}`);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: '❌ Erro ao processar interação.', flags: 64 }).catch(() => {});
+    }
+  }
+});
 
 // ===============================
 // EVENTO: BOTÃO INTERAÇÃO (PAINEL ADMIN)
