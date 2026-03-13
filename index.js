@@ -43,7 +43,7 @@ const CONFIG = {
   adminRoles: process.env.ADMIN_ROLES ? process.env.ADMIN_ROLES.split(',') : [],
   ACCESS_CODE: process.env.ACCESS_CODE || "1234",
   STAFF_USER_ID: process.env.STAFF_USER_ID || "Y2k_Nat",
-  DAILY_REPORT_TIME: process.env.DAILY_REPORT_TIME || "08:00", // Horário do relatório diário
+  DAILY_REPORT_TIME: process.env.DAILY_REPORT_TIME || "08:00",
 };
 
 // ===============================
@@ -315,7 +315,7 @@ function findOffensiveWord(text) {
 }
 
 // ===============================
-// FUNÇÃO PARA VERIFICAR PERMISSÕES DE ADMIN
+// FUNÇÃO PARA VERIFICAR PERMISSÕES DE ADMIN (NÃO USADA NOS COMANDOS)
 // ===============================
 function isAdmin(member) {
   if (!member) return false;
@@ -431,12 +431,9 @@ const helpCommand = {
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
         { name: '/adm', value: 'Acesso ao painel administrativo', inline: false },
         { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
-        { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false },
-        { name: '!clear', value: '(Apenas DM) Limpar Mensagens do bot.', inline: false },
-        { name: '!MonitorOn', value: 'Ativar monitoramento de palavras no servidor (Staff)', inline: false },
-        { name: '!MonitorOff', value: 'Desativar monitoramento de palavras no servidor (Staff)', inline: false }
+        { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false }
       )
-      .setFooter({ text: 'Digite /help para mais informações' })
+      .setFooter({ text: 'Comandos de texto: !clear, !clearAll, !MonitorOn, !MonitorOff' })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], flags: 64 });
@@ -768,11 +765,7 @@ client.on("messageCreate", async (message) => {
   
   // COMANDO !MonitorOn
   if (message.content.startsWith('!MonitorOn')) {
-    // Verificar se tem permissão de admin
-    if (!isAdmin(message.member)) {
-      return message.reply('❌ Você não tem permissão para usar este comando!');
-    }
-    
+    // Verificar APENAS a senha, não o cargo
     const args = message.content.split(' ');
     const password = args[1];
     
@@ -805,11 +798,7 @@ client.on("messageCreate", async (message) => {
   
   // COMANDO !MonitorOff
   if (message.content.startsWith('!MonitorOff')) {
-    // Verificar se tem permissão de admin
-    if (!isAdmin(message.member)) {
-      return message.reply('❌ Você não tem permissão para usar este comando!');
-    }
-    
+    // Verificar APENAS a senha, não o cargo
     const args = message.content.split(' ');
     const password = args[1];
     
@@ -911,7 +900,6 @@ client.once('clientReady', async () => {
   // Inicializar monitoramento para todos os servidores (padrão: ativo)
   for (const guild of client.guilds.cache.values()) {
     serverMonitoring.set(guild.id, true);
-    logInfo(`Monitoramento ativado por padrão em: ${guild.name}`);
   }
   
   // Registrar comandos em TODOS os servidores
@@ -936,12 +924,6 @@ client.once('clientReady', async () => {
   }
 
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
-  console.log(chalk.yellow('  📝 COMANDOS:'));
-  console.log(chalk.yellow('  • !clear - Limpa mensagens da DM (com confirmação)'));
-  console.log(chalk.yellow('  • !clearAll SUA_SENHA - Limpa mensagens do bot em TODAS as DMs'));
-  console.log(chalk.yellow('  • !MonitorOn ACCESS_CODE - Ativar monitoramento no servidor'));
-  console.log(chalk.yellow('  • !MonitorOff ACCESS_CODE - Desativar monitoramento no servidor'));
-  console.log(chalk.yellow('  • /report - Gerar relatório manual (Staff)\n'));
   
   // Iniciar sistema de relatórios diários
   scheduleDailyReport();
@@ -1100,205 +1082,6 @@ async function handleButtonInteraction(interaction) {
       await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
   }
 }
-
-// ===============================
-// EVENTOS DE LOG (MENSAGENS, CANAIS, ETC)
-// ===============================
-
-client.on('messageDelete', async (message) => {
-  if (!message.guild || !message.author) return;
-  
-  // Incrementar estatística (já incrementado no messageCreate)
-
-  let deleter = 'Desconhecido';
-  try {
-    const auditLogs = await message.guild.fetchAuditLogs({ 
-      type: 72, 
-      limit: 1 
-    });
-    const entry = auditLogs.entries.first();
-    if (entry && entry.target.id === message.author.id && entry.createdTimestamp > Date.now() - 5000) {
-      deleter = entry.executor.tag;
-    }
-  } catch (e) {
-    logWarn('Não foi possível buscar logs de auditoria');
-  }
-
-  console.log(chalk.red.bgBlack.bold('\n 🗑️ MENSAGEM DELETADA '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Autor:     ${message.author.tag}`));
-  console.log(chalk.red(`   Conteúdo: ${message.content || '[sem texto]'}`));
-  console.log(chalk.red(`   Deletado:  ${deleter}`));
-  console.log(chalk.red(`   Canal:     #${message.channel.name}`));
-  console.log(chalk.red(`   Servidor:  ${message.guild.name}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-});
-
-client.on('messageUpdate', async (oldMessage, newMessage) => {
-  if (!oldMessage.guild || !oldMessage.author) return;
-  if (oldMessage.content === newMessage.content) return;
-
-  console.log(chalk.yellow.bgBlack.bold('\n 📝 MENSAGEM ATUALIZADA '));
-  console.log(chalk.yellow('────────────────────────────────'));
-  console.log(chalk.yellow(`   Autor:     ${oldMessage.author.tag}`));
-  console.log(chalk.yellow(`   Antigo:    ${oldMessage.content}`));
-  console.log(chalk.yellow(`   Novo:      ${newMessage.content}`));
-  console.log(chalk.yellow(`   Canal:     #${oldMessage.channel.name}`));
-  console.log(chalk.yellow('────────────────────────────────\n'));
-});
-
-client.on('guildMemberAdd', async (member) => {
-  // Incrementar estatística
-  stats.membersJoined++;
-  
-  console.log(chalk.green.bgBlack.bold('\n 👤 NOVO MEMBRO '));
-  console.log(chalk.green('────────────────────────────────'));
-  console.log(chalk.green(`   Usuário: ${member.user.tag}`));
-  console.log(chalk.green(`   ID:      ${member.user.id}`));
-  console.log(chalk.green(`   Servidor: ${member.guild.name}`));
-  console.log(chalk.green(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
-  console.log(chalk.green('────────────────────────────────\n'));
-  logInfo(`Novo membro: ${member.user.tag} (${member.guild.name})`);
-});
-
-client.on('guildMemberRemove', async (member) => {
-  // Incrementar estatística
-  stats.membersLeft++;
-  
-  console.log(chalk.red.bgBlack.bold('\n ❌ MEMBRO SAIU '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Usuário: ${member.user.tag}`));
-  console.log(chalk.red(`   Servidor: ${member.guild.name}`));
-  console.log(chalk.red(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-  logInfo(`Membro saiu: ${member.user.tag} (${member.guild.name})`);
-});
-
-client.on('channelCreate', async (channel) => {
-  if (!channel.guild) return;
-  console.log(chalk.blue.bgBlack.bold('\n 📁 CANAL CRIADO '));
-  console.log(chalk.blue('────────────────────────────────'));
-  console.log(chalk.blue(`   Nome:  #${channel.name}`));
-  console.log(chalk.blue(`   Tipo:  ${channel.type}`));
-  console.log(chalk.blue(`   Servidor: ${channel.guild.name}`));
-  console.log(chalk.blue('────────────────────────────────\n'));
-});
-
-client.on('channelDelete', async (channel) => {
-  if (!channel.guild) return;
-  console.log(chalk.red.bgBlack.bold('\n 🗑️ CANAL DELETADO '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Nome:  #${channel.name}`));
-  console.log(chalk.red(`   Servidor: ${channel.guild.name}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-});
-
-client.on('channelUpdate', async (oldChannel, newChannel) => {
-  if (!oldChannel.guild) return;
-  if (oldChannel.name === newChannel.name) return;
-
-  console.log(chalk.yellow.bgBlack.bold('\n 🔄 CANAL ATUALIZADO '));
-  console.log(chalk.yellow('────────────────────────────────'));
-  console.log(chalk.yellow(`   Nome Antigo: #${oldChannel.name}`));
-  console.log(chalk.yellow(`   Nome Novo:   #${newChannel.name}`));
-  console.log(chalk.yellow(`   Servidor:    ${oldChannel.guild.name}`));
-  console.log(chalk.yellow('────────────────────────────────\n'));
-});
-
-client.on('roleCreate', async (role) => {
-  if (!role.guild) return;
-  console.log(chalk.magenta.bgBlack.bold('\n 🎭 ROLE CRIADA '));
-  console.log(chalk.magenta('────────────────────────────────'));
-  console.log(chalk.magenta(`   Nome:  ${role.name}`));
-  console.log(chalk.magenta(`   ID:    ${role.id}`));
-  console.log(chalk.magenta(`   Cor:   ${role.hexColor}`));
-  console.log(chalk.magenta(`   Servidor: ${role.guild.name}`));
-  console.log(chalk.magenta('────────────────────────────────\n'));
-});
-
-client.on('roleDelete', async (role) => {
-  if (!role.guild) return;
-  console.log(chalk.red.bgBlack.bold('\n 🗑️ ROLE DELETADA '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Nome:  ${role.name}`));
-  console.log(chalk.red(`   ID:    ${role.id}`));
-  console.log(chalk.red(`   Servidor: ${role.guild.name}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-});
-
-client.on('roleUpdate', async (oldRole, newRole) => {
-  if (!oldRole.guild) return;
-  if (oldRole.name === newRole.name && oldRole.hexColor === newRole.hexColor) return;
-
-  console.log(chalk.yellow.bgBlack.bold('\n 🔄 ROLE ATUALIZADA '));
-  console.log(chalk.yellow('────────────────────────────────'));
-  console.log(chalk.yellow(`   Nome Antigo: ${oldRole.name}`));
-  console.log(chalk.yellow(`   Nome Novo:   ${newRole.name}`));
-  console.log(chalk.yellow(`   Cor Antiga:  ${oldRole.hexColor}`));
-  console.log(chalk.yellow(`   Cor Nova:    ${newRole.hexColor}`));
-  console.log(chalk.yellow(`   Servidor:    ${oldRole.guild.name}`));
-  console.log(chalk.yellow('────────────────────────────────\n'));
-});
-
-client.on('guildEmojiCreate', async (emoji) => {
-  console.log(chalk.cyan.bgBlack.bold('\n 😊 EMOJI CRIADO '));
-  console.log(chalk.cyan('────────────────────────────────'));
-  console.log(chalk.cyan(`   Nome:  ${emoji.name}`));
-  console.log(chalk.cyan(`   ID:    ${emoji.id}`));
-  console.log(chalk.cyan(`   Servidor: ${emoji.guild.name}`));
-  console.log(chalk.cyan('────────────────────────────────\n'));
-});
-
-client.on('guildEmojiDelete', async (emoji) => {
-  console.log(chalk.red.bgBlack.bold('\n 🗑️ EMOJI DELETADO '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Nome:  ${emoji.name}`));
-  console.log(chalk.red(`   ID:    ${emoji.id}`));
-  console.log(chalk.red(`   Servidor: ${emoji.guild.name}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-});
-
-client.on('voiceStateUpdate', async (oldState, newState) => {
-  if (!oldState.channel && newState.channel) {
-    console.log(chalk.green.bgBlack.bold('\n 🎤 ENTROU NO CANAL DE VOZ '));
-    console.log(chalk.green('────────────────────────────────'));
-    console.log(chalk.green(`   Usuário: ${newState.member.user.tag}`));
-    console.log(chalk.green(`   Canal:   #${newState.channel.name}`));
-    console.log(chalk.green('────────────────────────────────\n'));
-  } else if (oldState.channel && !newState.channel) {
-    console.log(chalk.red.bgBlack.bold('\n 🎤 SAIU DO CANAL DE VOZ '));
-    console.log(chalk.red('────────────────────────────────'));
-    console.log(chalk.red(`   Usuário: ${oldState.member.user.tag}`));
-    console.log(chalk.red(`   Canal:   ${oldState.channel.name}`));
-    console.log(chalk.red('────────────────────────────────\n'));
-  }
-});
-
-client.on('guildUpdate', async (oldGuild, newGuild) => {
-  if (oldGuild.name !== newGuild.name) {
-    console.log(chalk.yellow.bgBlack.bold('\n 🏛️ NOME DO SERVIDOR ALTERADO '));
-    console.log(chalk.yellow('────────────────────────────────'));
-    console.log(chalk.yellow(`   Antigo: ${oldGuild.name}`));
-    console.log(chalk.yellow(`   Novo:   ${newGuild.name}`));
-    console.log(chalk.yellow('────────────────────────────────\n'));
-  }
-});
-
-client.on('guildBanAdd', async (guild, user) => {
-  console.log(chalk.red.bgBlack.bold('\n 🚫 USUÁRIO BANIDO '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Usuário: ${user.tag}`));
-  console.log(chalk.red(`   Servidor: ${guild.name}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-});
-
-client.on('guildBanRemove', async (guild, user) => {
-  console.log(chalk.green.bgBlack.bold('\n ✅ USUÁRIO DESBANIDO '));
-  console.log(chalk.green('────────────────────────────────'));
-  console.log(chalk.green(`   Usuário: ${user.tag}`));
-  console.log(chalk.green(`   Servidor: ${guild.name}`));
-  console.log(chalk.green('────────────────────────────────\n'));
-});
 
 // ===============================
 // MENU INTERATIVO NO CONSOLE
@@ -1585,6 +1368,201 @@ function showBotStatus() {
   console.log(chalk.yellow('══════════════════════════════\n'));
   showMenu();
 }
+
+// ===============================
+// EVENTOS DE LOG (MENSAGENS, CANAIS, ETC)
+// ===============================
+
+client.on('messageDelete', async (message) => {
+  if (!message.guild || !message.author) return;
+
+  let deleter = 'Desconhecido';
+  try {
+    const auditLogs = await message.guild.fetchAuditLogs({ 
+      type: 72, 
+      limit: 1 
+    });
+    const entry = auditLogs.entries.first();
+    if (entry && entry.target.id === message.author.id && entry.createdTimestamp > Date.now() - 5000) {
+      deleter = entry.executor.tag;
+    }
+  } catch (e) {
+    logWarn('Não foi possível buscar logs de auditoria');
+  }
+
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ MENSAGEM DELETADA '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Autor:     ${message.author.tag}`));
+  console.log(chalk.red(`   Conteúdo: ${message.content || '[sem texto]'}`));
+  console.log(chalk.red(`   Deletado:  ${deleter}`));
+  console.log(chalk.red(`   Canal:     #${message.channel.name}`));
+  console.log(chalk.red(`   Servidor:  ${message.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+  if (!oldMessage.guild || !oldMessage.author) return;
+  if (oldMessage.content === newMessage.content) return;
+
+  console.log(chalk.yellow.bgBlack.bold('\n 📝 MENSAGEM ATUALIZADA '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Autor:     ${oldMessage.author.tag}`));
+  console.log(chalk.yellow(`   Antigo:    ${oldMessage.content}`));
+  console.log(chalk.yellow(`   Novo:      ${newMessage.content}`));
+  console.log(chalk.yellow(`   Canal:     #${oldMessage.channel.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
+});
+
+client.on('guildMemberAdd', async (member) => {
+  stats.membersJoined++;
+  
+  console.log(chalk.green.bgBlack.bold('\n 👤 NOVO MEMBRO '));
+  console.log(chalk.green('────────────────────────────────'));
+  console.log(chalk.green(`   Usuário: ${member.user.tag}`));
+  console.log(chalk.green(`   ID:      ${member.user.id}`));
+  console.log(chalk.green(`   Servidor: ${member.guild.name}`));
+  console.log(chalk.green(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
+  console.log(chalk.green('────────────────────────────────\n'));
+  logInfo(`Novo membro: ${member.user.tag} (${member.guild.name})`);
+});
+
+client.on('guildMemberRemove', async (member) => {
+  stats.membersLeft++;
+  
+  console.log(chalk.red.bgBlack.bold('\n ❌ MEMBRO SAIU '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Usuário: ${member.user.tag}`));
+  console.log(chalk.red(`   Servidor: ${member.guild.name}`));
+  console.log(chalk.red(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+  logInfo(`Membro saiu: ${member.user.tag} (${member.guild.name})`);
+});
+
+client.on('channelCreate', async (channel) => {
+  if (!channel.guild) return;
+  console.log(chalk.blue.bgBlack.bold('\n 📁 CANAL CRIADO '));
+  console.log(chalk.blue('────────────────────────────────'));
+  console.log(chalk.blue(`   Nome:  #${channel.name}`));
+  console.log(chalk.blue(`   Tipo:  ${channel.type}`));
+  console.log(chalk.blue(`   Servidor: ${channel.guild.name}`));
+  console.log(chalk.blue('────────────────────────────────\n'));
+});
+
+client.on('channelDelete', async (channel) => {
+  if (!channel.guild) return;
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ CANAL DELETADO '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Nome:  #${channel.name}`));
+  console.log(chalk.red(`   Servidor: ${channel.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('channelUpdate', async (oldChannel, newChannel) => {
+  if (!oldChannel.guild) return;
+  if (oldChannel.name === newChannel.name) return;
+
+  console.log(chalk.yellow.bgBlack.bold('\n 🔄 CANAL ATUALIZADO '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Nome Antigo: #${oldChannel.name}`));
+  console.log(chalk.yellow(`   Nome Novo:   #${newChannel.name}`));
+  console.log(chalk.yellow(`   Servidor:    ${oldChannel.guild.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
+});
+
+client.on('roleCreate', async (role) => {
+  if (!role.guild) return;
+  console.log(chalk.magenta.bgBlack.bold('\n 🎭 ROLE CRIADA '));
+  console.log(chalk.magenta('────────────────────────────────'));
+  console.log(chalk.magenta(`   Nome:  ${role.name}`));
+  console.log(chalk.magenta(`   ID:    ${role.id}`));
+  console.log(chalk.magenta(`   Cor:   ${role.hexColor}`));
+  console.log(chalk.magenta(`   Servidor: ${role.guild.name}`));
+  console.log(chalk.magenta('────────────────────────────────\n'));
+});
+
+client.on('roleDelete', async (role) => {
+  if (!role.guild) return;
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ ROLE DELETADA '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Nome:  ${role.name}`));
+  console.log(chalk.red(`   ID:    ${role.id}`));
+  console.log(chalk.red(`   Servidor: ${role.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('roleUpdate', async (oldRole, newRole) => {
+  if (!oldRole.guild) return;
+  if (oldRole.name === newRole.name && oldRole.hexColor === newRole.hexColor) return;
+
+  console.log(chalk.yellow.bgBlack.bold('\n 🔄 ROLE ATUALIZADA '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Nome Antigo: ${oldRole.name}`));
+  console.log(chalk.yellow(`   Nome Novo:   ${newRole.name}`));
+  console.log(chalk.yellow(`   Cor Antiga:  ${oldRole.hexColor}`));
+  console.log(chalk.yellow(`   Cor Nova:    ${newRole.hexColor}`));
+  console.log(chalk.yellow(`   Servidor:    ${oldRole.guild.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
+});
+
+client.on('guildEmojiCreate', async (emoji) => {
+  console.log(chalk.cyan.bgBlack.bold('\n 😊 EMOJI CRIADO '));
+  console.log(chalk.cyan('────────────────────────────────'));
+  console.log(chalk.cyan(`   Nome:  ${emoji.name}`));
+  console.log(chalk.cyan(`   ID:    ${emoji.id}`));
+  console.log(chalk.cyan(`   Servidor: ${emoji.guild.name}`));
+  console.log(chalk.cyan('────────────────────────────────\n'));
+});
+
+client.on('guildEmojiDelete', async (emoji) => {
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ EMOJI DELETADO '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Nome:  ${emoji.name}`));
+  console.log(chalk.red(`   ID:    ${emoji.id}`));
+  console.log(chalk.red(`   Servidor: ${emoji.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  if (!oldState.channel && newState.channel) {
+    console.log(chalk.green.bgBlack.bold('\n 🎤 ENTROU NO CANAL DE VOZ '));
+    console.log(chalk.green('────────────────────────────────'));
+    console.log(chalk.green(`   Usuário: ${newState.member.user.tag}`));
+    console.log(chalk.green(`   Canal:   #${newState.channel.name}`));
+    console.log(chalk.green('────────────────────────────────\n'));
+  } else if (oldState.channel && !newState.channel) {
+    console.log(chalk.red.bgBlack.bold('\n 🎤 SAIU DO CANAL DE VOZ '));
+    console.log(chalk.red('────────────────────────────────'));
+    console.log(chalk.red(`   Usuário: ${oldState.member.user.tag}`));
+    console.log(chalk.red(`   Canal:   ${oldState.channel.name}`));
+    console.log(chalk.red('────────────────────────────────\n'));
+  }
+});
+
+client.on('guildUpdate', async (oldGuild, newGuild) => {
+  if (oldGuild.name !== newGuild.name) {
+    console.log(chalk.yellow.bgBlack.bold('\n 🏛️ NOME DO SERVIDOR ALTERADO '));
+    console.log(chalk.yellow('────────────────────────────────'));
+    console.log(chalk.yellow(`   Antigo: ${oldGuild.name}`));
+    console.log(chalk.yellow(`   Novo:   ${newGuild.name}`));
+    console.log(chalk.yellow('────────────────────────────────\n'));
+  }
+});
+
+client.on('guildBanAdd', async (guild, user) => {
+  console.log(chalk.red.bgBlack.bold('\n 🚫 USUÁRIO BANIDO '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Usuário: ${user.tag}`));
+  console.log(chalk.red(`   Servidor: ${guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('guildBanRemove', async (guild, user) => {
+  console.log(chalk.green.bgBlack.bold('\n ✅ USUÁRIO DESBANIDO '));
+  console.log(chalk.green('────────────────────────────────'));
+  console.log(chalk.green(`   Usuário: ${user.tag}`));
+  console.log(chalk.green(`   Servidor: ${guild.name}`));
+  console.log(chalk.green('────────────────────────────────\n'));
+});
 
 // ===============================
 // ERROS NÃO TRATADOS
