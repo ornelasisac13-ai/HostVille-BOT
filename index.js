@@ -430,14 +430,9 @@ client.on("messageCreate", async (message) => {
       try {
         // Responde com a mensagem automática
         await message.reply({
-          content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}> ou ${CONFIG.STAFF_USER_ID}.`
+          content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}> `
         });
-        
-        // Também envia uma mensagem separada (opcional)
-        await message.channel.send({
-          content: `📬 **Para falar com a staff, use:**\n\`/private [usuário] [mensagem] [código]\`\nOu contate diretamente: ${CONFIG.STAFF_USER_ID}`
-        });
-        
+    
         logInfo(`Mensagem automática enviada para ${message.author.tag} na DM`);
       } catch (error) {
         logError(`Erro ao responder DM: ${error.message}`);
