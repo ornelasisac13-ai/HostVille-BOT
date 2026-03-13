@@ -373,6 +373,32 @@ function createStatusEmbed(guild, action, user) {
 }
 
 // ===============================
+// INICIALIZAR READLINE (DEFINIR ANTES DE USAR)
+// ===============================
+let rl = null;
+let isMenuActive = false;
+
+function initReadline() {
+  if (!rl) {
+    rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    
+    rl.on('close', () => {
+      isMenuActive = false;
+      logWarn('Console do menu fechado.');
+    });
+    
+    rl.on('line', (input) => {
+      if (isMenuActive) {
+        handleMenuOption(input);
+      }
+    });
+  }
+}
+
+// ===============================
 // COMANDOS DO BOT
 // ===============================
 
@@ -974,6 +1000,7 @@ client.once('clientReady', async () => {
   
   scheduleDailyReport();
   
+  // Inicia o menu interativo
   initReadline();
   showMenu();
 });
@@ -1012,6 +1039,11 @@ client.on('interactionCreate', async (interaction) => {
       await command.execute(interaction);
     } catch (error) {
       logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
+      } else {
+        await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
+      }
     }
     return;
   }
@@ -1122,7 +1154,7 @@ async function handleServerSelection(interaction) {
   const pending = pendingActions.get(interaction.user.id);
   
   if (!pending) {
-    return interaction.reply({ content: '❌ Nenhuma ação pendente encontrada.', flags: 64, ephemeral: true });
+    return interaction.reply({ content: '❌ Nenhuma ação pendente encontrada.', flags: 64 });
   }
   
   const isOn = pending.action === 'on';
@@ -1224,8 +1256,9 @@ async function handleButtonInteraction(interaction) {
 }
 
 // ===============================
-// MENU INTERATIVO NO CONSOLE
+// FUNÇÕES DO MENU INTERATIVO
 // ===============================
+
 function showMenu() {
   if (isMenuActive) return;
   isMenuActive = true;
