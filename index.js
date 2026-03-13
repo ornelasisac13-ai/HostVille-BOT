@@ -501,7 +501,7 @@ const helpCommand = {
       .addFields(
         { name: '/ping', value: 'Verifica a latência do bot', inline: false },
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
-        { name: '/adm', value: 'Acesso ao painel administrativo', inline: false },
+        { name: '/adm', value: 'Acesso ao painel administrativo (Staff)', inline: false },
         { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
         { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false }
       )
@@ -1163,9 +1163,9 @@ client.once('clientReady', async () => {
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
   console.log(chalk.yellow('  📝 COMANDOS NA DM:'));
   console.log(chalk.yellow('  • !clear - Limpa mensagens da DM (mensagens temporárias)'));
-  console.log(chalk.yellow('  • !clearAll SUA_SENHA - Limpa TODAS as DMs'));
-  console.log(chalk.yellow('  • !MonitorOn SUA_SENHA - Ativar monitoramento'));
-  console.log(chalk.yellow('  • !MonitorOff SUA_SENHA - Desativar monitoramento\n'));
+  console.log(chalk.yellow('  • !clearAll - Limpa TODAS as DMs'));
+  console.log(chalk.yellow('  • !MonitorOn - Ativar monitoramento'));
+  console.log(chalk.yellow('  • !MonitorOff - Desativar monitoramento\n'));
   
   scheduleDailyReport();
   
