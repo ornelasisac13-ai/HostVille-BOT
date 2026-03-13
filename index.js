@@ -251,10 +251,9 @@ const helpCommand = {
         { name: '/ping', value: 'Verifica a latência do bot', inline: false },
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
         { name: '/adm', value: 'Acesso ao painel administrativo', inline: false },
-        { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
-        { name: '/clear', value: 'Limpa o histórico de mensagens na DM com o bot (Staff)', inline: false }
+        { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false }
       )
-      .setFooter({ text: 'Digite /help para mais informações' })
+      .setFooter({ text: 'Use !clear na DM para limpar mensagens' })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], flags: 64 });
@@ -329,93 +328,6 @@ const privateCommand = {
   }
 };
 
-// === COMANDO /CLEAR - LIMPAR DM COM O BOT ===
-const clearCommand = {
-  data: {
-    name: 'clear',
-    description: 'Limpa o histórico de mensagens na DM com o bot',
-    options: [
-      {
-        name: 'code',
-        description: 'Código de acesso administrativo',
-        type: 3,
-        required: true
-      },
-      {
-        name: 'amount',
-        description: 'Quantidade de mensagens a limpar (padrão: 50, máximo: 100)',
-        type: 4,
-        required: false
-      }
-    ]
-  },
-  async execute(interaction) {
-    const code = interaction.options.getString('code');
-    const amount = interaction.options.getInteger('amount') || 50;
-    
-    // Limitar para no máximo 100 mensagens
-    const messagesToDelete = Math.min(amount, 100);
-    
-    // Verifica se o código está correto
-    if (code !== CONFIG.ACCESS_CODE) {
-      return interaction.reply({
-        content: '❌ Código de acesso incorreto!',
-        flags: 64
-      });
-    }
-
-    // Verifica se o comando está sendo usado na DM
-    if (interaction.channel.type !== ChannelType.DM) {
-      return interaction.reply({
-        content: '❌ Este comando só pode ser usado na DM com o bot!',
-        flags: 64
-      });
-    }
-
-    try {
-      // Busca mensagens no canal DM
-      const messages = await interaction.channel.messages.fetch({ limit: messagesToDelete });
-      
-      // Filtra apenas mensagens que podem ser deletadas (enviadas pelo bot ou pelo usuário)
-      const deletableMessages = messages.filter(msg => {
-        // Não deletar a mensagem de confirmação que será enviada
-        return msg.id !== interaction.id;
-      });
-
-      if (deletableMessages.size === 0) {
-        return interaction.reply({
-          content: '📭 Não há mensagens para limpar.',
-          flags: 64
-        });
-      }
-
-      // Deleta as mensagens
-      for (const [id, message] of deletableMessages) {
-        try {
-          await message.delete();
-          // Pequeno delay para não sobrecarregar a API
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } catch (err) {
-          logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
-        }
-      }
-
-      await interaction.reply({
-        content: `✅ **${deletableMessages.size} mensagens** foram limpas do histórico da DM!`,
-        flags: 64
-      });
-
-      logInfo(`${interaction.user.tag} limpou ${deletableMessages.size} mensagens na DM`);
-    } catch (error) {
-      logError(`Erro ao limpar DM: ${error.message}`);
-      await interaction.reply({
-        content: '❌ Erro ao limpar as mensagens. Tente novamente.',
-        flags: 64
-      });
-    }
-  }
-};
-
 // ===============================
 // EVENTO: MENSAGEM CRIADA (MODERAÇÃO E DM)
 // ===============================
@@ -425,18 +337,82 @@ client.on("messageCreate", async (message) => {
 
   // VERIFICAÇÃO DE MENSAGEM NA DM
   if (message.channel.type === ChannelType.DM) {
-    // Se a mensagem foi enviada por um usuário na DM (não é comando)
-    if (!message.content.startsWith('/')) {
-      try {
-        // Responde com a mensagem automática
-        await message.reply({
-          content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}> `
-        });
     
-        logInfo(`Mensagem automática enviada para ${message.author.tag} na DM`);
-      } catch (error) {
-        logError(`Erro ao responder DM: ${error.message}`);
+    // COMANDO !clear PARA LIMPAR DM
+    if (message.content.startsWith('!clear')) {
+      
+      // Extrai a senha
+      const args = message.content.split(' ');
+      const password = args[1];
+      
+      // Verifica se a senha foi fornecida
+      if (!password) {
+        return message.reply('❌ Use: `!clear SUA_SENHA`\nExemplo: `!clear 1234`');
       }
+      
+      // Verifica senha
+      if (password !== CONFIG.ACCESS_CODE) {
+        return message.reply('❌ Código de acesso incorreto!');
+      }
+      
+      try {
+        // Envia mensagem de processamento
+        const processingMsg = await message.reply('🔄 Limpando todas as mensagens...');
+        
+        // Busca todas as mensagens do canal (limitado a 100 por vez)
+        let deletedCount = 0;
+        let fetchedMessages;
+        
+        do {
+          // Busca mensagens (máximo 100 por vez)
+          fetchedMessages = await message.channel.messages.fetch({ limit: 100 });
+          
+          if (fetchedMessages.size === 0) break;
+          
+          // Filtra mensagens que podem ser deletadas (exceto a de processamento)
+          const deletableMessages = fetchedMessages.filter(msg => 
+            msg.id !== processingMsg.id && msg.id !== message.id
+          );
+          
+          if (deletableMessages.size === 0) break;
+          
+          // Deleta as mensagens em lote (se possível) ou individualmente
+          for (const [id, msg] of deletableMessages) {
+            try {
+              await msg.delete();
+              deletedCount++;
+              // Pequeno delay para não sobrecarregar a API
+              await new Promise(resolve => setTimeout(resolve, 200));
+            } catch (err) {
+              logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
+            }
+          }
+          
+        } while (fetchedMessages.size >= 100);
+        
+        // Atualiza a mensagem de processamento
+        await processingMsg.edit(`✅ **${deletedCount} mensagens** foram limpas do histórico da DM!`);
+        
+        logInfo(`${message.author.tag} limpou ${deletedCount} mensagens na DM`);
+        
+      } catch (error) {
+        logError(`Erro ao limpar DM: ${error.message}`);
+        message.reply('❌ Erro ao limpar mensagens. Tente novamente.');
+      }
+      
+      return;
+    }
+    
+    // Se chegou aqui, é qualquer outra mensagem na DM (não é !clear)
+    try {
+      // Responde com a mensagem automática
+      await message.reply({
+        content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}> `
+      });
+      
+      logInfo(`Mensagem automática enviada para ${message.author.tag} na DM`);
+    } catch (error) {
+      logError(`Erro ao responder DM: ${error.message}`);
     }
     return; // Não processa moderação em DMs
   }
@@ -493,7 +469,7 @@ client.on("messageCreate", async (message) => {
 });
 
 // ===============================
-// EVENTO: BOT PRONTO
+// EVENTO: BOT PRONTO (CORRIGIDO)
 // ===============================
 client.once('ready', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
@@ -513,8 +489,8 @@ client.once('ready', async () => {
           ...commands.map(c => c.data),
           pingCommand.data,
           helpCommand.data,
-          privateCommand.data,
-          clearCommand.data
+          privateCommand.data
+          // Comando /clear removido
         ]);
         logSuccess(`Comandos registrados em: ${guild.name}`);
       }
@@ -527,6 +503,8 @@ client.once('ready', async () => {
   }
 
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
+  console.log(chalk.yellow('  📝 COMANDO DM: !clear SUA_SENHA'));
+  console.log(chalk.yellow('  📝 Exemplo: !clear 1234\n'));
   
   // Inicia o menu interativo
   initReadline();
@@ -578,10 +556,6 @@ client.on('interactionCreate', async (interaction) => {
       }
       if (interaction.commandName === 'private') {
         await privateCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'clear') {
-        await clearCommand.execute(interaction);
         return;
       }
       return;
