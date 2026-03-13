@@ -501,7 +501,7 @@ const helpCommand = {
       .addFields(
         { name: '/ping', value: 'Verifica a latência do bot', inline: false },
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
-        { name: '/adm', value: 'Acesso ao painel administrativo', inline: false },
+        { name: '/adm', value: 'Acesso ao painel administrativo (Staff)', inline: false },
         { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
         { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false }
       )
@@ -676,7 +676,7 @@ client.on("messageCreate", async (message) => {
       const password = args[1];
       
       if (!password) {
-        return message.reply('❌ Use: `!MonitorOff ACCESS_CODE`');
+        return message.reply('❌ Use: `!MonitorOff Código de Acesso`');
       }
       
       if (password !== CONFIG.ACCESS_CODE) {
@@ -715,7 +715,7 @@ client.on("messageCreate", async (message) => {
       
       // Verifica se a senha foi fornecida
       if (!password) {
-        return message.reply('❌ Use: `!clearAll SUA_SENHA`');
+        return message.reply('❌ Use: `!clearAll Código de Acesso`');
       }
       
       // Verifica senha
@@ -890,7 +890,7 @@ client.on("messageCreate", async (message) => {
     // RESPOSTA AUTOMÁTICA para outras mensagens na DM
     try {
       await message.reply({
-        content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}> `
+        content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}>. `
       });
       
       logInfo(`Mensagem automática enviada para ${message.author.tag} na DM`);
@@ -994,9 +994,9 @@ client.once('clientReady', async () => {
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
   console.log(chalk.yellow('  📝 COMANDOS NA DM:'));
   console.log(chalk.yellow('  • !clear - Limpa mensagens da DM'));
-  console.log(chalk.yellow('  • !clearAll SUA_SENHA - Limpa TODAS as DMs'));
-  console.log(chalk.yellow('  • !MonitorOn SUA_SENHA - Ativar monitoramento'));
-  console.log(chalk.yellow('  • !MonitorOff SUA_SENHA - Desativar monitoramento\n'));
+  console.log(chalk.yellow('  • !clearAll - Limpa TODAS as DMs'));
+  console.log(chalk.yellow('  • !MonitorOn - Ativar monitoramento'));
+  console.log(chalk.yellow('  • !MonitorOff - Desativar monitoramento\n'));
   
   scheduleDailyReport();
   
