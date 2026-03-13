@@ -526,7 +526,7 @@ client.on("messageCreate", async (message) => {
     // RESPOSTA AUTOMÁTICA para outras mensagens na DM
     try {
       await message.reply({
-        content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}> `
+        content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}>. `
       });
       
       logInfo(`Mensagem automática enviada para ${message.author.tag} na DM`);
