@@ -1544,8 +1544,9 @@ async function handleButtonInteraction(interaction) {
   }
 }
 
+
 // ===============================
-// FUNÇÕES DO MENU INTERATIVO
+// MENU INTERATIVO NO CONSOLE
 // ===============================
 
 function showMenu() {
@@ -1553,18 +1554,17 @@ function showMenu() {
   isMenuActive = true;
   
   console.log(chalk.cyan('\n╔═══════════════════════════════════════════════════════╗'));
-  console.log(chalk.cyan('║                  𝙱𝙾𝚃 𝙼𝙾𝙳𝙴𝚁𝙰ÇÃ𝙾 𝚅𝟻.𝟶                        ║'));
+  console.log(chalk.cyan('║                  𝙷𝚘𝚜𝚝𝚅𝚒𝚕𝚕𝚎-𝙱𝙾𝚃 𝚅𝚎𝚛𝚜ã𝚘 𝟺.𝟷.𝟸                     ║'));
   console.log(chalk.cyan('╠═══════════════════════════════════════════════════════╣'));
   console.log(chalk.cyan('║  1.  Ver estatísticas detalhadas                                ║'));
   console.log(chalk.cyan('║  2.  Listar todos os servidores                                 ║'));
   console.log(chalk.cyan('║  3.  Ver membros de um servidor                                 ║'));
   console.log(chalk.cyan('║  4.  Enviar mensagem para canal                                 ║'));
-  console.log(chalk.cyan('║  5.  Ver status do monitoramento                                ║'));
+  console.log(chalk.cyan('║  5.  Atualizar dados                                            ║'));
   console.log(chalk.cyan('║  6.  Ver logs recentes                                          ║'));
   console.log(chalk.cyan('║  7.  Ver status do bot                                          ║'));
-  console.log(chalk.cyan('║  8.  Gerar relatório manual                                     ║'));
   console.log(chalk.cyan('║  0.  Sair                                                       ║'));
-  console.log(chalk.cyan('╚═══════════════════════════════════════════════════════╝'));
+  console.log(chalk.cyan('╚═════════════════════════𝚈𝟸𝚔═𝙽𝚊𝚝════════════════════════╝'));
   
   rl.question(chalk.yellow('\n👉 Escolha uma opção: '), (answer) => {
     isMenuActive = false;
