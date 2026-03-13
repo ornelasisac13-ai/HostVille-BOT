@@ -501,7 +501,7 @@ const helpCommand = {
       .addFields(
         { name: '/ping', value: 'Verifica a latência do bot', inline: false },
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
-        { name: '/adm', value: 'Acesso ao painel administrativo (Staff)', inline: false },
+        { name: '/adm', value: 'Acesso ao painel administrativo', inline: false },
         { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
         { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false }
       )
@@ -625,6 +625,34 @@ const reportCommand = {
 };
 
 // ===============================
+// FUNÇÃO PARA ENVIAR MENSAGEM EFÊMERA NA DM
+// ===============================
+async function sendEphemeralDM(user, content, options = {}) {
+  try {
+    // Tenta enviar como mensagem direta com flags efêmeras (só funciona em interações)
+    // Como é DM normal, não temos como fazer mensagem realmente efêmera,
+    // então vamos enviar e depois apagar após alguns segundos
+    const msg = await user.send(content);
+    
+    // Se tiver tempo para auto-apagar
+    if (options.deleteAfter) {
+      setTimeout(async () => {
+        try {
+          await msg.delete();
+        } catch (e) {
+          // Ignora erro se não conseguir apagar
+        }
+      }, options.deleteAfter);
+    }
+    
+    return msg;
+  } catch (error) {
+    logError(`Erro ao enviar mensagem efêmera: ${error.message}`);
+    return null;
+  }
+}
+
+// ===============================
 // EVENTO PRINCIPAL DE MENSAGENS (DM E MODERAÇÃO)
 // ===============================
 client.on("messageCreate", async (message) => {
@@ -640,11 +668,34 @@ client.on("messageCreate", async (message) => {
       const password = args[1];
       
       if (!password) {
-        return message.reply('❌ Use: `!MonitorOn ACCESS_CODE`');
+        await message.reply('❌ Use: `!MonitorOn ACCESS_CODE`');
+        // Apaga a mensagem de erro após 5 segundos
+        setTimeout(async () => {
+          try {
+            const msgs = await message.channel.messages.fetch({ limit: 2 });
+            for (const msg of msgs.values()) {
+              if (msg.author.id === client.user.id) {
+                await msg.delete();
+              }
+            }
+          } catch (e) {}
+        }, 5000);
+        return;
       }
       
       if (password !== CONFIG.ACCESS_CODE) {
-        return message.reply('❌ Código de acesso incorreto!');
+        await message.reply('❌ Código de acesso incorreto!');
+        setTimeout(async () => {
+          try {
+            const msgs = await message.channel.messages.fetch({ limit: 2 });
+            for (const msg of msgs.values()) {
+              if (msg.author.id === client.user.id) {
+                await msg.delete();
+              }
+            }
+          } catch (e) {}
+        }, 5000);
+        return;
       }
       
       // Criar botões para escolher ação
@@ -662,10 +713,18 @@ client.on("messageCreate", async (message) => {
             .setEmoji('🔍')
         );
       
-      await message.reply({
+      const reply = await message.reply({
         content: '🛡️ **Escolha uma opção para ATIVAR o monitoramento:**',
         components: [row]
       });
+      
+      // Apaga a mensagem do comando e a resposta após 2 minutos
+      setTimeout(async () => {
+        try {
+          await message.delete();
+          await reply.delete();
+        } catch (e) {}
+      }, 120000);
       
       return;
     }
@@ -676,11 +735,33 @@ client.on("messageCreate", async (message) => {
       const password = args[1];
       
       if (!password) {
-        return message.reply('❌ Use: `!MonitorOff Código de Acesso`');
+        await message.reply('❌ Use: `!MonitorOff ACCESS_CODE`');
+        setTimeout(async () => {
+          try {
+            const msgs = await message.channel.messages.fetch({ limit: 2 });
+            for (const msg of msgs.values()) {
+              if (msg.author.id === client.user.id) {
+                await msg.delete();
+              }
+            }
+          } catch (e) {}
+        }, 5000);
+        return;
       }
       
       if (password !== CONFIG.ACCESS_CODE) {
-        return message.reply('❌ Código de acesso incorreto!');
+        await message.reply('❌ Código de acesso incorreto!');
+        setTimeout(async () => {
+          try {
+            const msgs = await message.channel.messages.fetch({ limit: 2 });
+            for (const msg of msgs.values()) {
+              if (msg.author.id === client.user.id) {
+                await msg.delete();
+              }
+            }
+          } catch (e) {}
+        }, 5000);
+        return;
       }
       
       // Criar botões para escolher ação
@@ -698,10 +779,18 @@ client.on("messageCreate", async (message) => {
             .setEmoji('🔍')
         );
       
-      await message.reply({
+      const reply = await message.reply({
         content: '🛡️ **Escolha uma opção para DESATIVAR o monitoramento:**',
         components: [row]
       });
+      
+      // Apaga a mensagem do comando e a resposta após 2 minutos
+      setTimeout(async () => {
+        try {
+          await message.delete();
+          await reply.delete();
+        } catch (e) {}
+      }, 120000);
       
       return;
     }
@@ -715,16 +804,35 @@ client.on("messageCreate", async (message) => {
       
       // Verifica se a senha foi fornecida
       if (!password) {
-        return message.reply('❌ Use: `!clearAll Código de Acesso`');
+        const errorMsg = await message.reply('❌ Use: `!clearAll SUA_SENHA`');
+        setTimeout(async () => {
+          try {
+            await message.delete();
+            await errorMsg.delete();
+          } catch (e) {}
+        }, 5000);
+        return;
       }
       
       // Verifica senha
       if (password !== CONFIG.ACCESS_CODE) {
-        return message.reply('❌ Código de acesso incorreto!');
+        const errorMsg = await message.reply('❌ Código de acesso incorreto!');
+        setTimeout(async () => {
+          try {
+            await message.delete();
+            await errorMsg.delete();
+          } catch (e) {}
+        }, 5000);
+        return;
       }
       
+      // Apaga a mensagem do comando imediatamente
       try {
-        const processingMsg = await message.reply('🔄 Limpando mensagens de TODAS as DMs... Isso pode levar alguns minutos...');
+        await message.delete();
+      } catch (e) {}
+      
+      try {
+        const processingMsg = await message.channel.send('🔄 Limpando mensagens de TODAS as DMs... Isso pode levar alguns minutos...');
         
         let totalDeleted = 0;
         let totalChannels = 0;
@@ -771,18 +879,35 @@ client.on("messageCreate", async (message) => {
         
         await processingMsg.edit(`✅ **${totalDeleted} mensagens** do bot foram limpas de **${totalChannels} DMs**!`);
         
+        // Apaga a mensagem de processamento após 10 segundos
+        setTimeout(async () => {
+          try {
+            await processingMsg.delete();
+          } catch (e) {}
+        }, 10000);
+        
         logInfo(`${message.author.tag} limpou ${totalDeleted} mensagens de todas as DMs usando !clearAll`);
         
       } catch (error) {
         logError(`Erro ao limpar todas as DMs: ${error.message}`);
-        message.reply('❌ Erro ao limpar mensagens. Tente novamente.');
+        const errorMsg = await message.channel.send('❌ Erro ao limpar mensagens. Tente novamente.');
+        setTimeout(async () => {
+          try {
+            await errorMsg.delete();
+          } catch (e) {}
+        }, 5000);
       }
       
       return;
     }
     
-    // COMANDO !clear
+    // COMANDO !clear - TODAS AS MENSAGENS SÃO EFÊMERAS (APAGAM AUTOMATICAMENTE)
     if (message.content.startsWith('!clear')) {
+      
+      // Apaga a mensagem do comando imediatamente
+      try {
+        await message.delete();
+      } catch (e) {}
       
       try {
         // Cria botões para o usuário confirmar
@@ -798,7 +923,8 @@ client.on("messageCreate", async (message) => {
               .setStyle(ButtonStyle.Secondary)
           );
         
-        const confirmMsg = await message.reply({
+        // Envia mensagem de confirmação com botões
+        const confirmMsg = await message.channel.send({
           content: '⚠️ **Tem certeza que deseja limpar todas as mensagens desta DM?**',
           components: [row]
         });
@@ -817,6 +943,7 @@ client.on("messageCreate", async (message) => {
         collector.on('collect', async (interaction) => {
           try {
             if (interaction.customId === 'confirm_clear') {
+              // Atualiza a mensagem de confirmação
               await interaction.update({ content: '🔄 Limpando mensagens...', components: [] });
               
               let deletedCount = 0;
@@ -829,7 +956,7 @@ client.on("messageCreate", async (message) => {
                   if (fetchedMessages.size === 0) break;
                   
                   const deletableMessages = fetchedMessages.filter(msg => 
-                    msg.id !== confirmMsg.id && msg.id !== message.id
+                    msg.id !== confirmMsg.id // Não apaga a mensagem de confirmação atual
                   );
                   
                   if (deletableMessages.size === 0) break;
@@ -848,23 +975,46 @@ client.on("messageCreate", async (message) => {
                 
                 console.log(chalk.green.bgBlack.bold(`\n🧹 ${deletedCount} mensagens foram limpas do histórico da DM de ${message.author.tag}!`));
                 
-                await message.channel.send('✅ **Mensagens limpas com sucesso!**');
+                // Atualiza a mensagem de confirmação com sucesso
+                await interaction.editReply({ 
+                  content: '✅ **Mensagens limpas com sucesso!**',
+                  components: [] 
+                });
+                
+                // Apaga a mensagem de confirmação após 5 segundos
+                setTimeout(async () => {
+                  try {
+                    await confirmMsg.delete();
+                  } catch (e) {}
+                }, 5000);
                 
                 logInfo(`${message.author.tag} limpou ${deletedCount} mensagens na DM`);
                 
               } catch (error) {
                 logError(`Erro ao limpar DM: ${error.message}`);
-                await message.channel.send('❌ Erro ao limpar mensagens. Tente novamente.');
+                await interaction.editReply({ 
+                  content: '❌ Erro ao limpar mensagens. Tente novamente.',
+                  components: [] 
+                });
+                
+                setTimeout(async () => {
+                  try {
+                    await confirmMsg.delete();
+                  } catch (e) {}
+                }, 5000);
               }
               
             } else if (interaction.customId === 'cancel_clear') {
               await interaction.update({ content: '❌ Operação cancelada.', components: [] });
+              
+              setTimeout(async () => {
+                try {
+                  await confirmMsg.delete();
+                } catch (e) {}
+              }, 3000);
             }
           } catch (error) {
             logError(`Erro no coletor do !clear: ${error.message}`);
-            if (error.code === 10062) {
-              await message.channel.send('❌ Tempo esgotado. Operação cancelada.');
-            }
           }
         });
         
@@ -875,13 +1025,18 @@ client.on("messageCreate", async (message) => {
                 content: '⏰ Tempo esgotado. Operação cancelada.',
                 components: [] 
               });
+              
+              setTimeout(async () => {
+                try {
+                  await confirmMsg.delete();
+                } catch (e) {}
+              }, 3000);
             } catch (error) {}
           }
         });
         
       } catch (error) {
         logError(`Erro ao processar !clear: ${error.message}`);
-        message.reply('❌ Erro ao processar comando. Tente novamente.');
       }
       
       return;
@@ -889,9 +1044,16 @@ client.on("messageCreate", async (message) => {
     
     // RESPOSTA AUTOMÁTICA para outras mensagens na DM
     try {
-      await message.reply({
-        content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}>. `
+      const reply = await message.reply({
+        content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.STAFF_USER_ID}> `
       });
+      
+      // Apaga a resposta automática após 10 segundos
+      setTimeout(async () => {
+        try {
+          await reply.delete();
+        } catch (e) {}
+      }, 10000);
       
       logInfo(`Mensagem automática enviada para ${message.author.tag} na DM`);
     } catch (error) {
@@ -929,7 +1091,7 @@ client.on("messageCreate", async (message) => {
       
       stats.messagesDeleted++;
 
-      await message.channel.send({
+      const warningMsg = await message.channel.send({
         embeds: [new EmbedBuilder()
           .setTitle('🚫 Mensagem Removida')
           .setDescription(`Sua mensagem foi removida por conter palavras ofensivas.`)
@@ -943,6 +1105,13 @@ client.on("messageCreate", async (message) => {
           .setTimestamp()
         ]
       });
+
+      // Apaga o aviso após 10 segundos
+      setTimeout(async () => {
+        try {
+          await warningMsg.delete();
+        } catch (e) {}
+      }, 10000);
 
       logModeration("Palavras ofensivas detectadas", message.author, message.content, message.channel, foundWord || "desconhecida");
 
@@ -993,10 +1162,10 @@ client.once('clientReady', async () => {
 
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
   console.log(chalk.yellow('  📝 COMANDOS NA DM:'));
-  console.log(chalk.yellow('  • !clear - Limpa mensagens da DM'));
-  console.log(chalk.yellow('  • !clearAll - Limpa TODAS as DMs'));
-  console.log(chalk.yellow('  • !MonitorOn - Ativar monitoramento'));
-  console.log(chalk.yellow('  • !MonitorOff - Desativar monitoramento\n'));
+  console.log(chalk.yellow('  • !clear - Limpa mensagens da DM (mensagens temporárias)'));
+  console.log(chalk.yellow('  • !clearAll SUA_SENHA - Limpa TODAS as DMs'));
+  console.log(chalk.yellow('  • !MonitorOn SUA_SENHA - Ativar monitoramento'));
+  console.log(chalk.yellow('  • !MonitorOff SUA_SENHA - Desativar monitoramento\n'));
   
   scheduleDailyReport();
   
@@ -1006,22 +1175,19 @@ client.once('clientReady', async () => {
 });
 
 // ===============================
-// HANDLER PARA BOTÕES DE MONITORAMENTO (CORRIGIDO)
+// HANDLER PARA BOTÕES DE MONITORAMENTO
 // ===============================
 async function handleMonitorButtons(interaction) {
-  // Responde imediatamente para evitar timeout
   await interaction.deferReply({ flags: 64 });
   
   try {
-    // Extrair ação do customId: monitor_all_on, monitor_select_off, etc
     const parts = interaction.customId.split('_');
-    const action = parts[1]; // 'all' ou 'select'
-    const state = parts[2]; // 'on' ou 'off'
+    const action = parts[1];
+    const state = parts[2];
     const isOn = state === 'on';
     const actionText = isOn ? 'ATIVAR' : 'DESATIVAR';
     
     if (action === 'all') {
-      // Ação para todos os servidores
       let count = 0;
       for (const [guildId, guild] of client.guilds.cache) {
         setServerMonitoring(guildId, isOn, interaction.user);
@@ -1036,11 +1202,16 @@ async function handleMonitorButtons(interaction) {
         embeds: [embed]
       });
       
+      // Apaga após 10 segundos
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 10000);
+      
     } else if (action === 'select') {
-      // Criar menu de seleção de servidores
       const options = [];
       
-      // Adicionar opções de servidores (máx 25)
       let count = 0;
       for (const [guildId, guild] of client.guilds.cache) {
         if (count >= 25) break;
@@ -1056,7 +1227,6 @@ async function handleMonitorButtons(interaction) {
         count++;
       }
       
-      // Se tiver mais de 25 servidores
       if (client.guilds.cache.size > 25) {
         options.push(
           new StringSelectMenuOptionBuilder()
@@ -1074,7 +1244,6 @@ async function handleMonitorButtons(interaction) {
       
       const row = new ActionRowBuilder().addComponents(selectMenu);
       
-      // Armazenar a ação pendente
       pendingActions.set(interaction.user.id, { 
         action: state,
         messageId: interaction.id 
@@ -1090,49 +1259,79 @@ async function handleMonitorButtons(interaction) {
     await interaction.editReply({ 
       content: '❌ Erro ao processar comando. Tente novamente.'
     });
+    
+    setTimeout(async () => {
+      try {
+        await interaction.deleteReply();
+      } catch (e) {}
+    }, 5000);
   }
 }
 
 // ===============================
-// HANDLER PARA SELEÇÃO DE SERVIDOR (CORRIGIDO)
+// HANDLER PARA SELEÇÃO DE SERVIDOR
 // ===============================
 async function handleServerSelection(interaction) {
-  // Responde imediatamente para evitar timeout
   await interaction.deferUpdate();
   
   try {
     const selectedValue = interaction.values[0];
-    const customId = interaction.customId; // select_server_on ou select_server_off
-    const state = customId.split('_')[2]; // 'on' ou 'off'
+    const customId = interaction.customId;
+    const state = customId.split('_')[2];
     
     const pending = pendingActions.get(interaction.user.id);
     
     if (!pending) {
-      return interaction.editReply({ 
+      await interaction.editReply({ 
         content: '❌ Esta seleção expirou. Use o comando novamente.',
         components: [] 
       });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+      
+      return;
     }
     
     const isOn = state === 'on';
     const actionText = isOn ? 'ATIVADO' : 'DESATIVADO';
     
     if (selectedValue === 'more') {
-      return interaction.editReply({ 
+      await interaction.editReply({ 
         content: '📌 **Use o comando novamente para ver mais servidores.**\nDigite `!MonitorOn` ou `!MonitorOff` novamente.',
         components: [] 
       });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+      
+      pendingActions.delete(interaction.user.id);
+      return;
     }
     
     const guild = client.guilds.cache.get(selectedValue);
     if (!guild) {
-      return interaction.editReply({ 
+      await interaction.editReply({ 
         content: '❌ Servidor não encontrado.',
         components: [] 
       });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+      
+      pendingActions.delete(interaction.user.id);
+      return;
     }
     
-    // Atualizar status
     setServerMonitoring(selectedValue, isOn, interaction.user);
     
     const embed = createStatusEmbed(guild, state, interaction.user);
@@ -1143,7 +1342,12 @@ async function handleServerSelection(interaction) {
       components: [] 
     });
     
-    // Limpar ação pendente
+    setTimeout(async () => {
+      try {
+        await interaction.deleteReply();
+      } catch (e) {}
+    }, 10000);
+    
     pendingActions.delete(interaction.user.id);
     
   } catch (error) {
@@ -1152,11 +1356,17 @@ async function handleServerSelection(interaction) {
       content: '❌ Erro ao processar seleção.',
       components: [] 
     });
+    
+    setTimeout(async () => {
+      try {
+        await interaction.deleteReply();
+      } catch (e) {}
+    }, 5000);
   }
 }
 
 // ===============================
-// EVENTO: INTERAÇÃO (BOTÕES E MENUS) - CORRIGIDO
+// EVENTO: INTERAÇÃO (BOTÕES E MENUS)
 // ===============================
 client.on('interactionCreate', async (interaction) => {
   try {
@@ -1201,25 +1411,27 @@ client.on('interactionCreate', async (interaction) => {
 
     // Handler para botões
     if (interaction.isButton()) {
-      // Botões do painel admin
       if (interaction.customId === 'stats' || interaction.customId === 'console' || interaction.customId === 'help') {
         await handleButtonInteraction(interaction);
         return;
       }
       
-      // Botões do !clear
       if (interaction.customId === 'confirm_clear' || interaction.customId === 'cancel_clear') {
-        // Esses botões são tratados pelo coletor no messageCreate
         return;
       }
       
-      // Botões de monitoramento
       if (interaction.customId.startsWith('monitor_')) {
         await handleMonitorButtons(interaction);
         return;
       }
       
       await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
     }
     
     // Handler para menus de seleção
@@ -1233,6 +1445,12 @@ client.on('interactionCreate', async (interaction) => {
     logError(`Erro geral no interactionCreate: ${error.message}`);
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({ content: '❌ Erro ao processar interação.', flags: 64 }).catch(() => {});
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
     }
   }
 });
@@ -1262,6 +1480,13 @@ async function handleButtonInteraction(interaction) {
 
       await interaction.reply({ embeds: [embed], flags: 64 });
       logInfo(`${interaction.user.tag} abriu estatísticas`);
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 15000);
+      
       break;
     }
 
@@ -1273,6 +1498,13 @@ async function handleButtonInteraction(interaction) {
       console.log(chalk.white(`Users:   ${client.users.cache.size}`));
       console.log(chalk.yellow('═════════════════════════════\n'));
       await interaction.reply({ content: '✅ Verifique o console!', flags: 64 });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+      
       break;
     }
 
@@ -1291,11 +1523,24 @@ async function handleButtonInteraction(interaction) {
 
       await interaction.reply({ embeds: [embed], flags: 64 });
       logInfo(`${interaction.user.tag} pediu ajuda no painel`);
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 15000);
+      
       break;
     }
 
     default:
       await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
   }
 }
 
