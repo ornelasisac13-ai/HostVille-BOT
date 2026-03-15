@@ -54,6 +54,9 @@ const CONFIG = {
 const serverMonitoring = new Map(); // Key: guildId, Value: boolean (true = monitoramento ativo)
 const pendingActions = new Map(); // Armazena ações pendentes para seleção de servidor
 
+// Lista de IDs de staff que NÃO serão moderados
+const staffIds = CONFIG.STAFF_USER_ID.split(',').map(id => id.trim().replace(/[<@>]/g, ''));
+
 const stats = {
   messagesDeleted: 0,
   warnsGiven: 0,
@@ -72,44 +75,386 @@ const stats = {
 };
 
 // ===============================
-// LISTA DE PALAVRAS OFENSIVAS
+// LISTA DE PALAVRAS OFENSIVAS (VERSÃO COMPLETA COM BURLAS)
 // ===============================
 const offensiveWords = [
-"idiota", "burro", "estúpido", "estupido", "retardado", "lixo",
-"merda", "fdp", "otário", "otario", "desgraçado", "desgracado",
-"vtnc", "imbecil", "inútil", "inutil",
-"arrombado", "viado", "bicha", "piranha", "prostituta", "corno", "babaca",
-"palhaço", "palhaco", "nojento", "escroto", "cretino", "canalha",
-"maldito", "peste", "verme", "trouxa", "otária", "otaria",
-"burra", "cacete", "caralho", "merdinha",
-"vagabundo", "vagabunda", "cuzao", "idiotinha", "fodido", "bosta",
-"porra", "prr", "poha", "krl", "krlh", "caramba",
-"fds", "foda", "fudeu", "fodase", "fodassi",
-"pqp", "puta", "vsf", "tnc", "tmnc", "cuzão", "cú", "cu",
-"buceta", "bct", "xota", "xoxota", "ppk", "perereca",
-"rapariga", "putinha", "putão", "putona", "puto",
-"b0sta", "bostinha", "inutel", "idiot4", "burrinho",
-"stupido", "estupida", "retardada", "nojenta", "escrota",
-"trouxinha", "verminoso", "pestinha", "cretina", "maldita",
-"corninho", "chifrudo", "vagaba", "piriguete",
-"viadinho", "boiola", "bichinha", "baitola",
-"sapatão", "sapata", "galinha", "cachorra", "cachorro",
-"vaca", "égua", "cabra", "mula", "jumento", "asno", "anta",
-"besta", "bocó", "boçal", "bronco", "ignorante", "analfabeto",
-"pilantra", "malandro", "safado", "tarado", "pervertido", "depravado",
-"asqueroso", "repugnante", "horrivel", "feio", "crápula", "infeliz",
-"miseravel", "coitado", "nulo", "aborto", "lixinho", "traste",
-"praga", "desgraça", "fudido", "lascado", "ferrado", "danado",
-"capeta", "demonio", "diabo", "satanás", "lucifer", "animal",
-"bicho", "monstro", "abominavel", "marginal", "delinquente",
-"criminoso", "bandido", "ladrão", "assaltante", "golpista",
-"enganador", "trapaceiro", "manipulador", "abusador",
-"abusado", "folgado", "atrevido", "arrogante", "pretensioso",
-"metido", "convencido", "soberbo", "orgulhoso", "vaidoso",
-"futil", "oco", "teimoso", "birrento",
-"pentelho", "maçante", "enfadonho", "mrd", "fudendo" , "merda", "fd", "carai", "crl", "crlh"
-];
+  // PALAVRAS BASE
+  "idiota", "burro", "estúpido", "estupido", "retardado", "lixo",
+  "merda", "fdp", "otário", "otario", "desgraçado", "desgracado",
+  "vtnc", "imbecil", "inútil", "inutil",
+  "arrombado", "viado", "bicha", "piranha", "prostituta", "corno", "babaca",
+  "palhaço", "palhaco", "nojento", "escroto", "cretino", "canalha",
+  "maldito", "peste", "verme", "trouxa", "otária", "otaria",
+  "burra", "cacete", "caralho", "merdinha",
+  "vagabundo", "vagabunda", "cuzao", "idiotinha", "fodido", "bosta",
+  "porra", "prr", "poha", "krl", "krlh", "caramba",
+  "fds", "foda", "fudeu", "fodase", "fodassi",
+  "pqp", "puta", "vsf", "tnc", "tmnc", "cuzão", "cú", "cu",
+  "buceta", "bct", "xota", "xoxota", "ppk", "perereca",
+  "rapariga", "putinha", "putão", "putona", "puto",
+  "b0sta", "bostinha", "inutel", "idiot4", "burrinho",
+  "stupido", "estupida", "retardada", "nojenta", "escrota",
+  "trouxinha", "verminoso", "pestinha", "cretina", "maldita",
+  "corninho", "chifrudo", "vagaba", "piriguete",
+  "viadinho", "boiola", "bichinha", "baitola",
+  "sapatão", "sapata", "galinha", "cachorra", "cachorro",
+  "vaca", "égua", "cabra", "mula", "jumento", "asno", "anta",
+  "besta", "bocó", "boçal", "bronco", "ignorante", "analfabeto",
+  "pilantra", "malandro", "safado", "tarado", "pervertido", "depravado",
+  "asqueroso", "repugnante", "horrivel", "feio", "crápula", "infeliz",
+  "miseravel", "coitado", "nulo", "aborto", "lixinho", "traste",
+  "praga", "desgraça", "fudido", "lascado", "ferrado", "danado",
+  "capeta", "demonio", "diabo", "satanás", "lucifer", "animal",
+  "bicho", "monstro", "abominavel", "marginal", "delinquente",
+  "criminoso", "bandido", "ladrão", "assaltante", "golpista",
+  "enganador", "trapaceiro", "manipulador", "abusador",
+  "abusado", "folgado", "atrevido", "arrogante", "pretensioso",
+  "metido", "convencido", "soberbo", "orgulhoso", "vaidoso",
+  "futil", "oco", "teimoso", "birrento",
+  "pentelho", "maçante", "enfadonho", "mrd", "merda",
 
+  // NOVAS PALAVRAS ADICIONADAS
+  "fodendo", "fudendo", "crl", "crlh", "caralho", "caralh0",
+  
+  // VARIAÇÕES DE PALAVRAS JÁ EXISTENTES
+  "fdp", "fdpc", "fdpta", "puta", "putinha", "putona", "putão", "putao",
+  "puto", "putinho", "putinha", "putaria", "putero", "puteiro",
+  "caralho", "karalho", "caralhu", "carai", "karai", "caraio", "karaio",
+  "porra", "porr@", "p0rr@", "p0rra", "purra", "purr@",
+  
+  // BURLAS COMUNS (SUBSTITUIÇÕES)
+  "id1ota", "idiota", "1d1ota", "id10ta", "idiot@", "1d10t@",
+  "burr0", "burb0", "burr@", "burb@", "burrinho",
+  "estup1d0", "estupido", "estup1d@", "estupida", "estupid0",
+  "retardad0", "ret4rd4d0", "ret@rd@d0", "retardado",
+  "merd@", "m3rd@", "m3rda", "m3rd4", "merd4", "m3rda",
+  "l1x0", "lix0", "l1x@", "lix@",
+  "fdp", "fdps", "fdpz", "fdpta",
+  
+  // PALAVRAS COM NÚMEROS (LEET SPEAK)
+  "1d10t4", "1d10ta", "1d10t@", "id10t4", "id10t@",
+  "burr0", "bu2r0", "bu2r0", "bu22o", "burr0",
+  "3stup1d0", "3stup1do", "3stup1d@", "3stupida",
+  "r3t4rd4d0", "r3tardad0", "r3t4rd4d@", "r3tardad@",
+  "m3rd4", "m3rda", "m3rd@", "m3rd4",
+  "c0rn0", "corno", "c0rn@", "corn@",
+  "v14d0", "viado", "v14d@", "viad@",
+  "b1ch4", "bicha", "b1ch@", "bicha",
+  "p1r4nh4", "piranha", "p1r4nh@", "piranha",
+  "pr0st1tut4", "prostituta", "pr0st1tut@", "prostituta",
+  
+  // PALAVRAS COM CARACTERES ESPECIAIS
+  "b@b@c@", "babaca", "b@b@c4", "babaca",
+  "p@lh@ç0", "palhaço", "p@lh@ç@", "palhaco",
+  "n0j3nt0", "nojento", "n0j3nt@", "nojenta",
+  "3scr0t0", "escroto", "3scr0t@", "escrota",
+  "cr3t1n0", "cretino", "cr3t1n@", "cretina",
+  "c4n4lh4", "canalha", "c4n4lh@", "canalha",
+  "m4ld1t0", "maldito", "m4ld1t@", "maldita",
+  "p3st3", "peste", "p3st3", "peste",
+  "v3rm3", "verme", "v3rm3", "verme",
+  "tr0ux4", "trouxa", "tr0ux@", "trouxa",
+  
+  // PALAVRAS OFENSIVAS ADICIONAIS
+  "arrombado", "arrombada", "arr0mbad0", "arr0mbad@",
+  "desgraçado", "desgraçada", "desgraçad0", "desgraçad@",
+  "desgracado", "desgracada", "desgracad0", "desgracad@",
+  "vagabundo", "vagabunda", "vagabund0", "vagabund@",
+  "vagaba", "v4g4b4", "v@g@b@",
+  "marginal", "m4rg1n4l", "m@rg1n@l",
+  "delinquente", "d3l1nqu3nt3", "d3l1nqu3nt3",
+  "criminoso", "criminosa", "cr1m1n0s0", "cr1m1n0s@",
+  "bandido", "bandida", "b4nd1d0", "b4nd1d@",
+  "ladrão", "ladra", "ladrona", "l4dr@0", "l4dr@",
+  "assaltante", "4ss4lt4nt3", "@ss@lt@nt3",
+  "golpista", "g0lp1st4", "g0lp1st@", "g0lpista",
+  "enganador", "enganadora", "3ng4n4d0r", "3ng4n4d0r@",
+  
+  // MAIS BURLAS COMUNS
+  "corno manso", "corn0 mans0", "c0rn0 m4ns0",
+  "chifrudo", "chifruda", "ch1frud0", "ch1frud@",
+  "otario", "otária", "otaria", "0t4r10", "0t4r14", "0t4ri0", "0t4ri@",
+  "babaca", "b4b4c4", "b@b@c@", "b4baca", "babak4",
+  "idiota", "1d10t4", "id10t4", "1d1ota", "idiot4",
+  "merda", "m3rd4", "merd4", "m3rda", "m3rd@", "m3rda",
+  "bosta", "b0st4", "bost4", "b0sta", "b0st@",
+  "porra", "p0rr4", "porr4", "p0rra", "p0rr@",
+  "caralho", "c4r4lh0", "karalho", "c4r4lh0", "caralh0",
+  "puta", "put4", "p@t@", "p4t4", "put@",
+  "cu", "cú", "c u", "c-u", "c.u", "kú", "ku",
+  "cuzão", "cuz4o", "cuz@0", "cuz4o", "cuzão",
+  
+  // PALAVRAS COMPOSTAS E EXPRESSÕES
+  "vai tomar no cu", "vtnc", "vai tnc", "vai tmnc",
+  "vai se foder", "vsf", "vai se fuder", "vai sf",
+  "foda se", "fodase", "foda-se", "f0da s3",
+  "pqp", "puta que pariu", "puta q pariu", "puta que me pariu",
+  "puta merda", "puta m3rd4", "p@t@ m3rd@",
+  
+  // VARIAÇÕES DE "FODER"
+  "foder", "fuder", "fode", "fude", "fodendo", "fudendo",
+  "fodido", "fudido", "fodida", "fudida", "f0d3r", "fud3r",
+  "f0d4", "fud4", "f0d3", "fud3", "fodao", "fudao",
+  
+  // NOVAS ADIÇÕES - MAIS XINGAMENTOS BURLADOS
+  "krl", "krlh", "crlh", "crl", "kralho", "k4r4lh0",
+  "fdp", "fdps", "fdpta", "fdpz", "fdp123", "fdpp",
+  "vsf", "vsfs", "vsfd", "vsff", "vsfz",
+  "tnc", "tmnc", "tnc", "tmnc", "tnc123",
+  "pqp", "pqpp", "pqpz", "pqp123", "pqvp",
+  "cu", "cú", "cuu", "c u", "c-u", "c.u", "kú", "ku",
+  "cuzão", "cuz4o", "cuz@0", "cuzão", "cuz4um",
+  "buceta", "bucet4", "buc3t4", "buc3ta", "buc3t@",
+  "bct", "bctz", "bct123", "bctt",
+  "xota", "xot4", "x0t4", "x0ta", "xot@",
+  "xoxota", "x0x0t4", "xox0ta", "x0x0t@",
+  "ppk", "ppkz", "ppk123", "ppkinha",
+  "perereca", "perer3c4", "pererec4", "p3r3r3c4",
+  "rapariga", "r4p4r1g4", "raparig4", "rap4r1g@",
+  
+  // PALAVRAS COM SUBSTITUIÇÃO DE LETRAS
+  "safado", "s4f4d0", "s4fad0", "s4f4d@", "safad0",
+  "tarado", "t4r4d0", "t4rad0", "t4r4d@", "tarad0",
+  "pervertido", "p3rv3rt1d0", "perv3rt1d0", "p3rvertido",
+  "depravado", "d3pr4v4d0", "depravad0", "d3pravad0",
+  "asqueroso", "4squ3r0s0", "asquer0s0", "4squeroso",
+  "repugnante", "r3pugn4nt3", "repugn4nt3", "repugnante",
+  "horrivel", "horr1v3l", "horrivel", "horr1v3l",
+  "nojento", "n0j3nt0", "n0jent0", "noj3nt0",
+  
+  // PALAVRAS COMUNS EM DISCORD
+  "lixo", "l1x0", "lixo", "l1x0", "lix0",
+  "merda", "m3rd4", "merd4", "m3rda", "m3rd@",
+  "bosta", "b0st4", "bost4", "b0sta", "b0st@",
+  "lixoso", "lix0s0", "l1x0s0", "lixos0",
+  "merdoso", "merd0s0", "m3rd0s0", "merdos0",
+  "bostao", "b0st4o", "bost4o", "bosta0",
+  
+  // MAIS VARIAÇÕES DE PALAVRAS JÁ EXISTENTES
+  "estupido", "3stup1d0", "estup1d0", "3stupido",
+  "estupida", "3stup1d4", "estup1d4", "3stupida",
+  "retardado", "r3t4rd4d0", "ret4rd4d0", "retardad0",
+  "retardada", "r3t4rd4d4", "ret4rd4d4", "retardad4",
+  "idiota", "1d10t4", "id10t4", "1d1ota", "idiot4",
+  "idiotice", "1d10t1c3", "id10t1c3", "idiotic3",
+  "imbecil", "1mb3c1l", "imb3c1l", "1mbecil",
+  "inutil", "1nutil", "1nút1l", "inut1l",
+  "inútil", "1nút1l", "inut1l", "1nutil",
+  
+  // PALAVRAS RELACIONADAS A GÊNERO/SEXUALIDADE (OFENSIVAS)
+  "viado", "v14d0", "viad0", "v14do",
+  "bicha", "b1ch4", "bich4", "b1cha",
+  "boiola", "bo1ol4", "b01ol4", "boiol4",
+  "baitola", "ba1tol4", "bait0l4", "baitola",
+  "sapatão", "s4p4t4o", "sapat4o", "s4patao",
+  "sapata", "s4p4t4", "sapat4", "s4pata",
+  "puto", "put0", "put0", "put0",
+  "putinha", "put1nh4", "putinh4", "put1nha",
+  "putona", "puton4", "put0n4", "putona",
+  
+  // PALAVRAS EM INGLÊS COMUNS
+  "fuck", "f_u_c_k", "f u c k", "f*ck", "f**k",
+  "shit", "sh1t", "sh1t", "shit",
+  "asshole", "assh0l3", "asshol3", "4ssh0l3",
+  "bitch", "b1tch", "b1tch", "bitch",
+  "motherfucker", "m0th3rfck3r", "m0therfucker", "mf",
+  "dick", "d1ck", "d1ck", "dick",
+  "pussy", "puss1", "puss1", "pus$y",
+  
+  // COMBINAÇÕES COMUNS
+  "vtnc", "vtnc", "v t n c", "v.t.n.c",
+  "tmnc", "tmnc", "t m n c", "t.m.n.c",
+  "pqp", "pqp", "p q p", "p.q.p",
+  "vsf", "vsf", "v s f", "v.s.f",
+  "fds", "fds", "f d s", "f.d.s",
+  "krl", "krl", "k r l", "k.r.l",
+  "crl", "crl", "c r l", "c.r.l",
+  "krlh", "krlh", "k r l h", "k.r.l.h",
+  "crlh", "crlh", "c r l h", "c.r.l.h",
+  
+  // MAIS VARIAÇÕES COM NÚMEROS
+  "c0rn0", "c0rn0", "c0rn0", "corn0",
+  "ch1frud0", "ch1frud0", "ch1frud0", "chifrud0",
+  "v4g4bund0", "v4g4bund0", "v4g4bund0", "vagabund0",
+  "v4g4bund4", "v4g4bund4", "v4g4bund4", "vagabund4",
+  "v4g4b4", "v4g4b4", "v4g4b4", "vagab4",
+  "c4rn3", "c4rn3", "c4rn3", "carne", // gíria
+  "0ss0", "0ss0", "0ss0", "osso", // gíria
+  
+  // EXPRESSÕES COMUNS
+  "vai tomar no cu", "vai tnc", "vai tmnc",
+  "vai se foder", "vai se fuder", "vsf",
+  "vai pra puta que pariu", "vai pra pqp",
+  "vai pro caralho", "vai pra casa do caralho",
+  "filho da puta", "fdp", "fdpc",
+  "filha da puta", "fdp", "fdpc",
+  "puta merda", "puta m3rd4",
+  "que merda", "q merda", "q m3rd4",
+  "que bosta", "q bosta", "q b0st4",
+  
+  // NOVAS ADIÇÕES - MAIS XINGAMENTOS BURLADOS
+  "f0d4-s3", "f0d4s3", "f0d4s3",
+  "f0d4", "fud4", "f0d4", "fud4",
+  "f0d1d0", "fud1d0", "f0d1d4", "fud1d4",
+  "f0d3nd0", "fud3nd0", "f0d3nd0", "fud3nd0",
+  "f0d3r", "fud3r", "f0d3r", "fud3r",
+  "c4r4lh0", "c4r4lh0", "kar4lh0", "k4r4lh0",
+  "c4r4i", "c4r4i", "kar4i", "k4r4i",
+  "c4r41", "c4r41", "kar41", "k4r41",
+  "p0rr4", "p0rr4", "p0rr4", "p0rr4",
+  "p0rr@", "p0rr@", "p0rr@", "p0rr@",
+  "prr", "prr", "prr", "prr",
+  "p0r4", "p0r4", "p0r4", "p0r4",
+  
+  // PALAVRAS OFENSIVAS EM OUTROS CONTEXTOS
+  "retardado mental", "ret4rd4d0 mental", "retardado m3nt4l",
+  "deficiente mental", "d3f1c13nt3 m3nt4l", "deficient3 m3nt4l",
+  "mongol", "mong0l", "m0ng0l", "mongol",
+  "mongolóide", "mong0l0id3", "mongoloide", "mong0loide",
+  "down", "down", "d0wn", "down", // ofensivo quando usado como xingamento
+  "autista", "aut1st4", "4ut1st4", "autista", // ofensivo quando usado como xingamento
+  
+  // PALAVRAS COMUNS EM JOGOS
+  "noob", "n00b", "n00b", "nub", "nub", "nb",
+  "novato", "n0v4t0", "novat0", "n0vato",
+  "lixo", "l1x0", "lixo", "l1x0",
+  "ruim", "ru1m", "r u i m", "r.u.i.m",
+  "péssimo", "p3ss1m0", "pess1m0", "p3ssimo",
+  
+  // PALAVRAS COM ACENTOS SUBSTITUÍDOS
+  "otário", "otario", "ot4rio", "otari0",
+  "otária", "otaria", "ot4ria", "otari4",
+  "idiota", "idiota", "idiot4", "idiot@",
+  "burro", "burro", "burr0", "burr@",
+  "estúpido", "estupido", "3stupido", "estup1do",
+  "estúpida", "estupida", "3stupida", "estup1da",
+  
+  // PALAVRAS COM CARACTERES ESPECIAIS (@, !, #, $, %, &, *)
+  "id!ot@", "id!0t@", "!d!0t@", "!diot@",
+  "b!ch@", "b!ch@", "b!ch@", "b!ch@",
+  "v!@d0", "v!@d0", "v!@d0", "v!@d0",
+  "c#r@lh0", "c#r@lh0", "c#r@lh0", "c#r@lh0",
+  "p#t@", "p#t@", "p#t@", "p#t@",
+  "m#rd@", "m#rd@", "m#rd@", "m#rd@",
+  "b#st@", "b#st@", "b#st@", "b#st@",
+  "c#z@0", "c#z@0", "c#z@0", "c#z@0",
+  
+  // PALAVRAS COM PONTUAÇÃO
+  "c.u", "c-u", "c_u", "c*u", "c+u", "c=u",
+  "c.u.z.ã.o", "c-u-z-ã-o", "c_u_z_ã_o",
+  "f.d.p", "f-d-p", "f_d_p", "f*d*p",
+  "v.s.f", "v-s-f", "v_s_f", "v*s*f",
+  "p.q.p", "p-q-p", "p_q_p", "p*q*p",
+  "c.r.l", "c-r-l", "c_r_l", "c*r*l",
+  "k.r.l", "k-r-l", "k_r_l", "k*r*l",
+  
+  // MAIS COMBINAÇÕES
+  "vtnc", "vtnc", "vtnc", "vtnc",
+  "tmnc", "tmnc", "tmnc", "tmnc",
+  "pqp", "pqp", "pqp", "pqp",
+  "vsf", "vsf", "vsf", "vsf",
+  "fds", "fds", "fds", "fds",
+  "krl", "krl", "krl", "krl",
+  "crl", "crl", "crl", "crl",
+  "krlh", "krlh", "krlh", "krlh",
+  "crlh", "crlh", "crlh", "crlh",
+  
+  // EXPRESSÕES COMUNS EM PORTUGUÊS
+  "vai pra casa do caralho", "vai pro caralho",
+  "vai pra puta que pariu", "vai pra pqp",
+  "vai tomar no cu", "vai tnc",
+  "vai se foder", "vai se fuder", "vsf",
+  "vai chupar uma rola", "vai chupar rola",
+  "chupa minha pica", "chupa pica",
+  "chupa meu pau", "chupa pau",
+  
+  // PALAVRAS DE CUNHO SEXUAL OFENSIVAS
+  "pau no seu cu", "pau no cu",
+  "rola no cu", "rola",
+  "pica", "pika", "pic4", "pik4",
+  "caralho", "karalho", "caralho",
+  "porra", "porra",
+  "merda", "merda",
+  
+  // MAIS VARIAÇÕES DE "FODER"
+  "fodeu", "fudeu", "fod3u", "fud3u",
+  "fode", "fude", "fod3", "fud3",
+  "fodendo", "fudendo", "fod3nd0", "fud3nd0",
+  "fodido", "fudido", "fod1d0", "fud1d0",
+  "fodida", "fudida", "fod1d4", "fud1d4",
+  "foder", "fuder", "fod3r", "fud3r",
+  "fodao", "fudao", "fod4o", "fud4o",
+  "fodona", "fudona", "fod0n4", "fud0n4",
+  
+  // PALAVRAS OFENSIVAS RELACIONADAS A ANIMAIS
+  "cachorro", "cachorra", "c4ch0rr0", "c4ch0rr4",
+  "vaca", "v4c4", "vaca", "v4c4",
+  "égua", "3gu4", "egua", "3gu4",
+  "cabra", "c4br4", "cabra", "c4br4",
+  "mula", "mul4", "mula", "mul4",
+  "jumento", "jum3nt0", "jument0", "jum3nt0",
+  "asno", "4sn0", "asno", "4sn0",
+  "anta", "4nt4", "anta", "4nt4",
+  "besta", "b3st4", "besta", "b3st4",
+  "animal", "4n1m4l", "animal", "4n1m4l",
+  "bicho", "b1ch0", "bicho", "b1ch0",
+  "monstro", "m0nstr0", "monstr0", "m0nstr0",
+  
+  // PALAVRAS COMUNS EM CONVERSAS
+  "lixo", "l1x0", "lixo", "l1x0",
+  "merda", "m3rd4", "merda", "m3rd4",
+  "bosta", "b0st4", "bosta", "b0st4",
+  "porcaria", "p0rc4r14", "porcaria", "p0rc4r14",
+  "nojeira", "n0j31r4", "nojeira", "n0j31r4",
+  "sujeira", "suj31r4", "sujeira", "suj31r4",
+  
+  // PALAVRAS EM INGLÊS COMUNS EM JOGOS
+  "noob", "n00b", "nub", "nb",
+  "newbie", "newb", "n3wb13", "n3wb",
+  "scrub", "scrub", "scrub", "scrub",
+  "trash", "tr4sh", "trash", "tr4sh",
+  "garbage", "g4rb4g3", "garbage", "g4rb4g3",
+  "cancer", "c4nc3r", "cancer", "c4nc3r",
+  
+  // MAIS EXPRESSÕES COMUNS
+  "vsf", "vsf", "v s f", "v s f",
+  "tnc", "tnc", "t n c", "t n c",
+  "tmnc", "tmnc", "t m n c", "t m n c",
+  "pqp", "pqp", "p q p", "p q p",
+  "fds", "fds", "f d s", "f d s",
+  "krl", "krl", "k r l", "k r l",
+  "crl", "crl", "c r l", "c r l",
+  "krlh", "krlh", "k r l h", "k r l h",
+  "crlh", "crlh", "c r l h", "c r l h",
+  "vtnc", "vtnc", "v t n c", "v t n c",
+  
+  // PALAVRAS COM SUBSTITUIÇÃO DE VOGAIS
+  "1d1ot4", "1d1ota", "1d1ot@", "1d1ota",
+  "b2rr2", "b2rro", "b2rr0", "b2rro",
+  "3st2p1d2", "3stup1d0", "3stup1do", "3stup1d0",
+  "r3t4rd4d2", "r3tardad0", "r3t4rd4d0", "r3tardad0",
+  "m3rd4", "m3rda", "m3rd@", "m3rda",
+  "b2st4", "b2sta", "b2st@", "b2sta",
+  "c2rn2", "c2rno", "c2rn0", "c2rno",
+  "v14d2", "v14do", "v14d0", "v14do",
+  "b1ch4", "b1cha", "b1ch@", "b1cha",
+  "p2rr4", "p2rra", "p2rr@", "p2rra",
+  "c4r4lh2", "c4r4lho", "c4r4lh0", "c4r4lho",
+  
+  // ÚLTIMAS ADIÇÕES - PALAVRAS BURLADAS DIFÍCEIS
+  "vtnc", "vtnc", "v.t.n.c", "v_t_n_c",
+  "tmnc", "tmnc", "t.m.n.c", "t_m_n_c",
+  "pqp", "pqp", "p.q.p", "p_q_p",
+  "vsf", "vsf", "v.s.f", "v_s_f",
+  "fds", "fds", "f.d.s", "f_d_s",
+  "krl", "krl", "k.r.l", "k_r_l",
+  "crl", "crl", "c.r.l", "c_r_l",
+  "krlh", "krlh", "k.r.l.h", "k_r_l_h",
+  "crlh", "crlh", "c.r.l.h", "c_r_l_h",
+  "fdp", "fdp", "f.d.p", "f_d_p",
+  "fdpc", "fdpc", "f.d.p.c", "f_d_p_c",
+  "fdpta", "fdpta", "f.d.p.t.a", "f_d_p_t_a"
+];
 // ===============================
 // FUNÇÕES DE LOG PERSONALIZADAS
 // ===============================
@@ -346,6 +691,13 @@ function isAdmin(member) {
   return member.roles.cache.some(role => 
     CONFIG.adminRoles.includes(role.id) || CONFIG.adminRoles.includes(role.name)
   );
+}
+
+// ===============================
+// FUNÇÃO PARA VERIFICAR SE O USUÁRIO É STAFF (NÃO SERÁ MODERADO)
+// ===============================
+function isStaff(userId) {
+  return staffIds.includes(userId);
 }
 
 // ===============================
@@ -1124,6 +1476,11 @@ client.on("messageCreate", async (message) => {
     return;
   }
   
+  // VERIFICAR SE O USUÁRIO É STAFF (NÃO MODERAR)
+  if (isStaff(message.author.id)) {
+    return; // Staff não é moderado
+  }
+  
   if (isAdmin(message.member)) return;
 
   if (containsOffensiveWord(message.content)) {
@@ -1176,7 +1533,7 @@ client.on("messageCreate", async (message) => {
 });
 
 // ===============================
-// EVENTO: BOT PRONTO
+// EVENTO: BOT PRONTO (MANTIDO IGUAL)
 // ===============================
 client.once('ready', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
