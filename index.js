@@ -301,21 +301,36 @@ function scheduleDailyReport() {
 }
 
 // ===============================
-// FUNÇÃO PARA CHECAR PALAVRAS OFENSIVAS
+// FUNÇÃO PARA CHECAR PALAVRAS OFENSIVAS (VERSÃO MELHORADA)
 // ===============================
 function containsOffensiveWord(text) {
   if (!text) return false;
-  const msg = text.toLowerCase();
-  return offensiveWords.some(word => msg.includes(word));
+  
+  const textLower = text.toLowerCase();
+  
+  // Usa regex com limites de palavra (\b) para detectar apenas palavras completas
+  return offensiveWords.some(word => {
+    const regex = new RegExp(`\\b${word}\\b`, 'i');
+    return regex.test(textLower);
+  });
 }
 
 // ===============================
-// FUNÇÃO PARA ENCONTRAR A PALAVRA OFENSIVA
+// FUNÇÃO PARA ENCONTRAR A PALAVRA OFENSIVA (VERSÃO MELHORADA)
 // ===============================
 function findOffensiveWord(text) {
   if (!text) return null;
-  const msg = text.toLowerCase();
-  return offensiveWords.find(word => msg.includes(word));
+  
+  const textLower = text.toLowerCase();
+  
+  for (const word of offensiveWords) {
+    const regex = new RegExp(`\\b${word}\\b`, 'i');
+    if (regex.test(textLower)) {
+      return word;
+    }
+  }
+  
+  return null;
 }
 
 // ===============================
