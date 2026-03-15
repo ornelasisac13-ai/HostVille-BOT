@@ -107,7 +107,7 @@ const offensiveWords = [
 "abusado", "folgado", "atrevido", "arrogante", "pretensioso",
 "metido", "convencido", "soberbo", "orgulhoso", "vaidoso",
 "futil", "oco", "teimoso", "birrento",
-"pentelho", "maçante", "enfadonho", "mrd", "merda"
+"pentelho", "maçante", "enfadonho", "mrd", "fudendo" , "merda", "fd", "carai", "crl", "crlh"
 ];
 
 // ===============================
