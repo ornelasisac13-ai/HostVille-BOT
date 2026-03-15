@@ -38,7 +38,7 @@ const client = new Client({
 });
 
 // ===============================
-// CONFIGURAÇÕES GERAIS (UMA ÚNICA VEZ!)
+// CONFIGURAÇÕES GERAIS
 // ===============================
 const CONFIG = {
   logChannelId: process.env.LOG_CHANNEL_ID || "",
@@ -48,17 +48,6 @@ const CONFIG = {
   OWNER_ID: process.env.OWNER_ID || "", // <-- ADICIONE AQUI, NÃO CRIE OUTRO CONFIG
   DAILY_REPORT_TIME: process.env.DAILY_REPORT_TIME || "08:00",
 };
-// ===============================
-// CONFIGURAÇÕES GERAIS
-// ===============================
-const CONFIG = {
-  logChannelId: process.env.LOG_CHANNEL_ID || "",
-  adminRoles: process.env.ADMIN_ROLES ? process.env.ADMIN_ROLES.split(',') : [],
-  ACCESS_CODE: process.env.ACCESS_CODE || "1234",
-  STAFF_USER_ID: process.env.STAFF_USER_ID || "Y2k_Nat",
-  DAILY_REPORT_TIME: process.env.DAILY_REPORT_TIME || "08:00",
-};
-
 // ===============================
 // VARIÁVEIS GLOBAIS
 // ===============================
