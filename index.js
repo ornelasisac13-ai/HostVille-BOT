@@ -252,8 +252,8 @@ const offensiveWords = [
   "putinha", "put1nh4", "putinh4", "put1nha",
   "putona", "puton4", "put0n4", "putona",
   
-  // PALAVRAS EM INGLÊS COMUNS
-  "fuck", "f_u_c_k", "f u c k", "f*ck", "f**k",
+// PALAVRAS EM INGLÊS COMUNS
+"fuck", "f_u_c_k", "f u c k", "fuck", "fck", "fk",
   "shit", "sh1t", "sh1t", "shit",
   "asshole", "assh0l3", "asshol3", "4ssh0l3",
   "bitch", "b1tch", "b1tch", "bitch",
