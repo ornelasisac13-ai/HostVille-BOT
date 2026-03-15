@@ -212,10 +212,13 @@ async function generateDailyReport() {
       }
     )
     .setFooter({ 
-      text: `Relatório gerado automaticamente • ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
+      text: `Relatório gerado automaticamente • Hoje às ${new Date().toLocaleTimeString('pt-BR', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        timeZone: 'America/Sao_Paulo' 
+      })}`,
       iconURL: client.user.displayAvatarURL()
-    })
-    .setTimestamp();
+    });
 
   return reportEmbed;
 }
@@ -626,13 +629,49 @@ const reportCommand = {
     
     const reportEmbed = await generateDailyReport();
     
+    // Enviar para cada staff na DM (sem auto-delete)
+    const staffIds = CONFIG.STAFF_USER_ID.split(',');
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const staffId of staffIds) {
+      const staffIdTrimmed = staffId.trim();
+      const cleanId = staffIdTrimmed.replace(/[<@>]/g, '');
+      
+      try {
+        const staffUser = await client.users.fetch(cleanId);
+        if (staffUser) {
+          await staffUser.send({ 
+            content: '📊 **Relatório Manual do Bot**',
+            embeds: [reportEmbed] 
+          });
+          successCount++;
+          logInfo(`📊 Relatório manual enviado para ${staffUser.tag}`);
+        }
+      } catch (err) {
+        failCount++;
+        logError(`Erro ao enviar relatório manual para ${cleanId}: ${err.message}`);
+      }
+    }
+    
+    // Também enviar para o canal de logs se configurado
+    if (CONFIG.logChannelId) {
+      const logChannel = await client.channels.fetch(CONFIG.logChannelId).catch(() => null);
+      if (logChannel) {
+        await logChannel.send({ 
+          content: '📊 **Relatório Manual do Bot**',
+          embeds: [reportEmbed] 
+        });
+      }
+    }
+    
+    // Confirmar para quem usou o comando
     await interaction.followUp({
-      content: '📊 **Relatório Atual:**',
-      embeds: [reportEmbed],
+      content: `✅ Relatório gerado e enviado para **${successCount} staff(s)**${failCount > 0 ? ` (${failCount} falhas)` : ''}`,
       flags: 64
     });
     
-    logInfo(`${interaction.user.tag} gerou relatório manual`);
+    logInfo(`${interaction.user.tag} gerou relatório manual (enviado para ${successCount} staffs)`);
     
     // Registrar comando usado
     stats.commandsUsed['report'] = (stats.commandsUsed['report'] || 0) + 1;
@@ -1139,7 +1178,7 @@ client.on("messageCreate", async (message) => {
 // ===============================
 // EVENTO: BOT PRONTO
 // ===============================
-client.once('clientReady', async () => {
+client.once('ready', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
