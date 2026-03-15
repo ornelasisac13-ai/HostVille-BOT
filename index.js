@@ -41,12 +41,12 @@ const client = new Client({
 // CONFIGURAÇÕES GERAIS
 // ===============================
 const CONFIG = {
-  logChannelId: process.env.LOG_CHANNEL_ID || "",
+  logChannelId: process.env.LOG_CHANNEL_ID,
   adminRoles: process.env.ADMIN_ROLES ? process.env.ADMIN_ROLES.split(',') : [],
-  ACCESS_CODE: process.env.ACCESS_CODE || "1234",
-  STAFF_USER_ID: process.env.STAFF_USER_ID || "Y2k_Nat",
-  OWNER_ID: process.env.OWNER_ID || "", // <-- ADICIONE AQUI, NÃO CRIE OUTRO CONFIG
-  DAILY_REPORT_TIME: process.env.DAILY_REPORT_TIME || "08:00",
+  ACCESS_CODE: process.env.ACCESS_CODE,
+  STAFF_USER_ID: process.env.STAFF_USER_ID,
+  OWNER_ID: process.env.OWNER_ID,
+  DAILY_REPORT_TIME: process.env.DAILY_REPORT_TIME,
 };
 // ===============================
 // VARIÁVEIS GLOBAIS
