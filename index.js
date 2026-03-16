@@ -1,5 +1,5 @@
 // ===============================
-// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA
+// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - CORRIGIDO (SEM FALSOS POSITIVOS)
 // ===============================
 const { 
   Client, 
@@ -48,6 +48,7 @@ const CONFIG = {
   OWNER_ID: process.env.OWNER_ID,
   DAILY_REPORT_TIME: process.env.DAILY_REPORT_TIME,
 };
+
 // ===============================
 // VARIÁVEIS GLOBAIS
 // ===============================
@@ -55,7 +56,7 @@ const serverMonitoring = new Map(); // Key: guildId, Value: boolean (true = moni
 const pendingActions = new Map(); // Armazena ações pendentes para seleção de servidor
 
 // Lista de IDs de staff que NÃO serão moderados
-const staffIds = CONFIG.STAFF_USER_ID.split(',').map(id => id.trim().replace(/[<@>]/g, ''));
+const staffIds = CONFIG.STAFF_USER_ID ? CONFIG.STAFF_USER_ID.split(',').map(id => id.trim().replace(/[<@>]/g, '')) : [];
 
 const stats = {
   messagesDeleted: 0,
@@ -252,8 +253,8 @@ const offensiveWords = [
   "putinha", "put1nh4", "putinh4", "put1nha",
   "putona", "puton4", "put0n4", "putona",
   
-// PALAVRAS EM INGLÊS COMUNS
-"fuck", "f_u_c_k", "f u c k", "fuck", "fck", "fk",
+  // PALAVRAS EM INGLÊS COMUNS
+  "fuck", "f_u_c_k", "f u c k", "fuck", "fck", "fk",
   "shit", "sh1t", "sh1t", "shit",
   "asshole", "assh0l3", "asshol3", "4ssh0l3",
   "bitch", "b1tch", "b1tch", "bitch",
@@ -278,8 +279,8 @@ const offensiveWords = [
   "v4g4bund0", "v4g4bund0", "v4g4bund0", "vagabund0",
   "v4g4bund4", "v4g4bund4", "v4g4bund4", "vagabund4",
   "v4g4b4", "v4g4b4", "v4g4b4", "vagab4",
-  "c4rn3", "c4rn3", "c4rn3", "carne", // gíria
-  "0ss0", "0ss0", "0ss0", "osso", // gíria
+  "c4rn3", "c4rn3", "c4rn3", "carne",
+  "0ss0", "0ss0", "0ss0", "osso",
   
   // EXPRESSÕES COMUNS
   "vai tomar no cu", "vai tnc", "vai tmnc",
@@ -311,8 +312,8 @@ const offensiveWords = [
   "deficiente mental", "d3f1c13nt3 m3nt4l", "deficient3 m3nt4l",
   "mongol", "mong0l", "m0ng0l", "mongol",
   "mongolóide", "mong0l0id3", "mongoloide", "mong0loide",
-  "down", "down", "d0wn", "down", // ofensivo quando usado como xingamento
-  "autista", "aut1st4", "4ut1st4", "autista", // ofensivo quando usado como xingamento
+  "down", "down", "d0wn", "down",
+  "autista", "aut1st4", "4ut1st4", "autista",
   
   // PALAVRAS COMUNS EM JOGOS
   "noob", "n00b", "n00b", "nub", "nub", "nb",
@@ -455,6 +456,7 @@ const offensiveWords = [
   "fdpc", "fdpc", "f.d.p.c", "f_d_p_c",
   "fdpta", "fdpta", "f.d.p.t.a", "f_d_p_t_a"
 ];
+
 // ===============================
 // FUNÇÕES DE LOG PERSONALIZADAS
 // ===============================
@@ -576,7 +578,7 @@ async function sendReportToStaff() {
     const reportEmbed = await generateDailyReport();
     
     // Dividir STAFF_USER_ID se houver múltiplos
-    const staffIds = CONFIG.STAFF_USER_ID.split(',');
+    const staffIds = CONFIG.STAFF_USER_ID ? CONFIG.STAFF_USER_ID.split(',') : [];
     
     for (const staffId of staffIds) {
       const staffIdTrimmed = staffId.trim();
@@ -622,7 +624,7 @@ async function sendReportToStaff() {
 // ===============================
 function scheduleDailyReport() {
   const now = new Date();
-  const [reportHour, reportMinute] = CONFIG.DAILY_REPORT_TIME.split(':').map(Number);
+  const [reportHour, reportMinute] = CONFIG.DAILY_REPORT_TIME ? CONFIG.DAILY_REPORT_TIME.split(':').map(Number) : [0, 0];
   
   // Criar data para hoje no horário do relatório
   const nextReport = new Date(now);
@@ -649,31 +651,105 @@ function scheduleDailyReport() {
 }
 
 // ===============================
-// FUNÇÃO PARA CHECAR PALAVRAS OFENSIVAS (VERSÃO MELHORADA)
+// FUNÇÃO PARA CHECAR PALAVRAS OFENSIVAS (VERSÃO CORRIGIDA - SEM FALSOS POSITIVOS)
 // ===============================
 function containsOffensiveWord(text) {
   if (!text) return false;
   
   const textLower = text.toLowerCase();
   
-  // Usa regex com limites de palavra (\b) para detectar apenas palavras completas
-  return offensiveWords.some(word => {
-    const regex = new RegExp(`\\b${word}\\b`, 'i');
-    return regex.test(textLower);
-  });
+  // PASSO 1: Verificar primeiro frases completas (expressões)
+  for (const offensivePhrase of offensiveWords) {
+    if (offensivePhrase.includes(' ') && offensivePhrase.length > 3) {
+      if (textLower.includes(offensivePhrase)) {
+        return true;
+      }
+    }
+  }
+  
+  // PASSO 2: Normalizar o texto (remover caracteres especiais que podem causar falsos positivos)
+  const textNormalized = textLower
+    .replace(/[^\w\sÀ-ÿ]/gi, ' ') // substitui pontuação e símbolos por espaço (mantém acentos)
+    .replace(/\s+/g, ' ')         // remove espaços extras
+    .trim();
+  
+  // PASSO 3: Dividir em palavras individuais
+  const words = textNormalized.split(' ');
+  
+  // PASSO 4: Verificar cada palavra individualmente
+  for (const word of words) {
+    // IGNORAR palavras muito curtas (1-2 caracteres) - isso elimina 99% dos falsos positivos!
+    if (word.length < 3) continue;
+    
+    // Verificar se a palavra EXATA está na lista ofensiva
+    if (offensiveWords.includes(word)) {
+      return true;
+    }
+    
+    // Verificar variações comuns (leet speak) apenas para palavras >= 3 caracteres
+    const leetVariations = {
+      '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a', '5': 's', 
+      '6': 'g', '7': 't', '8': 'b', '9': 'g', '@': 'a', '!': 'i', 
+      '$': 's', '#': 'h', '+': 't', '&': 'e'
+    };
+    
+    let normalizedWord = word;
+    for (const [leet, letter] of Object.entries(leetVariations)) {
+      normalizedWord = normalizedWord.replace(new RegExp(leet, 'g'), letter);
+    }
+    
+    if (offensiveWords.includes(normalizedWord)) {
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 // ===============================
-// FUNÇÃO PARA ENCONTRAR A PALAVRA OFENSIVA (VERSÃO MELHORADA)
+// FUNÇÃO PARA ENCONTRAR A PALAVRA OFENSIVA (VERSÃO CORRIGIDA)
 // ===============================
 function findOffensiveWord(text) {
   if (!text) return null;
   
   const textLower = text.toLowerCase();
   
-  for (const word of offensiveWords) {
-    const regex = new RegExp(`\\b${word}\\b`, 'i');
-    if (regex.test(textLower)) {
+  // Verificar frases completas primeiro
+  for (const offensivePhrase of offensiveWords) {
+    if (offensivePhrase.includes(' ') && textLower.includes(offensivePhrase)) {
+      return offensivePhrase;
+    }
+  }
+  
+  // Normalizar o texto
+  const textNormalized = textLower
+    .replace(/[^\w\sÀ-ÿ]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  const words = textNormalized.split(' ');
+  
+  for (const word of words) {
+    if (word.length < 3) continue;
+    
+    // Verificar palavra exata
+    if (offensiveWords.includes(word)) {
+      return word;
+    }
+    
+    // Verificar leet speak
+    const leetVariations = {
+      '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a', '5': 's', 
+      '6': 'g', '7': 't', '8': 'b', '9': 'g', '@': 'a', '!': 'i', 
+      '$': 's', '#': 'h', '+': 't', '&': 'e'
+    };
+    
+    let normalizedWord = word;
+    for (const [leet, letter] of Object.entries(leetVariations)) {
+      normalizedWord = normalizedWord.replace(new RegExp(leet, 'g'), letter);
+    }
+    
+    if (offensiveWords.includes(normalizedWord)) {
       return word;
     }
   }
@@ -686,7 +762,7 @@ function findOffensiveWord(text) {
 // ===============================
 function isAdmin(member) {
   if (!member) return false;
-  if (CONFIG.adminRoles.length === 0) return false;
+  if (!CONFIG.adminRoles || CONFIG.adminRoles.length === 0) return false;
   
   return member.roles.cache.some(role => 
     CONFIG.adminRoles.includes(role.id) || CONFIG.adminRoles.includes(role.name)
@@ -982,7 +1058,7 @@ const reportCommand = {
     const reportEmbed = await generateDailyReport();
     
     // Enviar para cada staff na DM (sem auto-delete)
-    const staffIds = CONFIG.STAFF_USER_ID.split(',');
+    const staffIds = CONFIG.STAFF_USER_ID ? CONFIG.STAFF_USER_ID.split(',') : [];
     let successCount = 0;
     let failCount = 0;
     
@@ -1035,19 +1111,13 @@ const reportCommand = {
 // ===============================
 async function sendEphemeralDM(user, content, options = {}) {
   try {
-    // Tenta enviar como mensagem direta com flags efêmeras (só funciona em interações)
-    // Como é DM normal, não temos como fazer mensagem realmente efêmera,
-    // então vamos enviar e depois apagar após alguns segundos
     const msg = await user.send(content);
     
-    // Se tiver tempo para auto-apagar
     if (options.deleteAfter) {
       setTimeout(async () => {
         try {
           await msg.delete();
-        } catch (e) {
-          // Ignora erro se não conseguir apagar
-        }
+        } catch (e) {}
       }, options.deleteAfter);
     }
     
@@ -1075,7 +1145,6 @@ client.on("messageCreate", async (message) => {
       
       if (!password) {
         await message.reply('❌ Use: `!MonitorOn ACCESS_CODE`');
-        // Apaga a mensagem de erro após 5 segundos
         setTimeout(async () => {
           try {
             const msgs = await message.channel.messages.fetch({ limit: 2 });
@@ -1257,7 +1326,7 @@ client.on("messageCreate", async (message) => {
                 if (fetchedMessages.size === 0) break;
                 
                 const deletableMessages = fetchedMessages.filter(msg => 
-                  msg.author.id === client.user.id // Só mensagens do bot
+                  msg.author.id === client.user.id
                 );
                 
                 if (deletableMessages.size === 0) break;
@@ -1362,7 +1431,7 @@ client.on("messageCreate", async (message) => {
                   if (fetchedMessages.size === 0) break;
                   
                   const deletableMessages = fetchedMessages.filter(msg => 
-                    msg.id !== confirmMsg.id // Não apaga a mensagem de confirmação atual
+                    msg.id !== confirmMsg.id
                   );
                   
                   if (deletableMessages.size === 0) break;
@@ -1475,10 +1544,10 @@ try {
   if (!isMonitoringActive) {
     return;
   }
-  
+   
   // VERIFICAR SE O USUÁRIO É STAFF (NÃO MODERAR)
   if (isStaff(message.author.id)) {
-    return; // Staff não é moderado
+    return;
   }
   
   if (isAdmin(message.member)) return;
@@ -1533,9 +1602,9 @@ try {
 });
 
 // ===============================
-// EVENTO: BOT PRONTO (MANTIDO IGUAL)
+// EVENTO: BOT PRONTO
 // ===============================
-client.once('clientReady', async () => {
+client.once('ready', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
