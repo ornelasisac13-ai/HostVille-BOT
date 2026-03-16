@@ -1604,10 +1604,7 @@ try {
 // ===============================
 // EVENTO: BOT PRONTO
 // ===============================
-// ===============================
-// EVENTO: BOT PRONTO
-// ===============================
-client.once(clientReady, async () => {
+client.once('ready', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
@@ -1616,7 +1613,7 @@ client.once(clientReady, async () => {
   console.log(chalk.white(`   • Tag: ${client.user.tag}`));
   console.log(chalk.white(`   • ID: ${client.user.id}`));
   console.log(chalk.white(`   • Servidores: ${client.guilds.cache.size}`));
-  
+    
   // Inicializar monitoramento para todos os servidores (padrão: ativo)
   for (const guild of client.guilds.cache.values()) {
     serverMonitoring.set(guild.id, true);
