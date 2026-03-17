@@ -786,20 +786,19 @@ async function handleOwnerPanel(message) {
         inline: false 
       }
     )
-    .setFooter({ 
-  text: `Painel do Dono • ${new Date().toLocaleString('pt-BR', { 
-    timeZone: 'America/Sao_Paulo',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  }).replace(',', '')}`,
+    const dataBrasil = new Date().toLocaleString('pt-BR', { 
+  timeZone: 'America/Sao_Paulo',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit'
+});
+
+.setFooter({ 
+  text: `Painel do Dono • ${dataBrasil}`,
   iconURL: client.user.displayAvatarURL()
 })
-    .setTimestamp();
-
   // Criar botões
   const row = new ActionRowBuilder()
     .addComponents(
@@ -817,7 +816,7 @@ async function handleOwnerPanel(message) {
 
   // Enviar mensagem com embed e botões
   const panelMsg = await message.reply({
-    content: '✅ **Painel do Dono ativado!**',
+    content: '✅ **Onwer Panel**',
     embeds: [embed],
     components: [row]
   });
