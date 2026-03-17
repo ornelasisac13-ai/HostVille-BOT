@@ -787,28 +787,29 @@ async function handleOwnerPanel(message) {
       }
     )
     .setFooter({ 
-  text: `Hostville-bot@5.0.1`,
-  iconURL: client.user.displayAvatarURL()
-})
-.setTimestamp() // Isso vai mostrar "Hoje às 10:49" automaticamente
+      text: `Hostville-bot@5.0.1`,
+      iconURL: client.user.displayAvatarURL()
+    })
+    .setTimestamp();
+
   // Criar botões
   const row = new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
         .setCustomId('owner_turnoff')
         .setLabel('Turn Off')
-        .setStyle(ButtonStyle.Secondary) // Cinza
+        .setStyle(ButtonStyle.Secondary)
         .setEmoji('🔴'),
       new ButtonBuilder()
         .setCustomId('owner_moderation')
         .setLabel('Moderation')
-        .setStyle(ButtonStyle.Danger) // Vermelho
+        .setStyle(ButtonStyle.Danger)
         .setEmoji('🛡️')
     );
 
   // Enviar mensagem com embed e botões
   const panelMsg = await message.reply({
-    content: '✅ **Onwer Panel**',
+    content: '✅ **Owner Panel**',
     embeds: [embed],
     components: [row]
   });
@@ -1960,6 +1961,13 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.isButton()) {
+      // Botões de confirmação de desligamento
+      if (interaction.customId === 'confirm_shutdown' || interaction.customId === 'cancel_shutdown') {
+        // Esses botões são tratados pelo coletor no handleOwnerPanelButtons
+        // Então apenas ignoramos aqui para não dar conflito
+        return;
+      }
+      
       // Botões do painel do dono
       if (interaction.customId === 'owner_turnoff' || interaction.customId === 'owner_moderation') {
         await handleOwnerPanelButtons(interaction);
