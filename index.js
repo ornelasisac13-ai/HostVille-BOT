@@ -1679,7 +1679,7 @@ client.on("messageCreate", async (message) => {
 // ===============================
 // EVENTO: BOT PRONTO
 // ===============================
-client.once('ready', async () => {
+client.once('clientReady', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
