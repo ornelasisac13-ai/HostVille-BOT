@@ -81,7 +81,7 @@ const stats = {
 const offensiveWords = [
   // PALAVRAS BASE (TODAS LIMPAS, SEM REGEX INVÁLIDOS)
   "idiota", "burro", "estupido", "retardado", "lixo",
-  "merda", "fdp", "otario", "desgracado",
+  "merda", "fdp", "otario", "hilter", "sybau", "vsfd", "nazista", "nazismo", "perereca", "Stfu", "desgracado",
   "vtnc", "imbecil", "inutil", "arrombado", "viado", "bicha", 
   "piranha", "prostituta", "corno", "babaca", "palhaco", "nojento", 
   "escroto", "cretino", "canalha", "maldito", "peste", "verme", 
