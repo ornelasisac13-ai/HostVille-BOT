@@ -787,7 +787,7 @@ async function handleOwnerPanel(message) {
       }
     )
     .setFooter({ 
-  text: `Painel do Dono`,
+  text: `Hostville-bot@5.0.1`,
   iconURL: client.user.displayAvatarURL()
 })
 .setTimestamp() // Isso vai mostrar "Hoje às 10:49" automaticamente
