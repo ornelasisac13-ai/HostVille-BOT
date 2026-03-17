@@ -786,19 +786,11 @@ async function handleOwnerPanel(message) {
         inline: false 
       }
     )
-    const dataBrasil = new Date().toLocaleString('pt-BR', { 
-  timeZone: 'America/Sao_Paulo',
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit'
-});
-
-.setFooter({ 
-  text: `Painel do Dono • ${dataBrasil}`,
+    .setFooter({ 
+  text: `Painel do Dono`,
   iconURL: client.user.displayAvatarURL()
 })
+.setTimestamp() // Isso vai mostrar "Hoje às 10:49" automaticamente
   // Criar botões
   const row = new ActionRowBuilder()
     .addComponents(
