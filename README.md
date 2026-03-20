@@ -87,24 +87,29 @@ O **HostVille-Bot** é um assistente de moderação completo para Discord, desen
 ## 📦 Tecnologias Utilizadas
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white">
-  <img src="https://img.shields.io/badge/Discord.js-5865F2?style=for-the-badge&logo=discord&logoColor=white">
-  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black">
-  <img src="https://img.shields.io/badge/npm-CB3837?style=for-the-badge&logo=npm&logoColor=white">
+  <a href="https://nodejs.org/en">
+    <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white">
+  </a>
+  <a href="https://discord.js.org/">
+    <img src="https://img.shields.io/badge/Discord.js-5865F2?style=for-the-badge&logo=discord&logoColor=white">
+  </a>
+  <a href="https://www.javascript.com/">
+    <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black">
+  </a>
+  <a href="https://www.npmjs.com/">
+    <img src="https://img.shields.io/badge/npm-CB3837?style=for-the-badge&logo=npm&logoColor=white">
+  </a>
 </p>
 
-| Tecnologia | Versão | Finalidade |
-|------------|--------|------------|
-| Node.js | 16.9.0+ | Ambiente de execução |
-| discord.js | 14.14.0+ | Biblioteca para API do Discord |
-| dotenv | 16.3.1+ | Gerenciamento de variáveis de ambiente |
-| chalk | 4.1.2+ | Terminal colorido |
-| node-cron | 3.0.3+ | Agendamento de tarefas |
-| axios | 1.6.2+ | Requisições HTTP (backup) |
-| fs | nativo | Sistema de arquivos |
-
----
-
+| Tecnologia | Versão | Finalidade | Documentação |
+|------------|--------|------------|--------------|
+| Node.js | 16.9.0+ | Ambiente de execução | [🔗 Site Oficial](https://nodejs.org/en) |
+| discord.js | 14.14.0+ | Biblioteca para API do Discord | [🔗 Documentação](https://discord.js.org/) |
+| dotenv | 16.3.1+ | Gerenciamento de variáveis de ambiente | [🔗 npm](https://www.npmjs.com/package/dotenv) |
+| chalk | 4.1.2+ | Terminal colorido | [🔗 npm](https://www.npmjs.com/package/chalk) |
+| node-cron | 3.0.3+ | Agendamento de tarefas | [🔗 npm](https://www.npmjs.com/package/node-cron) |
+| axios | 1.6.2+ | Requisições HTTP (backup) | [🔗 npm](https://www.npmjs.com/package/axios) |
+| fs | nativo | Sistema de arquivos | [🔗 Node.js Docs](https://nodejs.org/api/fs.html) |
 ## ⚙️ Configuração do Ambiente
 
 ### 1. Clone o repositório
