@@ -9,7 +9,7 @@
 O **HostVille-Bot** é um assistente de moderação completo para Discord, desenvolvido em **Node.js** com a biblioteca **discord.js v14**. Ele oferece um sistema robusto de moderação com:
 
 - ✅ Monitoramento automático de mensagens ofensivas
-- ⚠️ Sistema de warns ultra completo (com expiração, templates e punições automáticas)
+- ⚠️ Sistema de warns
 - 🛡️ Painel administrativo com botões interativos
 - 👑 Painel exclusivo para o dono do bot
 - 📊 Relatórios diários automáticos
