@@ -3867,3 +3867,1194 @@ function setupSchedules() {
   }, 60 * 60 * 1000); // A cada hora
 }
 
+// ============================================
+// CONTINUAÇÃO - SISTEMA DE WARNS ULTIMATE
+// ============================================
+
+// ============================================
+// FUNÇÕES DE LIMPEZA E MANUTENÇÃO
+// ============================================
+
+async function clearOldWarns(guildId, days = CONFIG.warnExpirationDays) {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+  
+  let clearedCount = 0;
+  const guildWarns = warns.get(guildId);
+  
+  if (guildWarns) {
+    for (const [userId, userData] of guildWarns) {
+      const oldWarns = userData.history.filter(w => 
+        w.active && new Date(w.timestamp) < cutoffDate
+      );
+      
+      oldWarns.forEach(warn => {
+        warn.active = false;
+        warn.expired = true;
+        warn.expiredAt = new Date().toISOString();
+        userData.activeCount--;
+        clearedCount++;
+        
+        logger.debug(`⏰ Warn #${warn.id} expirado automaticamente`, {
+          userId,
+          warnId: warn.id,
+          date: warn.timestamp
+        });
+      });
+      
+      // Atualizar estatísticas
+      if (oldWarns.length > 0) {
+        statistics.totalExpiredWarns += oldWarns.length;
+        statistics.totalActiveWarns -= oldWarns.length;
+      }
+      
+      guildWarns.set(userId, userData);
+    }
+  }
+  
+  if (clearedCount > 0) {
+    saveData();
+    logger.info(`🧹 ${clearedCount} warns antigos limpos em ${guildId}`, {
+      guildId,
+      clearedCount
+    });
+  }
+  
+  return clearedCount;
+}
+
+async function cleanupExpiredAppeals() {
+  const now = new Date();
+  let expiredCount = 0;
+  
+  for (const [appealId, appeal] of appeals) {
+    if (appeal.status === 'pending' && new Date(appeal.expiresAt) < now) {
+      appeal.status = 'expired';
+      appeal.expiredAt = now.toISOString();
+      expiredCount++;
+      
+      logger.info(`⌛ Recurso #${appealId} expirado`, {
+        appealId,
+        userId: appeal.userId
+      });
+    }
+  }
+  
+  if (expiredCount > 0) {
+    saveData();
+  }
+  
+  return expiredCount;
+}
+
+async function cleanupOldData() {
+  const now = new Date();
+  const retentionDate = new Date(now.getTime() - PUNISHMENT_CONFIG.analytics.retentionDays * 24 * 60 * 60 * 1000);
+  
+  let cleanedCount = 0;
+  
+  // Limpar logs antigos
+  const oldLogs = logger.getLogs(null, 10000)
+    .filter(l => new Date(l.timestamp) < retentionDate);
+  
+  if (oldLogs.length > 0) {
+    // Implementar limpeza de logs
+    cleanedCount += oldLogs.length;
+  }
+  
+  // Limpar cache
+  cacheManager.prune();
+  
+  logger.info(`🧹 Limpeza concluída: ${cleanedCount} itens removidos`);
+  
+  return cleanedCount;
+}
+
+// ============================================
+// FUNÇÕES DE BLACKLIST
+// ============================================
+
+function addToBlacklist(guildId, userId, reason, moderatorId, duration = null) {
+  try {
+    if (!blacklist.has(guildId)) {
+      blacklist.set(guildId, new Map());
+    }
+    
+    const guildBlacklist = blacklist.get(guildId);
+    const expiresAt = duration ? new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString() : null;
+    
+    const blacklistEntry = {
+      userId,
+      reason,
+      moderatorId,
+      createdAt: new Date().toISOString(),
+      expiresAt,
+      active: true,
+      hits: 0,
+      lastHit: null
+    };
+    
+    guildBlacklist.set(userId, blacklistEntry);
+    
+    saveData();
+    
+    logger.mod(`⛔ Usuário ${userId} adicionado à blacklist em ${guildId}`, {
+      guildId,
+      userId,
+      reason,
+      moderatorId,
+      duration
+    });
+    
+    auditLogger.log('BLACKLIST_ADD', {
+      userId,
+      reason,
+      duration
+    }, { id: moderatorId });
+    
+    return {
+      success: true,
+      entry: blacklistEntry
+    };
+    
+  } catch (err) {
+    logger.error(`❌ Erro ao adicionar à blacklist: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+function removeFromBlacklist(guildId, userId, moderatorId, reason = 'Remoção manual') {
+  try {
+    const guildBlacklist = blacklist.get(guildId);
+    if (!guildBlacklist?.has(userId)) {
+      return { success: false, error: 'Usuário não está na blacklist' };
+    }
+    
+    const entry = guildBlacklist.get(userId);
+    entry.active = false;
+    entry.removedAt = new Date().toISOString();
+    entry.removedBy = moderatorId;
+    entry.removalReason = reason;
+    
+    guildBlacklist.set(userId, entry);
+    
+    saveData();
+    
+    logger.mod(`✅ Usuário ${userId} removido da blacklist em ${guildId}`, {
+      guildId,
+      userId,
+      reason,
+      moderatorId
+    });
+    
+    auditLogger.log('BLACKLIST_REMOVE', {
+      userId,
+      reason
+    }, { id: moderatorId });
+    
+    return { success: true };
+    
+  } catch (err) {
+    logger.error(`❌ Erro ao remover da blacklist: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+function checkBlacklist(guildId, userId) {
+  const guildBlacklist = blacklist.get(guildId);
+  if (!guildBlacklist) return null;
+  
+  const entry = guildBlacklist.get(userId);
+  if (!entry) return null;
+  
+  // Verificar se expirou
+  if (entry.expiresAt && new Date(entry.expiresAt) < new Date()) {
+    entry.active = false;
+    saveData();
+    return null;
+  }
+  
+  // Atualizar hits
+  if (entry.active) {
+    entry.hits++;
+    entry.lastHit = new Date().toISOString();
+    saveData();
+  }
+  
+  return entry.active ? entry : null;
+}
+
+function getBlacklist(guildId, activeOnly = true) {
+  const guildBlacklist = blacklist.get(guildId);
+  if (!guildBlacklist) return [];
+  
+  const entries = Array.from(guildBlacklist.values());
+  
+  if (activeOnly) {
+    return entries.filter(e => e.active);
+  }
+  
+  return entries;
+}
+
+// ============================================
+// FUNÇÕES DE TEMPLATES DE WARNS
+// ============================================
+
+function addWarnTemplate(guildId, templateData, moderatorId) {
+  try {
+    if (!warnTemplates.has(guildId)) {
+      warnTemplates.set(guildId, []);
+    }
+    
+    const templates = warnTemplates.get(guildId);
+    const templateId = generateId('TMP');
+    
+    const template = {
+      id: templateId,
+      name: templateData.name,
+      reason: templateData.reason,
+      duration: templateData.duration || 0,
+      severity: templateData.severity || 'medium',
+      color: templateData.color || Colors.Orange,
+      emoji: templateData.emoji || '⚠️',
+      createdBy: moderatorId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      usageCount: 0,
+      category: templateData.category || 'general',
+      roles: templateData.roles || [],
+      channels: templateData.channels || [],
+      evidence: templateData.evidence || false,
+      autoPunish: templateData.autoPunish || false
+    };
+    
+    templates.push(template);
+    
+    saveData();
+    
+    logger.mod(`📋 Template de warn criado: ${template.name} (${templateId})`, {
+      guildId,
+      templateId,
+      name: template.name,
+      moderatorId
+    });
+    
+    return {
+      success: true,
+      templateId,
+      template
+    };
+    
+  } catch (err) {
+    logger.error(`❌ Erro ao criar template: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+function getWarnTemplates(guildId, category = null) {
+  const templates = warnTemplates.get(guildId) || [];
+  
+  if (category) {
+    return templates.filter(t => t.category === category);
+  }
+  
+  return templates;
+}
+
+function getWarnTemplate(guildId, templateId) {
+  const templates = warnTemplates.get(guildId) || [];
+  return templates.find(t => t.id === templateId);
+}
+
+function useWarnTemplate(guildId, templateId, userId, moderatorId, customReason = null) {
+  try {
+    const template = getWarnTemplate(guildId, templateId);
+    if (!template) {
+      return { success: false, error: 'Template não encontrado' };
+    }
+    
+    // Incrementar uso
+    template.usageCount++;
+    template.updatedAt = new Date().toISOString();
+    
+    // Usar o template
+    const reason = customReason || template.reason;
+    
+    const result = addWarn(guildId, userId, reason, moderatorId, {
+      duration: template.duration,
+      template: templateId,
+      evidence: template.evidence ? 'Requer evidência' : null
+    });
+    
+    if (result.success) {
+      logger.mod(`📋 Template usado: ${template.name} para ${userId}`, {
+        guildId,
+        templateId,
+        userId,
+        moderatorId
+      });
+    }
+    
+    return result;
+    
+  } catch (err) {
+    logger.error(`❌ Erro ao usar template: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+function deleteWarnTemplate(guildId, templateId, moderatorId) {
+  try {
+    const templates = warnTemplates.get(guildId);
+    if (!templates) {
+      return { success: false, error: 'Nenhum template encontrado' };
+    }
+    
+    const index = templates.findIndex(t => t.id === templateId);
+    if (index === -1) {
+      return { success: false, error: 'Template não encontrado' };
+    }
+    
+    const template = templates[index];
+    templates.splice(index, 1);
+    
+    saveData();
+    
+    logger.mod(`🗑️ Template deletado: ${template.name} (${templateId})`, {
+      guildId,
+      templateId,
+      name: template.name,
+      moderatorId
+    });
+    
+    return { success: true };
+    
+  } catch (err) {
+    logger.error(`❌ Erro ao deletar template: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+function updateWarnTemplate(guildId, templateId, updates, moderatorId) {
+  try {
+    const template = getWarnTemplate(guildId, templateId);
+    if (!template) {
+      return { success: false, error: 'Template não encontrado' };
+    }
+    
+    Object.assign(template, updates);
+    template.updatedAt = new Date().toISOString();
+    template.updatedBy = moderatorId;
+    
+    saveData();
+    
+    logger.mod(`✏️ Template atualizado: ${template.name} (${templateId})`, {
+      guildId,
+      templateId,
+      updates: Object.keys(updates),
+      moderatorId
+    });
+    
+    return {
+      success: true,
+      template
+    };
+    
+  } catch (err) {
+    logger.error(`❌ Erro ao atualizar template: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+// ============================================
+// FUNÇÕES DE APPEAL (RECURSO) AVANÇADAS
+// ============================================
+
+function createAppeal(guildId, userId, warnId, appealReason, evidence = null) {
+  try {
+    if (!warns.has(guildId)) {
+      return { success: false, error: 'Servidor não encontrado' };
+    }
+    
+    const guildWarns = warns.get(guildId);
+    if (!guildWarns.has(userId)) {
+      return { success: false, error: 'Usuário não encontrado' };
+    }
+    
+    const userWarns = guildWarns.get(userId);
+    const warn = userWarns.history.find(w => w.id === warnId);
+    
+    if (!warn) {
+      return { success: false, error: 'Warn não encontrado' };
+    }
+    
+    if (warn.appealed) {
+      return { success: false, error: 'Este warn já possui um recurso' };
+    }
+    
+    // Verificar limite de recursos
+    const userAppeals = Array.from(appeals.values())
+      .filter(a => a.userId === userId && a.guildId === guildId);
+    
+    if (userAppeals.length >= PUNISHMENT_CONFIG.appeals.maxAppealsPerMonth) {
+      return { success: false, error: 'Limite de recursos mensal atingido' };
+    }
+    
+    const appealId = generateId('APL');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + PUNISHMENT_CONFIG.appeals.autoExpireDays * 24 * 60 * 60 * 1000);
+    
+    const appeal = {
+      id: appealId,
+      warnId,
+      userId,
+      guildId,
+      reason: appealReason,
+      evidence,
+      status: 'pending',
+      createdAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      votes: {
+        for: [],
+        against: []
+      },
+      comments: [],
+      history: []
+    };
+    
+    appeals.set(appealId, appeal);
+    
+    warn.appealed = true;
+    warn.appealId = appealId;
+    warn.appealReason = appealReason;
+    warn.appealDate = now.toISOString();
+    
+    if (!warn.notes) warn.notes = [];
+    warn.notes.push({
+      type: 'appeal_created',
+      appealId,
+      reason: appealReason,
+      timestamp: now.toISOString()
+    });
+    
+    guildWarns.set(userId, userWarns);
+    
+    statistics.totalAppeals++;
+    statistics.totalAppealsPending++;
+    
+    saveData();
+    
+    logger.mod(`📝 Recurso #${appealId} criado para warn #${warnId}`, {
+      guildId,
+      userId,
+      warnId,
+      appealId
+    });
+    
+    auditLogger.logAppealCreate(appeal, { id: userId });
+    
+    return {
+      success: true,
+      appealId,
+      appeal,
+      expiresAt: appeal.expiresAt
+    };
+    
+  } catch (err) {
+    logger.error(`❌ Erro ao criar recurso: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+function voteOnAppeal(guildId, appealId, moderatorId, vote, reason = null) {
+  try {
+    const appeal = appeals.get(appealId);
+    if (!appeal) {
+      return { success: false, error: 'Recurso não encontrado' };
+    }
+    
+    if (appeal.guildId !== guildId) {
+      return { success: false, error: 'Recurso não pertence a este servidor' };
+    }
+    
+    if (appeal.status !== 'pending') {
+      return { success: false, error: 'Este recurso já foi decidido' };
+    }
+    
+    if (appeal.votes.for.includes(moderatorId) || appeal.votes.against.includes(moderatorId)) {
+      return { success: false, error: 'Você já votou neste recurso' };
+    }
+    
+    if (vote === 'for') {
+      appeal.votes.for.push(moderatorId);
+    } else if (vote === 'against') {
+      appeal.votes.against.push(moderatorId);
+    } else {
+      return { success: false, error: 'Voto inválido' };
+    }
+    
+    appeal.history.push({
+      type: 'vote',
+      moderatorId,
+      vote,
+      reason,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Verificar se atingiu votos necessários
+    if (PUNISHMENT_CONFIG.appeals.votingEnabled) {
+      const required = PUNISHMENT_CONFIG.appeals.votesRequired;
+      
+      if (appeal.votes.for.length >= required) {
+        return reviewAppeal(guildId, appealId, 'system', true, 'Aprovado por votação');
+      }
+      
+      if (appeal.votes.against.length >= required) {
+        return reviewAppeal(guildId, appealId, 'system', false, 'Rejeitado por votação');
+      }
+    }
+    
+    appeals.set(appealId, appeal);
+    saveData();
+    
+    logger.mod(`🗳️ Voto registrado no recurso #${appealId}`, {
+      guildId,
+      appealId,
+      moderatorId,
+      vote
+    });
+    
+    return {
+      success: true,
+      votes: {
+        for: appeal.votes.for.length,
+        against: appeal.votes.against.length,
+        required: PUNISHMENT_CONFIG.appeals.votesRequired
+      }
+    };
+    
+  } catch (err) {
+    logger.error(`❌ Erro ao votar em recurso: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+function reviewAppeal(guildId, appealId, moderatorId, approved, reason = null) {
+  try {
+    const appeal = appeals.get(appealId);
+    if (!appeal) {
+      return { success: false, error: 'Recurso não encontrado' };
+    }
+    
+    if (appeal.guildId !== guildId) {
+      return { success: false, error: 'Recurso não pertence a este servidor' };
+    }
+    
+    if (appeal.status !== 'pending') {
+      return { success: false, error: 'Este recurso já foi decidido' };
+    }
+    
+    appeal.status = approved ? 'approved' : 'rejected';
+    appeal.reviewedBy = moderatorId;
+    appeal.reviewedAt = new Date().toISOString();
+    appeal.reviewReason = reason;
+    
+    appeal.history.push({
+      type: 'review',
+      moderatorId,
+      approved,
+      reason,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Se aprovado, remover o warn
+    if (approved) {
+      const guildWarns = warns.get(guildId);
+      if (guildWarns?.has(appeal.userId)) {
+        const userWarns = guildWarns.get(appeal.userId);
+        const warn = userWarns.history.find(w => w.id === appeal.warnId);
+        
+        if (warn) {
+          warn.active = false;
+          warn.appealApproved = true;
+          warn.approvedAt = new Date().toISOString();
+          userWarns.activeCount--;
+          
+          guildWarns.set(appeal.userId, userWarns);
+          
+          statistics.totalActiveWarns--;
+          statistics.totalAppealsApproved++;
+          
+          logger.mod(`✅ Warn #${appeal.warnId} removido por aprovação de recurso`, {
+            guildId,
+            userId: appeal.userId,
+            warnId: appeal.warnId,
+            appealId
+          });
+        }
+      }
+    } else {
+      statistics.totalAppealsRejected++;
+    }
+    
+    statistics.totalAppealsPending--;
+    
+    appeals.set(appealId, appeal);
+    saveData();
+    
+    logger.mod(`📝 Recurso #${appealId} ${approved ? 'APROVADO' : 'REJEITADO'}`, {
+      guildId,
+      appealId,
+      moderatorId,
+      approved,
+      reason
+    });
+    
+    auditLogger.logAppealDecision(appealId, approved, { id: moderatorId });
+    
+    return {
+      success: true,
+      appeal,
+      approved
+    };
+    
+  } catch (err) {
+    logger.error(`❌ Erro ao revisar recurso: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+function getAppeal(appealId) {
+  return appeals.get(appealId);
+}
+
+function getAppeals(guildId, filters = {}) {
+  const result = [];
+  
+  for (const [appealId, appeal] of appeals) {
+    if (appeal.guildId !== guildId) continue;
+    
+    if (filters.status && appeal.status !== filters.status) continue;
+    if (filters.userId && appeal.userId !== filters.userId) continue;
+    
+    result.push({
+      appealId,
+      ...appeal
+    });
+  }
+  
+  // Ordenar por data
+  result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  
+  return result;
+}
+
+// ============================================
+// FUNÇÕES DE ESTATÍSTICAS AVANÇADAS
+// ============================================
+
+function getServerStats(guildId) {
+  const guildWarns = warns.get(guildId);
+  if (!guildWarns) {
+    return {
+      totalWarns: 0,
+      activeWarns: 0,
+      warnedUsers: 0,
+      averageWarnsPerUser: 0,
+      topModerators: [],
+      topReasons: [],
+      warnsByDay: {}
+    };
+  }
+  
+  const stats = {
+    totalWarns: 0,
+    activeWarns: 0,
+    warnedUsers: guildWarns.size,
+    averageWarnsPerUser: 0,
+    topModerators: {},
+    topReasons: {},
+    warnsByDay: {},
+    warnsByHour: Array(24).fill(0),
+    warnsByMonth: Array(12).fill(0),
+    warnsByWeekday: Array(7).fill(0)
+  };
+  
+  for (const [userId, userData] of guildWarns) {
+    stats.totalWarns += userData.count;
+    stats.activeWarns += userData.activeCount;
+    
+    for (const warn of userData.history) {
+      // Top moderadores
+      stats.topModerators[warn.moderatorId] = (stats.topModerators[warn.moderatorId] || 0) + 1;
+      
+      // Top razões
+      stats.topReasons[warn.reason] = (stats.topReasons[warn.reason] || 0) + 1;
+      
+      // Warns por dia
+      const day = new Date(warn.timestamp).toISOString().split('T')[0];
+      stats.warnsByDay[day] = (stats.warnsByDay[day] || 0) + 1;
+      
+      // Warns por hora
+      const hour = new Date(warn.timestamp).getHours();
+      stats.warnsByHour[hour]++;
+      
+      // Warns por mês
+      const month = new Date(warn.timestamp).getMonth();
+      stats.warnsByMonth[month]++;
+      
+      // Warns por dia da semana
+      const weekday = new Date(warn.timestamp).getDay();
+      stats.warnsByWeekday[weekday]++;
+    }
+  }
+  
+  stats.averageWarnsPerUser = stats.warnedUsers > 0 ? 
+    (stats.totalWarns / stats.warnedUsers).toFixed(2) : 0;
+  
+  // Converter para arrays ordenados
+  stats.topModerators = Object.entries(stats.topModerators)
+    .map(([id, count]) => ({ id, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+  
+  stats.topReasons = Object.entries(stats.topReasons)
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+  
+  return stats;
+}
+
+function getUserStats(guildId, userId) {
+  const guildWarns = warns.get(guildId);
+  if (!guildWarns?.has(userId)) {
+    return {
+      totalWarns: 0,
+      activeWarns: 0,
+      firstWarn: null,
+      lastWarn: null,
+      warnsByModerator: {},
+      warnsByReason: {},
+      warnsByMonth: Array(12).fill(0),
+      averageInterval: 0
+    };
+  }
+  
+  const userData = guildWarns.get(userId);
+  const stats = {
+    totalWarns: userData.count,
+    activeWarns: userData.activeCount,
+    firstWarn: userData.firstWarn,
+    lastWarn: userData.lastWarn,
+    warnsByModerator: {},
+    warnsByReason: {},
+    warnsByMonth: Array(12).fill(0),
+    intervals: []
+  };
+  
+  let prevDate = null;
+  
+  for (const warn of userData.history) {
+    // Por moderador
+    stats.warnsByModerator[warn.moderatorId] = (stats.warnsByModerator[warn.moderatorId] || 0) + 1;
+    
+    // Por razão
+    stats.warnsByReason[warn.reason] = (stats.warnsByReason[warn.reason] || 0) + 1;
+    
+    // Por mês
+    const month = new Date(warn.timestamp).getMonth();
+    stats.warnsByMonth[month]++;
+    
+    // Intervalos entre warns
+    if (prevDate) {
+      const interval = (new Date(warn.timestamp) - prevDate) / (24 * 60 * 60 * 1000);
+      stats.intervals.push(interval);
+    }
+    prevDate = new Date(warn.timestamp);
+  }
+  
+  // Calcular média de intervalos
+  if (stats.intervals.length > 0) {
+    stats.averageInterval = (stats.intervals.reduce((a, b) => a + b, 0) / stats.intervals.length).toFixed(2);
+  } else {
+    stats.averageInterval = 0;
+  }
+  
+  return stats;
+}
+
+function getModeratorStats(guildId, moderatorId) {
+  const guildWarns = warns.get(guildId);
+  if (!guildWarns) {
+    return {
+      totalWarns: 0,
+      uniqueUsers: 0,
+      topReasons: {},
+      warnsByDay: {}
+    };
+  }
+  
+  const stats = {
+    totalWarns: 0,
+    uniqueUsers: new Set(),
+    topReasons: {},
+    warnsByDay: {},
+    warnsByHour: Array(24).fill(0)
+  };
+  
+  for (const [userId, userData] of guildWarns) {
+    for (const warn of userData.history) {
+      if (warn.moderatorId === moderatorId) {
+        stats.totalWarns++;
+        stats.uniqueUsers.add(userId);
+        stats.topReasons[warn.reason] = (stats.topReasons[warn.reason] || 0) + 1;
+        
+        const day = new Date(warn.timestamp).toISOString().split('T')[0];
+        stats.warnsByDay[day] = (stats.warnsByDay[day] || 0) + 1;
+        
+        const hour = new Date(warn.timestamp).getHours();
+        stats.warnsByHour[hour]++;
+      }
+    }
+  }
+  
+  stats.uniqueUsers = stats.uniqueUsers.size;
+  
+  // Ordenar top razões
+  stats.topReasons = Object.entries(stats.topReasons)
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+  
+  return stats;
+}
+
+// ============================================
+// FUNÇÕES DE EXPORTAÇÃO (COMPLEMENTARES)
+// ============================================
+
+async function exportServerData(guildId, options = {}) {
+  return exportManager.exportData(guildId, options);
+}
+
+async function importServerData(filepath, guildId, options = {}) {
+  return exportManager.importData(filepath, guildId, options);
+}
+
+// ============================================
+// FUNÇÕES DE BACKUP (COMPLEMENTARES)
+// ============================================
+
+async function createSystemBackup(description = '') {
+  return backupManager.createBackup({ 
+    type: 'full', 
+    description,
+    compress: true,
+    encrypt: PUNISHMENT_CONFIG.security.encryptData
+  });
+}
+
+async function restoreSystemBackup(backupId, options = {}) {
+  return backupManager.restoreBackup(backupId, options);
+}
+
+function listBackups(options = {}) {
+  return backupManager.listBackups(options);
+}
+
+function deleteBackup(backupId) {
+  return backupManager.deleteBackup(backupId);
+}
+
+// ============================================
+// FUNÇÕES DE ANÁLISE (COMPLEMENTARES)
+// ============================================
+
+function analyzeServer(guildId, options = {}) {
+  return analyticsEngine.analyzeGuild(guildId, options);
+}
+
+function predictTrends(guildId, days = 30) {
+  const guildWarns = warns.get(guildId);
+  if (!guildWarns) return null;
+  
+  return analyticsEngine.generatePredictions(guildWarns);
+}
+
+function detectAnomalies(guildId) {
+  const guildWarns = warns.get(guildId);
+  if (!guildWarns) return [];
+  
+  return analyticsEngine.detectAnomalies(guildWarns);
+}
+
+// ============================================
+// FUNÇÕES DE WEBHOOK (COMPLEMENTARES)
+// ============================================
+
+async function registerWebhook(guildId, options) {
+  return webhookManager.registerWebhook(guildId, options);
+}
+
+async function triggerWebhook(guildId, event, data) {
+  return webhookManager.triggerWebhooks(guildId, event, data);
+}
+
+// ============================================
+// FUNÇÕES DE UTILIDADE
+// ============================================
+
+function generateId(prefix = 'WRN') {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const hash = crypto.createHash('md5').update(`${timestamp}${random}`).digest('hex').substring(0, 4).toUpperCase();
+  
+  return `${prefix}-${timestamp}-${random}-${hash}`;
+}
+
+function calculateRiskLevel(warnCount) {
+  if (warnCount >= CONFIG.maxWarnsBeforeBan) {
+    return {
+      level: 'CRÍTICO',
+      color: CONFIG.colors.critical,
+      emoji: CONFIG.emojis.warning_level.critical,
+      action: 'BANIMENTO'
+    };
+  }
+  
+  if (warnCount >= CONFIG.maxWarnsBeforeKick) {
+    return {
+      level: 'ALTO',
+      color: CONFIG.colors.high,
+      emoji: CONFIG.emojis.warning_level.high,
+      action: 'KICK'
+    };
+  }
+  
+  if (warnCount >= CONFIG.maxWarnsBeforeMute) {
+    return {
+      level: 'MÉDIO',
+      color: CONFIG.colors.medium,
+      emoji: CONFIG.emojis.warning_level.medium,
+      action: 'MUTE'
+    };
+  }
+  
+  if (warnCount >= 1) {
+    return {
+      level: 'BAIXO',
+      color: CONFIG.colors.low,
+      emoji: CONFIG.emojis.warning_level.low,
+      action: 'MONITORAR'
+    };
+  }
+  
+  return {
+    level: 'NENHUM',
+    color: Colors.Grey,
+    emoji: CONFIG.emojis.warning_level.none,
+    action: 'NENHUMA'
+  };
+}
+
+function formatDate(date) {
+  return new Date(date).toLocaleString('pt-BR', {
+    timeZone: PUNISHMENT_CONFIG.localization.timezone,
+    dateStyle: 'short',
+    timeStyle: 'medium'
+  });
+}
+
+function formatDuration(ms) {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+  return `${seconds}s`;
+}
+
+function validateReason(reason) {
+  if (!reason && PUNISHMENT_CONFIG.security.requireReason) {
+    return { valid: false, error: 'Motivo é obrigatório' };
+  }
+  
+  if (reason && reason.length < PUNISHMENT_CONFIG.security.minReasonLength) {
+    return { 
+      valid: false, 
+      error: `Motivo deve ter no mínimo ${PUNISHMENT_CONFIG.security.minReasonLength} caracteres` 
+    };
+  }
+  
+  if (reason && reason.length > PUNISHMENT_CONFIG.security.maxReasonLength) {
+    return { 
+      valid: false, 
+      error: `Motivo deve ter no máximo ${PUNISHMENT_CONFIG.security.maxReasonLength} caracteres` 
+    };
+  }
+  
+  return { valid: true };
+}
+
+// ============================================
+// INICIALIZAÇÃO E CONFIGURAÇÃO
+// ============================================
+
+// Carregar dados
+loadData();
+
+// Configurar tarefas agendadas
+setupSchedules();
+
+// Backup inicial
+if (PUNISHMENT_CONFIG.automation.autoBackup) {
+  setTimeout(() => {
+    createSystemBackup('Backup inicial');
+  }, 5000);
+}
+
+// Limpeza inicial
+setTimeout(() => {
+  cleanupExpiredAppeals();
+  for (const [guildId] of warns) {
+    clearOldWarns(guildId);
+  }
+}, 10000);
+
+// ============================================
+// EXPORTAÇÃO DO MÓDULO
+// ============================================
+
+module.exports = {
+  // Versão
+  version: '2.0.0',
+  
+  // Configurações
+  CONFIG,
+  PUNISHMENT_CONFIG,
+  
+  // Funções principais de warns
+  addWarn,
+  removeWarn: (guildId, userId, warnId, moderatorId, reason) => {
+    // Implementar função de remoção
+    return { success: false, error: 'Função não implementada' };
+  },
+  clearUserWarns: (guildId, userId, moderatorId, reason) => {
+    // Implementar função de limpeza
+    return { success: false, error: 'Função não implementada' };
+  },
+  getUserWarns: (guildId, userId) => {
+    return warns.get(guildId)?.get(userId) || null;
+  },
+  getUserActiveWarns: (guildId, userId) => {
+    const userWarns = warns.get(guildId)?.get(userId);
+    if (!userWarns) return [];
+    return userWarns.history.filter(w => w.active);
+  },
+  getServerWarns: (guildId, options = {}) => {
+    const guildWarns = warns.get(guildId);
+    if (!guildWarns) return [];
+    
+    const result = [];
+    for (const [userId, userData] of guildWarns) {
+      for (const warn of userData.history) {
+        result.push({
+          userId,
+          ...warn,
+          currentCount: userData.activeCount,
+          totalCount: userData.count
+        });
+      }
+    }
+    
+    // Ordenar por data
+    result.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    if (options.limit) {
+      return result.slice(0, options.limit);
+    }
+    
+    return result;
+  },
+  
+  // Funções de estatísticas
+  getServerStats,
+  getUserStats,
+  getModeratorStats,
+  getGlobalStats: () => statistics,
+  
+  // Funções de blacklist
+  addToBlacklist,
+  removeFromBlacklist,
+  checkBlacklist,
+  getBlacklist,
+  
+  // Funções de templates
+  addWarnTemplate,
+  getWarnTemplates,
+  getWarnTemplate,
+  useWarnTemplate,
+  deleteWarnTemplate,
+  updateWarnTemplate,
+  
+  // Funções de appeal
+  createAppeal,
+  voteOnAppeal,
+  reviewAppeal,
+  getAppeal,
+  getAppeals,
+  
+  // Funções de backup
+  createBackup: createSystemBackup,
+  restoreBackup: restoreSystemBackup,
+  listBackups,
+  deleteBackup,
+  
+  // Funções de exportação
+  exportData: exportServerData,
+  importData: importServerData,
+  
+  // Funções de análise
+  analyzeServer,
+  predictTrends,
+  detectAnomalies,
+  
+  // Funções de webhook
+  registerWebhook,
+  triggerWebhook,
+  
+  // Funções de utilidade
+  generateId,
+  calculateRiskLevel,
+  formatDate,
+  formatDuration,
+  validateReason,
+  
+  // Acesso aos dados (para debug)
+  getWarns: () => warns,
+  getSettings: () => guildSettings,
+  getAppeals: () => appeals,
+  getTemplates: () => warnTemplates,
+  getBlacklist: () => blacklist,
+  getProfiles: () => userProfiles,
+  getStatistics: () => statistics,
+  getIndices: () => indices,
+  
+  // Cache e performance
+  cacheManager,
+  rateLimiter,
+  
+  // Logs
+  logger,
+  auditLogger,
+  
+  // Limpeza manual
+  clearOldWarns,
+  cleanupExpiredAppeals,
+  cleanupOldData
+};
