@@ -26,7 +26,7 @@ O **HostVille-Bot** é um assistente de moderação completo para Discord, desen
 - Staff é isenta de moderação automática
 - Logs detalhados no terminal
 
-### ⚠️ Sistema de Warns Ultra Completo
+### ⚠️ Sistema de Warns
 - Adicionar warns com motivo e duração personalizada
 - Remover warns específicos
 - Limpar todos os warns de um usuário
