@@ -1,4 +1,17 @@
-# HostVille-BOT# 🛡️ HostVille-Bot - Sistema Completo de Moderação
+<p align="center">
+  <img src="https://img.sanishtech.com/u/c788a601e91b29055a60cbcf765469bf.png" alt="HostVille-BOT Banner" width="100%">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-5.0.1-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/node-16.9%2B-green.svg" alt="Node.js">
+  <img src="https://img.shields.io/badge/discord.js-v14.14.0-blue.svg" alt="Discord.js">
+  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
+  <img src="https://img.shields.io/badge/status-online-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/warns%20system-v2.0.0-orange.svg" alt="Warns System">
+</p>
+
+# 🛡️ HostVille-Bot - Sistema Completo de Moderação
 
 **Versão 5.0.1** - Bot de moderação avançado para Discord com sistema de warns ultra completo, monitoramento de mensagens e painel administrativo.
 
@@ -9,7 +22,7 @@
 O **HostVille-Bot** é um assistente de moderação completo para Discord, desenvolvido em **Node.js** com a biblioteca **discord.js v14**. Ele oferece um sistema robusto de moderação com:
 
 - ✅ Monitoramento automático de mensagens ofensivas
-- ⚠️ Sistema de warns
+- ⚠️ Sistema de warns ultra completo
 - 🛡️ Painel administrativo com botões interativos
 - 👑 Painel exclusivo para o dono do bot
 - 📊 Relatórios diários automáticos
@@ -20,46 +33,65 @@ O **HostVille-Bot** é um assistente de moderação completo para Discord, desen
 
 ## 🚀 Funcionalidades Principais
 
-### 🛡️ Moderação Automática
-- Detecta e remove automaticamente mensagens com palavras ofensivas
-- Sistema de leet speak (ex: "v4i t0m4r n0 cU")
-- Staff é isenta de moderação automática
-- Logs detalhados no terminal
-
-### ⚠️ Sistema de Warns
-- Adicionar warns com motivo e duração personalizada
-- Remover warns específicos
-- Limpar todos os warns de um usuário
-- Verificar histórico de warns
-- Estatísticas de warns (global e por servidor)
-- Templates de warns pré-definidos
-- Punições automáticas por quantidade de warns
-- Sistema de blacklist
-- Backup manual de dados
-
-### 👑 Painel do Dono
-- Acesso exclusivo via comando `Hello` na DM
-- Desligamento remoto do bot
-- Gerenciamento de monitoramento por servidor
-- Visualização de estatísticas globais de warns
-
-### 📊 Relatórios
-- Relatórios diários automáticos enviados por DM para staff
-- Relatórios manuais via comando `/report`
-- Estatísticas de mensagens deletadas, warns, movimentação de membros
-- Ranking de comandos mais usados
-
-### 🖥️ Menu Interativo no Console
-- Estatísticas detalhadas em tempo real
-- Listagem de servidores e membros
-- Envio de mensagens para canais
-- Status de monitoramento
-- Gerar relatórios manualmente
-- Criar backups
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="https://cdn-icons-png.flaticon.com/512/190/190411.png" width="60">
+      <br>
+      <strong>🛡️ Moderação Automática</strong>
+      <br>
+      <sub>Detecta e remove mensagens ofensivas com sistema de leet speak</sub>
+     </td>
+    <td align="center" width="33%">
+      <img src="https://cdn-icons-png.flaticon.com/512/190/190406.png" width="60">
+      <br>
+      <strong>⚠️ Sistema de Warns</strong>
+      <br>
+      <sub>Com expiração, templates e punições automáticas</sub>
+     </td>
+    <td align="center" width="33%">
+      <img src="https://cdn-icons-png.flaticon.com/512/1828/1828884.png" width="60">
+      <br>
+      <strong>📊 Relatórios Diários</strong>
+      <br>
+      <sub>Envio automático para staff com estatísticas completas</sub>
+     </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" width="60">
+      <br>
+      <strong>👑 Painel do Dono</strong>
+      <br>
+      <sub>Controle total via DM com botões interativos</sub>
+     </td>
+    <td align="center">
+      <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" width="60">
+      <br>
+      <strong>💾 Backup Manual</strong>
+      <br>
+      <sub>Dados sempre seguros com backup automático</sub>
+     </td>
+    <td align="center">
+      <img src="https://cdn-icons-png.flaticon.com/512/1487/1487640.png" width="60">
+      <br>
+      <strong>🖥️ Menu no Console</strong>
+      <br>
+      <sub>Controle via terminal com 11 opções interativas</sub>
+     </td>
+  </tr>
+</table>
 
 ---
 
 ## 📦 Tecnologias Utilizadas
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white">
+  <img src="https://img.shields.io/badge/Discord.js-5865F2?style=for-the-badge&logo=discord&logoColor=white">
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black">
+  <img src="https://img.shields.io/badge/npm-CB3837?style=for-the-badge&logo=npm&logoColor=white">
+</p>
 
 | Tecnologia | Versão | Finalidade |
 |------------|--------|------------|
@@ -78,3 +110,4 @@ O **HostVille-Bot** é um assistente de moderação completo para Discord, desen
 ### 1. Clone o repositório
 ```bash
 git clone https://github.com/ornelasisac13-ai/HostVille-BOT
+cd HostVille-BOT
