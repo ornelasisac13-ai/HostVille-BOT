@@ -1,5 +1,5 @@
 // ===============================
-// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - CORRIGIDO (COM PAINEL DO DONO)
+// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - CORRIGIDO (COM PAINEL DO DONO E SISTEMA DE WARNS)
 // ===============================
 const { 
   Client, 
@@ -13,11 +13,16 @@ const {
   ChannelType,
   PermissionFlagsBits,
   StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder
+  StringSelectMenuOptionBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle
 } = require('discord.js');
 const dotenv = require('dotenv');
 const chalk = require('chalk');
 const readline = require('readline');
+const fs = require('fs');
+const path = require('path');
 
 dotenv.config();
 
@@ -32,9 +37,11 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildPresences,
     GatewayIntentBits.DirectMessages,
-    GatewayIntentBits.DirectMessageTyping
+    GatewayIntentBits.DirectMessageTyping,
+    GatewayIntentBits.GuildModeration,
+    GatewayIntentBits.GuildMessageReactions
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User],
+  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User, Partials.Reaction],
 });
 
 // ===============================
@@ -46,7 +53,7 @@ const CONFIG = {
   ACCESS_CODE: process.env.ACCESS_CODE,
   STAFF_USER_ID: process.env.STAFF_USER_ID,
   OWNER_ID: process.env.OWNER_ID,
-  DAILY_REPORT_TIME: process.env.DAILY_REPORT_TIME,
+  DAILY_REPORT_TIME: process.env.DAILY_REPORT_TIME || '12:00',
 };
 
 // ===============================
@@ -74,6 +81,61 @@ const stats = {
     this.commandsUsed = {};
   }
 };
+
+// ===============================
+// IMPORTAÇÃO DO SISTEMA DE WARNS
+// ===============================
+let warnSystem;
+try {
+  warnSystem = require('./modules/warnSystem.js');
+  console.log(chalk.green('✅ Sistema de warns carregado com sucesso!'));
+} catch (error) {
+  console.log(chalk.yellow('⚠️ Sistema de warns não encontrado. Criando estrutura...'));
+  
+  // Criar pasta modules se não existir
+  const modulesDir = path.join(__dirname, 'modules');
+  if (!fs.existsSync(modulesDir)) {
+    fs.mkdirSync(modulesDir, { recursive: true });
+  }
+  
+  // Criar arquivo warnSystem.js básico
+  const warnSystemTemplate = `// Sistema de warns será carregado automaticamente
+module.exports = {
+  addWarn: () => ({ success: false, error: 'Sistema em inicialização' }),
+  removeWarn: () => ({ success: false, error: 'Sistema em inicialização' }),
+  clearUserWarns: () => ({ success: false, error: 'Sistema em inicialização' }),
+  getUserWarns: () => null,
+  getUserActiveWarns: () => [],
+  getServerWarns: () => [],
+  getServerStats: () => ({}),
+  getGlobalStats: () => ({}),
+  createAppeal: () => ({ success: false, error: 'Sistema em inicialização' }),
+  reviewAppeal: () => ({ success: false, error: 'Sistema em inicialização' }),
+  getGuildSettings: () => ({}),
+  updateGuildSettings: () => ({}),
+  applyAutomaticPunishments: async () => ({}),
+  createWarnEmbed: () => null,
+  createUserWarnsEmbed: () => null,
+  createServerStatsEmbed: () => null,
+  createAppealEmbed: () => null,
+  createWarnModal: () => null,
+  createAppealModal: () => null,
+  createWarnButtons: () => null,
+  createUserWarnMenu: () => null,
+  formatDate: (date) => date.toLocaleString('pt-BR'),
+  calculateWarnLevel: () => 'NENHUM',
+  getWarnColor: () => Colors.Green,
+  CONFIG: { emojis: {}, colors: {} },
+  warns: new Map(),
+  guildSettings: new Map()
+};`;
+  
+  fs.writeFileSync(path.join(modulesDir, 'warnSystem.js'), warnSystemTemplate);
+  console.log(chalk.green('✅ Arquivo warnSystem.js criado. Por favor, substitua pelo código completo do sistema de warns.'));
+  
+  // Tentar importar novamente
+  warnSystem = require('./modules/warnSystem.js');
+}
 
 // ===============================
 // LISTA DE PALAVRAS OFENSIVAS
@@ -187,6 +249,9 @@ async function generateDailyReport() {
     commandsField += "• Nenhum comando usado hoje";
   }
   
+  // Adicionar estatísticas de warns
+  const globalWarnStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : { totalWarns: 0, totalActiveWarns: 0 };
+  
   const reportEmbed = new EmbedBuilder()
     .setTitle('📊 Relatório Diário do Bot')
     .setDescription(`Período: **${reportDate}**`)
@@ -194,7 +259,7 @@ async function generateDailyReport() {
     .addFields(
       { 
         name: '🛡️ **Ações de Moderação**', 
-        value: `• Mensagens deletadas: **${stats.messagesDeleted}**\n• Avisos dados: **${stats.warnsGiven}**`,
+        value: `• Mensagens deletadas: **${stats.messagesDeleted}**\n• Avisos dados: **${stats.warnsGiven}**\n• Warns totais: **${globalWarnStats.totalWarns || 0}**`,
         inline: true 
       },
       { 
@@ -219,11 +284,7 @@ async function generateDailyReport() {
       }
     )
     .setFooter({ 
-      text: `Relatório gerado automaticamente • Hoje às ${new Date().toLocaleTimeString('pt-BR', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        timeZone: 'America/Sao_Paulo' 
-      })}`,
+      text: `Relatório gerado automaticamente • ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
       iconURL: client.user.displayAvatarURL()
     });
 
@@ -279,7 +340,7 @@ async function sendReportToStaff() {
 // ===============================
 function scheduleDailyReport() {
   const now = new Date();
-  const [reportHour, reportMinute] = CONFIG.DAILY_REPORT_TIME ? CONFIG.DAILY_REPORT_TIME.split(':').map(Number) : [0, 0];
+  const [reportHour, reportMinute] = CONFIG.DAILY_REPORT_TIME ? CONFIG.DAILY_REPORT_TIME.split(':').map(Number) : [12, 0];
   
   const nextReport = new Date(now);
   nextReport.setHours(reportHour, reportMinute, 0, 0);
@@ -573,7 +634,11 @@ const helpCommand = {
         { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
         { name: '/adm', value: 'Acesso ao painel administrativo (Staff)', inline: false },
         { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
-        { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false }
+        { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false },
+        { name: '/warn', value: 'Adicionar warn a um usuário (Staff)', inline: false },
+        { name: '/warnings', value: 'Ver warns de um usuário (Staff)', inline: false },
+        { name: '/clearwarns', value: 'Limpar warns de um usuário (Staff)', inline: false },
+        { name: '/warnstats', value: 'Estatísticas de warns do servidor (Staff)', inline: false }
       )
       .setFooter({ text: 'Comandos de texto na DM: !clear, !clearAll, !MonitorOn, !MonitorOff, Hello' })
       .setTimestamp();
@@ -624,7 +689,7 @@ const privateCommand = {
 
     try {
       await interaction.channel.send(
-        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\n${message}`
+        `🛠 **Mensagem da Staff**\n\n${user}\n\n${message}`
       );
 
       await user.send({
@@ -723,6 +788,362 @@ const reportCommand = {
 };
 
 // ===============================
+// COMANDOS DO SISTEMA DE WARNS
+// ===============================
+
+const warnCommand = {
+  data: {
+    name: 'warn',
+    description: 'Adiciona um warn a um usuário',
+    options: [
+      {
+        name: 'user',
+        description: 'Usuário a ser warnado',
+        type: 6,
+        required: true
+      },
+      {
+        name: 'reason',
+        description: 'Motivo do warn',
+        type: 3,
+        required: true
+      },
+      {
+        name: 'duration',
+        description: 'Duração em dias (0 = permanente)',
+        type: 4,
+        required: false
+      },
+      {
+        name: 'code',
+        description: 'Código de acesso',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  async execute(interaction) {
+    const code = interaction.options.getString('code');
+    if (code !== CONFIG.ACCESS_CODE) {
+      return interaction.reply({ content: '❌ Código incorreto!', flags: 64 });
+    }
+
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+      const user = interaction.options.getUser('user');
+      const reason = interaction.options.getString('reason');
+      const duration = interaction.options.getInteger('duration') || 0;
+      const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+
+      if (!member) {
+        return interaction.editReply({ content: '❌ Usuário não está no servidor.' });
+      }
+
+      // Verificar se é staff (não pode warnar staff)
+      if (isStaff(user.id)) {
+        return interaction.editReply({ content: '❌ Não é possível warnar membros da staff!' });
+      }
+
+      // Verificar se é admin (não pode warnar admin)
+      if (isAdmin(member)) {
+        return interaction.editReply({ content: '❌ Não é possível warnar administradores!' });
+      }
+
+      // Adicionar warn
+      const result = warnSystem.addWarn(
+        interaction.guild.id,
+        user.id,
+        reason,
+        interaction.user.id,
+        {
+          duration: duration > 0 ? duration : null,
+          channelId: interaction.channel.id,
+          messageId: interaction.id
+        }
+      );
+
+      if (!result.success) {
+        return interaction.editReply({ content: `❌ Erro: ${result.error}` });
+      }
+
+      stats.warnsGiven++;
+
+      // Criar embed de confirmação
+      const embed = new EmbedBuilder()
+        .setTitle(`${warnSystem.CONFIG?.emojis?.warn || '⚠️'} Warn Adicionado`)
+        .setColor(warnSystem.CONFIG?.colors?.warn || Colors.Orange)
+        .setDescription(`Warn registrado para ${user.toString()}`)
+        .addFields(
+          { name: '👤 Usuário', value: `${user.tag} (${user.id})`, inline: true },
+          { name: '🛡️ Moderador', value: interaction.user.tag, inline: true },
+          { name: '📋 Motivo', value: reason, inline: false },
+          { name: '⚠️ Total de Warns', value: `**${result.warnCount}** warns ativos`, inline: true },
+          { name: '🆔 ID do Warn', value: `\`${result.warnId}\``, inline: true }
+        )
+        .setTimestamp();
+
+      if (duration > 0) {
+        embed.addFields({
+          name: '⏰ Expira em',
+          value: warnSystem.formatDate ? 
+            warnSystem.formatDate(new Date(Date.now() + duration * 24 * 60 * 60 * 1000)) : 
+            new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toLocaleString('pt-BR'),
+          inline: true
+        });
+      }
+
+      await interaction.editReply({ embeds: [embed] });
+
+      // Aplicar punições automáticas
+      const punishment = await warnSystem.applyAutomaticPunishments(
+        interaction.guild,
+        member,
+        result.warnCount,
+        client
+      );
+
+      if (punishment.applied) {
+        const punishEmbed = new EmbedBuilder()
+          .setTitle(`${punishment.punishments.includes('ban') ? '🔨' : '👢'} Punição Automática`)
+          .setColor(punishment.punishments.includes('ban') ? Colors.DarkRed : Colors.Red)
+          .setDescription(`O usuário ${user.toString()} foi punido automaticamente por acumular ${result.warnCount} warns.`)
+          .addFields(
+            { name: '⚡ Punição', value: punishment.punishments.join(', ').toUpperCase(), inline: true },
+            { name: '⚠️ Total de Warns', value: result.warnCount.toString(), inline: true }
+          )
+          .setTimestamp();
+
+        await interaction.followUp({ embeds: [punishEmbed], flags: 64 });
+      }
+
+      // Tentar enviar DM para o usuário
+      try {
+        const dmEmbed = new EmbedBuilder()
+          .setTitle(`⚠️ Você recebeu um warn em ${interaction.guild.name}`)
+          .setColor(Colors.Orange)
+          .setDescription(`**Motivo:** ${reason}`)
+          .addFields(
+            { name: '📊 Total de Warns', value: `**${result.warnCount}** warns ativos`, inline: true },
+            { name: '🆔 Servidor', value: interaction.guild.name, inline: true }
+          )
+          .setFooter({ text: 'Caso ache isso um erro, contate a staff.' })
+          .setTimestamp();
+
+        await user.send({ embeds: [dmEmbed] });
+      } catch (dmError) {
+        // Usuário bloqueou DMs, ignorar
+      }
+
+      // Registrar no stats
+      stats.commandsUsed['warn'] = (stats.commandsUsed['warn'] || 0) + 1;
+
+    } catch (error) {
+      logError(`Erro no comando warn: ${error.message}`);
+      await interaction.editReply({ content: '❌ Erro ao executar o comando.' });
+    }
+  }
+};
+
+const warningsCommand = {
+  data: {
+    name: 'warnings',
+    description: 'Ver warns de um usuário',
+    options: [
+      {
+        name: 'user',
+        description: 'Usuário para ver warns',
+        type: 6,
+        required: true
+      },
+      {
+        name: 'code',
+        description: 'Código de acesso',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  async execute(interaction) {
+    const code = interaction.options.getString('code');
+    if (code !== CONFIG.ACCESS_CODE) {
+      return interaction.reply({ content: '❌ Código incorreto!', flags: 64 });
+    }
+
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+      const user = interaction.options.getUser('user');
+      const userWarns = warnSystem.getUserWarns(interaction.guild.id, user.id);
+
+      if (!userWarns || userWarns.history.length === 0) {
+        const embed = new EmbedBuilder()
+          .setTitle('📭 Histórico de Warns')
+          .setColor(Colors.Green)
+          .setDescription(`${user.toString()} não possui warns.`)
+          .setThumbnail(user.displayAvatarURL())
+          .setTimestamp();
+
+        return interaction.editReply({ embeds: [embed] });
+      }
+
+      // Criar embed com paginação
+      const embed = warnSystem.createUserWarnsEmbed ? 
+        warnSystem.createUserWarnsEmbed(user, userWarns, interaction.guild, 1) :
+        new EmbedBuilder()
+          .setTitle(`Warns de ${user.tag}`)
+          .setColor(Colors.Orange)
+          .setDescription(`Total: **${userWarns.activeCount}** ativos (${userWarns.count} total)`)
+          .setTimestamp();
+
+      // Criar botões de paginação se houver mais de 5 warns
+      if (userWarns.history.length > 5) {
+        const row = new ActionRowBuilder()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId(`warns_prev_${user.id}_1`)
+              .setLabel('◀ Anterior')
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(true),
+            new ButtonBuilder()
+              .setCustomId(`warns_next_${user.id}_1`)
+              .setLabel('Próximo ▶')
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(false)
+          );
+
+        await interaction.editReply({ embeds: [embed], components: [row] });
+      } else {
+        await interaction.editReply({ embeds: [embed] });
+      }
+
+      stats.commandsUsed['warnings'] = (stats.commandsUsed['warnings'] || 0) + 1;
+
+    } catch (error) {
+      logError(`Erro no comando warnings: ${error.message}`);
+      await interaction.editReply({ content: '❌ Erro ao executar o comando.' });
+    }
+  }
+};
+
+const clearwarnsCommand = {
+  data: {
+    name: 'clearwarns',
+    description: 'Remove todos os warns de um usuário',
+    options: [
+      {
+        name: 'user',
+        description: 'Usuário para limpar warns',
+        type: 6,
+        required: true
+      },
+      {
+        name: 'reason',
+        description: 'Motivo da limpeza',
+        type: 3,
+        required: false
+      },
+      {
+        name: 'code',
+        description: 'Código de acesso',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  async execute(interaction) {
+    const code = interaction.options.getString('code');
+    if (code !== CONFIG.ACCESS_CODE) {
+      return interaction.reply({ content: '❌ Código incorreto!', flags: 64 });
+    }
+
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+      const user = interaction.options.getUser('user');
+      const reason = interaction.options.getString('reason') || 'Limpeza manual';
+
+      const result = warnSystem.clearUserWarns(
+        interaction.guild.id,
+        user.id,
+        interaction.user.id,
+        reason
+      );
+
+      if (!result.success) {
+        return interaction.editReply({ content: `❌ ${result.error}` });
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle('🧹 Warns Limpos')
+        .setColor(Colors.Green)
+        .setDescription(`Todos os warns de ${user.toString()} foram limpos.`)
+        .addFields(
+          { name: '👤 Usuário', value: user.tag, inline: true },
+          { name: '🧹 Warns Removidos', value: `**${result.clearedCount}**`, inline: true },
+          { name: '📋 Motivo', value: reason, inline: false },
+          { name: '🛡️ Moderador', value: interaction.user.tag, inline: true }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+
+      stats.commandsUsed['clearwarns'] = (stats.commandsUsed['clearwarns'] || 0) + 1;
+
+    } catch (error) {
+      logError(`Erro no comando clearwarns: ${error.message}`);
+      await interaction.editReply({ content: '❌ Erro ao executar o comando.' });
+    }
+  }
+};
+
+const warnstatsCommand = {
+  data: {
+    name: 'warnstats',
+    description: 'Ver estatísticas de warns do servidor',
+    options: [
+      {
+        name: 'code',
+        description: 'Código de acesso',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  async execute(interaction) {
+    const code = interaction.options.getString('code');
+    if (code !== CONFIG.ACCESS_CODE) {
+      return interaction.reply({ content: '❌ Código incorreto!', flags: 64 });
+    }
+
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+      const stats = warnSystem.getServerStats(interaction.guild.id);
+      const embed = warnSystem.createServerStatsEmbed ? 
+        warnSystem.createServerStatsEmbed(interaction.guild, stats) :
+        new EmbedBuilder()
+          .setTitle(`📊 Estatísticas de Warns - ${interaction.guild.name}`)
+          .setColor(Colors.Blue)
+          .addFields(
+            { name: 'Total de Warns', value: stats.totalWarns?.toString() || '0', inline: true },
+            { name: 'Warns Ativos', value: stats.activeWarns?.toString() || '0', inline: true },
+            { name: 'Usuários Warnados', value: stats.warnedUsers?.toString() || '0', inline: true }
+          )
+          .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+
+      stats.commandsUsed['warnstats'] = (stats.commandsUsed['warnstats'] || 0) + 1;
+
+    } catch (error) {
+      logError(`Erro no comando warnstats: ${error.message}`);
+      await interaction.editReply({ content: '❌ Erro ao executar o comando.' });
+    }
+  }
+};
+
+// ===============================
 // FUNÇÕES DO PAINEL DO DONO
 // ===============================
 
@@ -759,9 +1180,12 @@ async function handleOwnerPanel(message) {
   // Calcular total de comandos usados hoje
   const totalCommandsToday = Object.values(stats.commandsUsed).reduce((a, b) => a + b, 0);
 
-  // Criar embed azul bebê (cor: #89CFF0)
+  // Obter estatísticas globais de warns
+  const globalWarnStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : { totalWarns: 0, totalUsers: 0 };
+
+  // Criar embed
   const embed = new EmbedBuilder()
-    .setTitle('👋 Welcome, Isac!')
+    .setTitle('👋 Welcome, Owner!')
     .setDescription('**Painel de Controle do Bot**')
     .setColor('#89CFF0')
     .addFields(
@@ -777,12 +1201,12 @@ async function handleOwnerPanel(message) {
       },
       { 
         name: '📅 **Informações**', 
-        value: `• **Iniciado em:** ${stats.startDate.toLocaleString('pt-BR')}\n• **Comandos hoje:** ${totalCommandsToday}`,
+        value: `• **Iniciado em:** ${stats.startDate.toLocaleString('pt-BR')}\n• **Comandos hoje:** ${totalCommandsToday}\n• **Warns totais:** ${globalWarnStats.totalWarns || 0}`,
         inline: true 
       },
       { 
         name: '📋 **Comandos Disponíveis**', 
-        value: '`/ping` - Verificar latência\n`/help` - Lista de comandos\n`/adm` - Painel admin\n`/private` - Mensagem staff\n`/report` - Gerar relatório\n\n**Comandos DM:**\n`!clear` - Limpar DM\n`!clearAll` - Limpar todas DMs\n`Hello` - Abrir este painel',
+        value: '`/ping` - Verificar latência\n`/help` - Lista de comandos\n`/adm` - Painel admin\n`/private` - Mensagem staff\n`/report` - Gerar relatório\n`/warn` - Adicionar warn\n`/warnings` - Ver warns\n`/clearwarns` - Limpar warns\n`/warnstats` - Estatísticas\n\n**Comandos DM:**\n`!clear` - Limpar DM\n`!clearAll` - Limpar todas DMs\n`Hello` - Abrir este painel',
         inline: false 
       }
     )
@@ -804,7 +1228,12 @@ async function handleOwnerPanel(message) {
         .setCustomId('owner_moderation')
         .setLabel('Moderation')
         .setStyle(ButtonStyle.Danger)
-        .setEmoji('🛡️')
+        .setEmoji('🛡️'),
+      new ButtonBuilder()
+        .setCustomId('owner_warnstats')
+        .setLabel('Warn Stats')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('📊')
     );
 
   // Enviar mensagem com embed e botões
@@ -975,6 +1404,38 @@ async function handleOwnerPanelButtons(interaction) {
       logError(`Erro no painel de moderação: ${error.message}`);
       await interaction.editReply({ 
         content: '❌ Erro ao carregar servidores.' 
+      });
+    }
+  } else if (interaction.customId === 'owner_warnstats') {
+    // Botão Warn Stats
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+      const globalStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : { 
+        totalServers: 0, 
+        totalUsers: 0, 
+        totalWarns: 0,
+        totalActiveWarns: 0
+      };
+
+      const embed = new EmbedBuilder()
+        .setTitle('📊 Estatísticas Globais de Warns')
+        .setColor(Colors.Blue)
+        .addFields(
+          { name: '🌐 Servidores', value: globalStats.totalServers?.toString() || '0', inline: true },
+          { name: '👥 Usuários Warnados', value: globalStats.totalUsers?.toString() || '0', inline: true },
+          { name: '⚠️ Total de Warns', value: globalStats.totalWarns?.toString() || '0', inline: true },
+          { name: '🟢 Warns Ativos', value: globalStats.totalActiveWarns?.toString() || '0', inline: true },
+          { name: '📊 Média por Usuário', value: globalStats.averageWarnsPerUser?.toString() || '0', inline: true }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+
+    } catch (error) {
+      logError(`Erro no painel de warns: ${error.message}`);
+      await interaction.editReply({ 
+        content: '❌ Erro ao carregar estatísticas de warns.' 
       });
     }
   }
@@ -1160,6 +1621,157 @@ async function handleOwnerBulkAction(interaction) {
 
   } catch (error) {
     logError(`Erro no handleOwnerBulkAction: ${error.message}`);
+  }
+}
+
+// ===============================
+// HANDLER PARA BOTÕES DE WARNS
+// ===============================
+
+async function handleWarnButtons(interaction) {
+  const customId = interaction.customId;
+
+  // Paginação de warns
+  if (customId.startsWith('warns_prev_') || customId.startsWith('warns_next_')) {
+    const parts = customId.split('_');
+    const action = parts[1]; // prev ou next
+    const userId = parts[2];
+    const currentPage = parseInt(parts[3]);
+
+    const user = await client.users.fetch(userId);
+    const userWarns = warnSystem.getUserWarns(interaction.guild.id, userId);
+    
+    if (!userWarns) {
+      return interaction.reply({ content: '❌ Warns não encontrados.', flags: 64 });
+    }
+
+    const newPage = action === 'next' ? currentPage + 1 : currentPage - 1;
+    const embed = warnSystem.createUserWarnsEmbed ? 
+      warnSystem.createUserWarnsEmbed(user, userWarns, interaction.guild, newPage) :
+      new EmbedBuilder()
+        .setTitle(`Warns de ${user.tag}`)
+        .setColor(Colors.Orange)
+        .setDescription(`Página ${newPage}`)
+        .setTimestamp();
+
+    const row = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(`warns_prev_${userId}_${newPage}`)
+          .setLabel('◀ Anterior')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(newPage === 1),
+        new ButtonBuilder()
+          .setCustomId(`warns_next_${userId}_${newPage}`)
+          .setLabel('Próximo ▶')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(newPage * 5 >= userWarns.history.length)
+      );
+
+    await interaction.update({ embeds: [embed], components: [row] });
+  }
+
+  // Ver detalhes do warn
+  if (customId.startsWith('warn_details_')) {
+    const warnId = customId.replace('warn_details_', '');
+    
+    // Buscar o warn
+    const guildWarns = warnSystem.warns?.get(interaction.guild.id);
+    if (guildWarns) {
+      for (const [uid, userWarns] of guildWarns) {
+        const warn = userWarns.history.find(w => w.id === warnId);
+        if (warn) {
+          const user = await client.users.fetch(uid);
+          const moderator = await client.users.fetch(warn.moderatorId).catch(() => null);
+          
+          const embed = new EmbedBuilder()
+            .setTitle(`📋 Detalhes do Warn #${warnId}`)
+            .setColor(warnSystem.getWarnColor ? warnSystem.getWarnColor(userWarns.activeCount) : Colors.Orange)
+            .addFields(
+              { name: '👤 Usuário', value: `${user.tag} (${uid})`, inline: true },
+              { name: '🛡️ Moderador', value: moderator ? moderator.tag : warn.moderatorId, inline: true },
+              { name: '📅 Data', value: warnSystem.formatDate ? warnSystem.formatDate(warn.timestamp) : new Date(warn.timestamp).toLocaleString('pt-BR'), inline: true },
+              { name: '📋 Motivo', value: warn.reason, inline: false },
+              { name: '🟢 Status', value: warn.active ? 'Ativo' : 'Inativo', inline: true }
+            )
+            .setTimestamp();
+
+          if (warn.expiresAt) {
+            embed.addFields({
+              name: '⏰ Expira em',
+              value: warnSystem.formatDate ? warnSystem.formatDate(warn.expiresAt) : new Date(warn.expiresAt).toLocaleString('pt-BR'),
+              inline: true
+            });
+          }
+
+          return interaction.reply({ embeds: [embed], flags: 64 });
+        }
+      }
+    }
+
+    await interaction.reply({ content: '❌ Warn não encontrado.', flags: 64 });
+  }
+
+  // Remover warn
+  if (customId.startsWith('warn_remove_')) {
+    const parts = customId.replace('warn_remove_', '').split('_');
+    const warnId = parts[0];
+    const userId = parts[1];
+
+    const modal = new ModalBuilder()
+      .setCustomId(`remove_warn_modal_${warnId}_${userId}`)
+      .setTitle('Remover Warn');
+
+    const reasonInput = new TextInputBuilder()
+      .setCustomId('remove_reason')
+      .setLabel('Motivo da remoção')
+      .setStyle(TextInputStyle.Paragraph)
+      .setPlaceholder('Por que este warn está sendo removido?')
+      .setRequired(true);
+
+    const row = new ActionRowBuilder().addComponents(reasonInput);
+    modal.addComponents(row);
+
+    await interaction.showModal(modal);
+  }
+}
+
+// ===============================
+// HANDLER PARA MODAIS DE WARNS
+// ===============================
+
+async function handleWarnModals(interaction) {
+  if (interaction.customId.startsWith('remove_warn_modal_')) {
+    const parts = interaction.customId.replace('remove_warn_modal_', '').split('_');
+    const warnId = parts[0];
+    const userId = parts[1];
+    const reason = interaction.fields.getTextInputValue('remove_reason');
+
+    await interaction.deferReply({ flags: 64 });
+
+    const result = warnSystem.removeWarn(
+      interaction.guild.id,
+      userId,
+      warnId,
+      interaction.user.id,
+      reason
+    );
+
+    if (result.success) {
+      const embed = new EmbedBuilder()
+        .setTitle('✅ Warn Removido')
+        .setColor(Colors.Green)
+        .setDescription(`Warn #${warnId} foi removido com sucesso.`)
+        .addFields(
+          { name: '👤 Usuário', value: `<@${userId}>`, inline: true },
+          { name: '📋 Motivo', value: reason, inline: false }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } else {
+      await interaction.editReply({ content: `❌ ${result.error}` });
+    }
   }
 }
 
@@ -1679,7 +2291,7 @@ client.on("messageCreate", async (message) => {
 // ===============================
 // EVENTO: BOT PRONTO
 // ===============================
-client.once('clientReady', async () => {
+client.once('ready', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
   console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
   console.log(chalk.green.underline('═'.repeat(50)));
@@ -1701,7 +2313,11 @@ client.once('clientReady', async () => {
           pingCommand.data,
           helpCommand.data,
           privateCommand.data,
-          reportCommand.data
+          reportCommand.data,
+          warnCommand.data,
+          warningsCommand.data,
+          clearwarnsCommand.data,
+          warnstatsCommand.data
         ]);
         logSuccess(`Comandos registrados em: ${guild.name}`);
       }
@@ -1926,35 +2542,52 @@ client.on('interactionCreate', async (interaction) => {
       const cmdName = interaction.commandName;
       stats.commandsUsed[cmdName] = (stats.commandsUsed[cmdName] || 0) + 1;
       
-      const command = commands.find(c => c.data.name === interaction.commandName);
-      if (!command) {
-        if (interaction.commandName === 'ping') {
-          await pingCommand.execute(interaction);
-          return;
-        }
-        if (interaction.commandName === 'help') {
-          await helpCommand.execute(interaction);
-          return;
-        }
-        if (interaction.commandName === 'private') {
-          await privateCommand.execute(interaction);
-          return;
-        }
-        if (interaction.commandName === 'report') {
-          await reportCommand.execute(interaction);
-          return;
-        }
+      // Verificar comandos principais
+      if (interaction.commandName === 'ping') {
+        await pingCommand.execute(interaction);
         return;
       }
-
-      try {
-        await command.execute(interaction);
-      } catch (error) {
-        logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
-        if (interaction.replied || interaction.deferred) {
-          await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
-        } else {
-          await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
+      if (interaction.commandName === 'help') {
+        await helpCommand.execute(interaction);
+        return;
+      }
+      if (interaction.commandName === 'private') {
+        await privateCommand.execute(interaction);
+        return;
+      }
+      if (interaction.commandName === 'report') {
+        await reportCommand.execute(interaction);
+        return;
+      }
+      if (interaction.commandName === 'warn') {
+        await warnCommand.execute(interaction);
+        return;
+      }
+      if (interaction.commandName === 'warnings') {
+        await warningsCommand.execute(interaction);
+        return;
+      }
+      if (interaction.commandName === 'clearwarns') {
+        await clearwarnsCommand.execute(interaction);
+        return;
+      }
+      if (interaction.commandName === 'warnstats') {
+        await warnstatsCommand.execute(interaction);
+        return;
+      }
+      
+      // Comandos do array commands
+      const command = commands.find(c => c.data.name === interaction.commandName);
+      if (command) {
+        try {
+          await command.execute(interaction);
+        } catch (error) {
+          logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
+          if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
+          } else {
+            await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
+          }
         }
       }
       return;
@@ -1969,7 +2602,7 @@ client.on('interactionCreate', async (interaction) => {
       }
       
       // Botões do painel do dono
-      if (interaction.customId === 'owner_turnoff' || interaction.customId === 'owner_moderation') {
+      if (interaction.customId === 'owner_turnoff' || interaction.customId === 'owner_moderation' || interaction.customId === 'owner_warnstats') {
         await handleOwnerPanelButtons(interaction);
         return;
       }
@@ -2003,6 +2636,12 @@ client.on('interactionCreate', async (interaction) => {
         return;
       }
       
+      // Botões de warns
+      if (interaction.customId.startsWith('warns_') || interaction.customId.startsWith('warn_')) {
+        await handleWarnButtons(interaction);
+        return;
+      }
+      
       await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
       
       setTimeout(async () => {
@@ -2010,6 +2649,13 @@ client.on('interactionCreate', async (interaction) => {
           await interaction.deleteReply();
         } catch (e) {}
       }, 5000);
+    }
+    
+    if (interaction.isModalSubmit()) {
+      if (interaction.customId.startsWith('remove_warn_modal_')) {
+        await handleWarnModals(interaction);
+        return;
+      }
     }
     
     if (interaction.isStringSelectMenu()) {
@@ -2146,6 +2792,7 @@ function showMenu() {
   console.log(chalk.cyan('║  6.  Ver logs recentes                                          ║'));
   console.log(chalk.cyan('║  7.  Ver status do bot                                          ║'));
   console.log(chalk.cyan('║  8.  Gerar relatório manual                                     ║'));
+  console.log(chalk.cyan('║  9.  Ver estatísticas de warns                                  ║'));
   console.log(chalk.cyan('║  0.  Sair                                                       ║'));
   console.log(chalk.cyan('╚═══════════════════════════════════════════════════════╝'));
   
@@ -2184,6 +2831,9 @@ function handleMenuOption(option) {
       break;
     case '8':
       generateManualReport();
+      break;
+    case '9':
+      showWarnStats();
       break;
     case '0':
       console.log(chalk.red('❌ Encerrando o bot...'));
@@ -2270,6 +2920,30 @@ async function generateManualReport() {
   } catch (error) {
     console.log(chalk.red(`❌ Erro: ${error.message}`));
   }
+  console.log(chalk.yellow('═══════════════════════════════\n'));
+  showMenu();
+}
+
+function showWarnStats() {
+  console.log(chalk.yellow('\n═══ 📊 ESTATÍSTICAS DE WARNS ═══'));
+  
+  try {
+    const globalStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : {
+      totalServers: 0,
+      totalUsers: 0,
+      totalWarns: 0,
+      totalActiveWarns: 0
+    };
+    
+    console.log(chalk.white(`🌐 Servidores com warns: ${globalStats.totalServers}`));
+    console.log(chalk.white(`👥 Usuários warnados: ${globalStats.totalUsers}`));
+    console.log(chalk.white(`⚠️ Total de warns: ${globalStats.totalWarns}`));
+    console.log(chalk.white(`🟢 Warns ativos: ${globalStats.totalActiveWarns}`));
+    
+  } catch (error) {
+    console.log(chalk.red(`❌ Erro ao carregar estatísticas: ${error.message}`));
+  }
+  
   console.log(chalk.yellow('═══════════════════════════════\n'));
   showMenu();
 }
