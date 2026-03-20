@@ -87,17 +87,17 @@ O **HostVille-Bot** é um assistente de moderação completo para Discord, desen
 ## 📦 Tecnologias Utilizadas
 
 <p align="center">
-  <a href="https://nodejs.org/en" style="text-decoration: none;">
-    <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white">
+  <a href="https://nodejs.org/en" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" style="border: none;">
   </a>
-  <a href="https://discord.js.org/" style="text-decoration: none;">
-    <img src="https://img.shields.io/badge/Discord.js-5865F2?style=for-the-badge&logo=discord&logoColor=white">
+  <a href="https://discord.js.org/" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.shields.io/badge/Discord.js-5865F2?style=for-the-badge&logo=discord&logoColor=white" style="border: none;">
   </a>
-  <a href="https://www.javascript.com/" style="text-decoration: none;">
-    <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black">
+  <a href="https://www.javascript.com/" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" style="border: none;">
   </a>
-  <a href="https://www.npmjs.com/" style="text-decoration: none;">
-    <img src="https://img.shields.io/badge/npm-CB3837?style=for-the-badge&logo=npm&logoColor=white">
+  <a href="https://www.npmjs.com/" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.shields.io/badge/npm-CB3837?style=for-the-badge&logo=npm&logoColor=white" style="border: none;">
   </a>
 </p>
 
