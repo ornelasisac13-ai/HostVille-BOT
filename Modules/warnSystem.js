@@ -60,13 +60,13 @@ const CONFIG = {
   
   // Cargos automáticos por quantidade de warns
   autoRoles: {
-    1: 'ID_DO_CARGO_1_WARN',
-    2: 'ID_DO_CARGO_2_WARNS',
-    3: 'ID_DO_CARGO_3_WARNS',
-    4: 'ID_DO_CARGO_4_WARNS',
-    5: 'ID_DO_CARGO_5_WARNS',
-    6: 'ID_DO_CARGO_6_WARNS',
-    7: 'ID_DO_CARGO_7_WARNS',
+    1: '1484383270362677279',
+    2: 1484383343595491348',
+    3: '1484383411186438144',
+    4: '1484383888582246521',
+    5: '1484389386656288818',
+    6: '1484389491052515349',
+    7: '1484389573831426209',
   },
   
   // Cores e emojis
