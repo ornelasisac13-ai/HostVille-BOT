@@ -101,15 +101,15 @@ O **HostVille-Bot** é um assistente de moderação completo para Discord, desen
   </a>
 </p>
 
-| Tecnologia | Versão | Finalidade | Documentação |
-|------------|--------|------------|--------------|
-| Node.js | 16.9.0+ | Ambiente de execução | [🔗 Site Oficial](https://nodejs.org/en) |
-| discord.js | 14.14.0+ | Biblioteca para API do Discord | [🔗 Documentação](https://discord.js.org/) |
-| dotenv | 16.3.1+ | Gerenciamento de variáveis de ambiente | [🔗 npm](https://www.npmjs.com/package/dotenv) |
-| chalk | 4.1.2+ | Terminal colorido | [🔗 npm](https://www.npmjs.com/package/chalk) |
-| node-cron | 3.0.3+ | Agendamento de tarefas | [🔗 npm](https://www.npmjs.com/package/node-cron) |
-| axios | 1.6.2+ | Requisições HTTP (backup) | [🔗 npm](https://www.npmjs.com/package/axios) |
-| fs | nativo | Sistema de arquivos | [🔗 Node.js Docs](https://nodejs.org/api/fs.html) |
+| Tecnologia | Versão | Finalidade |
+|------------|--------|------------|
+| [Node.js](https://nodejs.org/en) | 16.9.0+ | Ambiente de execução |
+| [discord.js](https://discord.js.org/) | 14.14.0+ | Biblioteca para API do Discord |
+| [dotenv](https://www.npmjs.com/package/dotenv) | 16.3.1+ | Gerenciamento de variáveis de ambiente |
+| [chalk](https://www.npmjs.com/package/chalk) | 4.1.2+ | Terminal colorido |
+| [node-cron](https://www.npmjs.com/package/node-cron) | 3.0.3+ | Agendamento de tarefas |
+| [axios](https://www.npmjs.com/package/axios) | 1.6.2+ | Requisições HTTP (backup) |
+| fs | nativo | Sistema de arquivos |
 ## ⚙️ Configuração do Ambiente
 
 ### 1. Clone o repositório
