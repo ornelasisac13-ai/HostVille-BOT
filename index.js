@@ -157,7 +157,29 @@ const offensiveWords = [
   "idiota", "burro", "estupido", "retardado", "lixo", "merda", "fdp", "otario",
   "vtnc", "imbecil", "inutil", "arrombado", "viado", "bicha", "piranha", "prostituta",
   "corno", "babaca", "palhaco", "nojento", "escroto", "cretino", "canalha", "maldito",
-  "vai tomar no cu", "vai tnc", "vai se foder", "fodase", "caralho", "porra", "krl"
+  "peste", "verme", "trouxa", "otaria", "burra", "cacete", "caralho", "merdinha",
+  "vagabundo", "vagabunda", "cuzao", "idiotinha", "fodido", "bosta", "porra", "prr",
+  "poha", "krl", "krlh", "caramba", "fds", "foda", "fudeu", "fodase", "fodassi",
+  "pqp", "puta", "vsf", "tnc", "tmnc", "cuzão", "cú", "cu", "buceta", "bct", "xota",
+  "xoxota", "ppk", "perereca", "rapariga", "putinha", "putona", "puto", "bostinha",
+  "inutel", "burrinho", "estupida", "retardada", "nojenta", "escrota", "trouxinha",
+  "verminoso", "pestinha", "cretina", "maldita", "corninho", "chifrudo", "vagaba",
+  "piriguete", "viadinho", "boiola", "bichinha", "baitola", "sapatão", "sapata",
+  "galinha", "cachorra", "cachorro", "vaca", "égua", "cabra", "mula", "jumento",
+  "asno", "anta", "besta", "bocó", "boçal", "bronco", "ignorante", "analfabeto",
+  "pilantra", "malandro", "safado", "tarado", "pervertido", "depravado", "asqueroso",
+  "repugnante", "horrivel", "feio", "crápula", "infeliz", "miseravel", "coitado",
+  "nulo", "aborto", "lixinho", "traste", "praga", "desgraça", "fudido", "lascado",
+  "ferrado", "danado", "capeta", "demonio", "diabo", "satanás", "lucifer", "animal",
+  "bicho", "monstro", "abominavel", "marginal", "delinquente", "criminoso", "bandido",
+  "ladrão", "assaltante", "golpista", "enganador", "trapaceiro", "manipulador",
+  "abusador", "abusado", "folgado", "atrevido", "arrogante", "pretensioso", "metido",
+  "convencido", "soberbo", "orgulhoso", "vaidoso", "futil", "oco", "teimoso", "birrento",
+  "pentelho", "maçante", "enfadonho", "mrd", "fodendo", "fudendo", "crl", "crlh",
+  "putaria", "puteiro", "caraio", "karaio",
+  "vai tomar no cu", "vai tnc", "vai tmnc", "vai se foder", "vai se fuder", "vsf",
+  "foda se", "fodase", "foda-se", "puta que pariu", "puta q pariu",
+  "filho da puta", "filha da puta"
 ];
 
 // ===============================
@@ -205,14 +227,80 @@ function formatTime(ms) {
 
 function containsOffensiveWord(text) {
   if (!text || typeof text !== 'string') return false;
-  const textLower = text.toLowerCase();
-  return offensiveWords.some(word => textLower.includes(word));
+  const textLower = text.toLowerCase().trim();
+  
+  for (const offensivePhrase of offensiveWords) {
+    if (offensivePhrase.includes(' ') && textLower.includes(offensivePhrase)) {
+      return true;
+    }
+  }
+  
+  const textNormalized = textLower
+    .replace(/[^\w\sà-úÀ-Ú]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  const words = textNormalized.split(' ');
+  
+  for (const word of words) {
+    if (word.length < 3) continue;
+    if (offensiveWords.includes(word)) return true;
+    
+    const leetMap = {
+      '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a',
+      '5': 's', '6': 'g', '7': 't', '8': 'b', '9': 'g',
+      '@': 'a', '!': 'i', '$': 's', '#': 'h', '&': 'e'
+    };
+    
+    let normalizedWord = '';
+    for (let i = 0; i < word.length; i++) {
+      const char = word[i];
+      normalizedWord += leetMap[char] || char;
+    }
+    
+    if (offensiveWords.includes(normalizedWord)) return true;
+  }
+  
+  return false;
 }
 
 function findOffensiveWord(text) {
   if (!text || typeof text !== 'string') return null;
-  const textLower = text.toLowerCase();
-  return offensiveWords.find(word => textLower.includes(word)) || null;
+  const textLower = text.toLowerCase().trim();
+  
+  for (const offensivePhrase of offensiveWords) {
+    if (offensivePhrase.includes(' ') && textLower.includes(offensivePhrase)) {
+      return offensivePhrase;
+    }
+  }
+  
+  const textNormalized = textLower
+    .replace(/[^\w\sà-úÀ-Ú]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  const words = textNormalized.split(' ');
+  
+  for (const word of words) {
+    if (word.length < 3) continue;
+    if (offensiveWords.includes(word)) return word;
+    
+    const leetMap = {
+      '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a',
+      '5': 's', '6': 'g', '7': 't', '8': 'b', '9': 'g',
+      '@': 'a', '!': 'i', '$': 's', '#': 'h', '&': 'e'
+    };
+    
+    let normalizedWord = '';
+    for (let i = 0; i < word.length; i++) {
+      const char = word[i];
+      normalizedWord += leetMap[char] || char;
+    }
+    
+    if (offensiveWords.includes(normalizedWord)) return word;
+  }
+  
+  return null;
 }
 
 function isAdmin(member) {
@@ -717,6 +805,21 @@ const warnCommand = {
           { name: 'code', type: 3, description: 'Código de acesso', required: true },
           { name: 'user', type: 6, description: 'Ver estatísticas de um usuário', required: false }
         ]
+      },
+      {
+        name: 'template',
+        description: 'Gerenciar templates de warns',
+        type: 1,
+        options: [
+          { name: 'code', type: 3, description: 'Código de acesso', required: true },
+          { name: 'action', type: 3, description: 'Ação (list, create, delete)', required: true, choices: [
+            { name: 'Listar templates', value: 'list' },
+            { name: 'Criar template', value: 'create' },
+            { name: 'Deletar template', value: 'delete' }
+          ]},
+          { name: 'name', type: 3, description: 'Nome do template (para criar)', required: false },
+          { name: 'reason', type: 3, description: 'Motivo padrão (para criar)', required: false }
+        ]
       }
     ]
   },
@@ -822,7 +925,9 @@ const warnCommand = {
           .addFields(
             { name: '⚠️ Warns Ativos', value: `**${userWarns.activeCount || 0}**`, inline: true },
             { name: '📊 Total de Warns', value: `**${userWarns.count || 0}**`, inline: true },
-            { name: '📊 Nível de Risco', value: `**${riskLevel.level}**`, inline: true }
+            { name: '📊 Nível de Risco', value: `**${riskLevel.level}**`, inline: true },
+            { name: '📅 Primeiro Warn', value: userWarns.firstWarn ? new Date(userWarns.firstWarn).toLocaleString('pt-BR') : 'Nunca', inline: true },
+            { name: '📅 Último Warn', value: userWarns.lastWarn ? new Date(userWarns.lastWarn).toLocaleString('pt-BR') : 'Nunca', inline: true }
           )
           .setTimestamp();
         
@@ -847,7 +952,9 @@ const warnCommand = {
             .setThumbnail(user.displayAvatarURL())
             .addFields(
               { name: '⚠️ Total de Warns', value: userStats?.totalWarns?.toString() || '0', inline: true },
-              { name: '🟢 Warns Ativos', value: userStats?.activeWarns?.toString() || '0', inline: true }
+              { name: '🟢 Warns Ativos', value: userStats?.activeWarns?.toString() || '0', inline: true },
+              { name: '📅 Primeiro Warn', value: userStats?.firstWarn ? new Date(userStats.firstWarn).toLocaleString('pt-BR') : 'Nunca', inline: true },
+              { name: '📅 Último Warn', value: userStats?.lastWarn ? new Date(userStats.lastWarn).toLocaleString('pt-BR') : 'Nunca', inline: true }
             )
             .setTimestamp();
           await interaction.editReply({ embeds: [embed] });
@@ -860,10 +967,75 @@ const warnCommand = {
             .addFields(
               { name: '⚠️ Total de Warns', value: serverStats?.totalWarns?.toString() || '0', inline: true },
               { name: '🟢 Warns Ativos', value: serverStats?.activeWarns?.toString() || '0', inline: true },
-              { name: '👥 Usuários Warnados', value: serverStats?.warnedUsers?.toString() || '0', inline: true }
+              { name: '👥 Usuários Warnados', value: serverStats?.warnedUsers?.toString() || '0', inline: true },
+              { name: '📊 Média por Usuário', value: serverStats?.averageWarnsPerUser?.toString() || '0', inline: true }
             )
             .setTimestamp();
+          
+          if (serverStats?.topModerators && serverStats.topModerators.length > 0) {
+            let modsList = serverStats.topModerators.slice(0, 5)
+              .map((m, i) => `${i+1}. <@${m.id || m.moderatorId}>: **${m.count || m.totalWarns}** warns`)
+              .join('\n');
+            embed.addFields({ name: '🛡️ Top Moderadores', value: modsList || 'Nenhum dado', inline: false });
+          }
+          
+          if (serverStats?.topReasons && serverStats.topReasons.length > 0) {
+            let reasonsList = serverStats.topReasons.slice(0, 5)
+              .map((r, i) => `${i+1}. **${r.reason}**: ${r.count || r.totalWarns}x`)
+              .join('\n');
+            embed.addFields({ name: '📋 Motivos Mais Comuns', value: reasonsList || 'Nenhum dado', inline: false });
+          }
+          
           await interaction.editReply({ embeds: [embed] });
+        }
+      }
+      
+      else if (subcommand === 'template') {
+        const action = interaction.options.getString('action');
+        
+        if (action === 'list') {
+          const templates = warnSystem?.getWarnTemplates?.(interaction.guild.id) || [];
+          if (!templates || templates.length === 0) {
+            return interaction.editReply({ content: '📭 Nenhum template encontrado neste servidor.' });
+          }
+          const embed = new EmbedBuilder()
+            .setTitle('📋 Templates de Warns')
+            .setColor(Colors.Blue)
+            .setDescription(`Total de **${templates.length}** templates disponíveis`)
+            .setTimestamp();
+          templates.slice(0, 10).forEach(t => {
+            embed.addFields({ name: `${t.emoji || '📋'} ${t.name} (${t.id})`, value: `**Motivo:** ${t.reason.substring(0, 100)}${t.reason.length > 100 ? '...' : ''}\n**Usos:** ${t.usageCount || 0} vezes`, inline: false });
+          });
+          await interaction.editReply({ embeds: [embed] });
+        } 
+        else if (action === 'create') {
+          const name = interaction.options.getString('name');
+          const reason = interaction.options.getString('reason');
+          if (!name || !reason) {
+            return interaction.editReply({ content: '❌ Para criar um template, forneça nome e motivo.' });
+          }
+          if (warnSystem?.addWarnTemplate) {
+            const result = warnSystem.addWarnTemplate(interaction.guild.id, { name, reason, duration: 0, severity: 'medium', emoji: '📋' }, interaction.user.id);
+            if (result && result.success) {
+              const embed = new EmbedBuilder()
+                .setTitle('✅ Template Criado')
+                .setColor(Colors.Green)
+                .setDescription(`Template **${name}** criado com sucesso!`)
+                .addFields(
+                  { name: '🆔 ID', value: `\`${result.templateId}\``, inline: true },
+                  { name: '📋 Motivo', value: reason, inline: false }
+                )
+                .setTimestamp();
+              await interaction.editReply({ embeds: [embed] });
+            } else {
+              await interaction.editReply({ content: `❌ Erro ao criar template: ${result?.error || 'Erro desconhecido'}` });
+            }
+          } else {
+            await interaction.editReply({ content: '❌ Função de templates não disponível.' });
+          }
+        } 
+        else if (action === 'delete') {
+          await interaction.editReply({ content: '🔜 Funcionalidade em desenvolvimento' });
         }
       }
 
@@ -963,8 +1135,8 @@ async function handleOwnerPanel(message) {
     .addFields(
       { name: '🤖 **Informações do Bot**', value: `• **Tag:** ${client.user.tag}\n• **ID:** ${client.user.id}\n• **Servidores:** ${client.guilds.cache.size}\n• **Usuários:** ${client.users.cache.size}`, inline: false },
       { name: '📊 **Status**', value: `• **Ping:** ${client.ws.ping}ms\n• **Uptime:** ${uptimeString}\n• **Memória:** ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`, inline: true },
-      { name: '📅 **Informações**', value: `• **Iniciado em:** ${stats.startDate.toLocaleString('pt-BR')}\n• **Comandos hoje:** ${totalCommandsToday}\n• **Warns totais:** ${globalWarnStats.totalWarns || 0}`, inline: true },
-      { name: '📋 **Comandos Disponíveis**', value: '`/ping` `/help` `/adm` `/private` `/report` `/warn` `/warnings` `/clearwarns` `/warnstats`\n\n**Comandos DM:** `!clear` `!clearAll` `Hello`', inline: false }
+      { name: '📅 **Informações**', value: `• **Iniciado em:** ${stats.startDate.toLocaleString('pt-BR')}\n• **Comandos hoje:** ${totalCommandsToday}\n• **Warns totais:** ${globalWarnStats.totalWarns || 0}\n• **Servidores com warns:** ${globalWarnStats.totalServers || 0}`, inline: true },
+      { name: '📋 **Comandos Disponíveis**', value: '`/ping` - Verificar latência\n`/help` - Lista de comandos\n`/adm` - Painel admin\n`/private` - Mensagem staff (pessoa ou cargo)\n`/report` - Gerar relatório\n`/warn` - Sistema completo de warns\n`/warnings` - Ver warns\n`/clearwarns` - Limpar warns\n`/warnstats` - Estatísticas\n\n**Comandos DM:**\n`!clear` - Limpar DM\n`!clearAll` - Limpar todas DMs\n`Hello` - Abrir este painel', inline: false }
     )
     .setFooter({ text: `Hostville-bot@5.0.1 • Warn System v${warnSystem?.version || '2.0.0'}` })
     .setTimestamp();
@@ -1055,7 +1227,7 @@ async function handleOwnerPanelButtons(interaction) {
   else if (interaction.customId === 'owner_monitor_roles') {
     await interaction.deferReply({ flags: 64 });
     await monitorWarnRoles();
-    await interaction.editReply({ content: '✅ **Monitoramento de cargos concluído!** Verifique o console.' });
+    await interaction.editReply({ content: '✅ **Monitoramento de cargos concluído!** Verifique o console para ver os resultados.' });
     setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 10000);
   }
 }
@@ -1069,6 +1241,11 @@ async function handleOwnerServerSelection(interaction) {
   await interaction.deferUpdate();
   try {
     const selectedValue = interaction.values[0];
+    if (selectedValue === 'more') {
+      await interaction.editReply({ content: '📌 **Use o comando `Hello` novamente para ver mais servidores.**', components: [] });
+      setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 5000);
+      return;
+    }
     const guild = client.guilds.cache.get(selectedValue);
     if (!guild) {
       await interaction.editReply({ content: '❌ Servidor não encontrado.', components: [] });
@@ -1329,8 +1506,9 @@ client.once('clientReady', async () => {
   console.log(chalk.magenta('  • /warn remove @user warnid motivo - Remover warn'));
   console.log(chalk.magenta('  • /warn clear @user motivo - Limpar warns'));
   console.log(chalk.magenta('  • /warn check @user - Ver warns'));
-  console.log(chalk.magenta('  • /warn stats [@user] - Estatísticas\n'));
-  console.log(chalk.magenta('  • /private (pessoa ou cargo) - Enviar mensagem\n'));
+  console.log(chalk.magenta('  • /warn stats [@user] - Estatísticas'));
+  console.log(chalk.magenta('  • /warn template list/create/delete - Templates\n'));
+  console.log(chalk.magenta('  • /private - Enviar mensagem para pessoa ou cargo\n'));
   
   console.log(chalk.cyan('\n📋 CARGOS DE WARN CARREGADOS:'));
   for (let i = 1; i <= 7; i++) {
@@ -1388,6 +1566,9 @@ client.on('interactionCreate', async (interaction) => {
       }
       if (interaction.customId.startsWith('monitor_')) {
         await handleMonitorButtons(interaction);
+        return;
+      }
+      if (interaction.customId === 'confirm_clear' || interaction.customId === 'cancel_clear') {
         return;
       }
     }
@@ -1507,6 +1688,13 @@ async function handleServerSelection(interaction) {
     }
     
     const isOn = state === 'on';
+    if (selectedValue === 'more') {
+      await interaction.editReply({ content: '📌 **Use o comando novamente para ver mais servidores.**', components: [] });
+      setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 5000);
+      pendingActions.delete(interaction.user.id);
+      return;
+    }
+    
     const guild = client.guilds.cache.get(selectedValue);
     if (!guild) {
       await interaction.editReply({ content: '❌ Servidor não encontrado.', components: [] });
@@ -1764,6 +1952,16 @@ client.on('messageDelete', async (message) => {
   console.log(chalk.red(`   Conteúdo: ${message.content || '[sem texto]'}`));
   console.log(chalk.red(`   Canal: #${message.channel.name}`));
   console.log(chalk.red('────────────────────────────────\n'));
+});
+
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+  if (!oldMessage.guild || !oldMessage.author) return;
+  if (oldMessage.content === newMessage.content) return;
+  console.log(chalk.yellow.bgBlack.bold('\n 📝 MENSAGEM ATUALIZADA '));
+  console.log(chalk.yellow(`   Autor: ${oldMessage.author.tag}`));
+  console.log(chalk.yellow(`   Antigo: ${oldMessage.content}`));
+  console.log(chalk.yellow(`   Novo: ${newMessage.content}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
 });
 
 // ===============================
