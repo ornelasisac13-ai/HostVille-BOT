@@ -777,7 +777,7 @@ const privateCommand = {
       {
         name: 'user',
         description: 'Usuário que receberá a mensagem',
-        type: 6,
+        type: 9,
         required: true
       },
       {
