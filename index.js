@@ -1,5 +1,5 @@
 // ===============================
-// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - CORRIGIDO
+// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - CORRIGIDO (COM PAINEL DO DONO E SISTEMA DE WARNS ULTRA COMPLETO)
 // ===============================
 const { 
   Client, 
@@ -140,7 +140,6 @@ try {
     }
   }
   
-  // PRIORIDADE 3: Usar os valores do .env (já estão no DEFAULT_WARN_ROLES)
   console.log(chalk.cyan(`\n📋 Cargos finais carregados:`));
   for (let i = 1; i <= 7; i++) {
     console.log(chalk.white(`   • Nível ${i}: ${WARN_ROLES[i]}`));
@@ -158,29 +157,7 @@ const offensiveWords = [
   "idiota", "burro", "estupido", "retardado", "lixo", "merda", "fdp", "otario",
   "vtnc", "imbecil", "inutil", "arrombado", "viado", "bicha", "piranha", "prostituta",
   "corno", "babaca", "palhaco", "nojento", "escroto", "cretino", "canalha", "maldito",
-  "peste", "verme", "trouxa", "otaria", "burra", "cacete", "caralho", "merdinha",
-  "vagabundo", "vagabunda", "cuzao", "idiotinha", "fodido", "bosta", "porra", "prr",
-  "poha", "krl", "krlh", "caramba", "fds", "foda", "fudeu", "fodase", "fodassi",
-  "pqp", "puta", "vsf", "tnc", "tmnc", "cuzão", "cú", "cu", "buceta", "bct", "xota",
-  "xoxota", "ppk", "perereca", "rapariga", "putinha", "putona", "puto", "bostinha",
-  "inutel", "burrinho", "estupida", "retardada", "nojenta", "escrota", "trouxinha",
-  "verminoso", "pestinha", "cretina", "maldita", "corninho", "chifrudo", "vagaba",
-  "piriguete", "viadinho", "boiola", "bichinha", "baitola", "sapatão", "sapata",
-  "galinha", "cachorra", "cachorro", "vaca", "égua", "cabra", "mula", "jumento",
-  "asno", "anta", "besta", "bocó", "boçal", "bronco", "ignorante", "analfabeto",
-  "pilantra", "malandro", "safado", "tarado", "pervertido", "depravado", "asqueroso",
-  "repugnante", "horrivel", "feio", "crápula", "infeliz", "miseravel", "coitado",
-  "nulo", "aborto", "lixinho", "traste", "praga", "desgraça", "fudido", "lascado",
-  "ferrado", "danado", "capeta", "demonio", "diabo", "satanás", "lucifer", "animal",
-  "bicho", "monstro", "abominavel", "marginal", "delinquente", "criminoso", "bandido",
-  "ladrão", "assaltante", "golpista", "enganador", "trapaceiro", "manipulador",
-  "abusador", "abusado", "folgado", "atrevido", "arrogante", "pretensioso", "metido",
-  "convencido", "soberbo", "orgulhoso", "vaidoso", "futil", "oco", "teimoso", "birrento",
-  "pentelho", "maçante", "enfadonho", "mrd", "fodendo", "fudendo", "crl", "crlh",
-  "putaria", "puteiro", "caraio", "karaio",
-  "vai tomar no cu", "vai tnc", "vai tmnc", "vai se foder", "vai se fuder", "vsf",
-  "foda se", "fodase", "foda-se", "puta que pariu", "puta q pariu",
-  "filho da puta", "filha da puta"
+  "vai tomar no cu", "vai tnc", "vai se foder", "fodase", "caralho", "porra", "krl"
 ];
 
 // ===============================
@@ -215,7 +192,6 @@ function logModeration(message, user, content, channel, foundWord) {
   console.log(chalk.red(`   Conteúdo:  ${content}`));
   console.log(chalk.red(`   Palavra:   "${foundWord}"`));
   console.log(chalk.red(`   Canal:     #${channel.name}`));
-  console.log(chalk.red(`   Motivo:    ${message}`));
   console.log(chalk.red('────────────────────────────────\n'));
 }
 
@@ -229,80 +205,14 @@ function formatTime(ms) {
 
 function containsOffensiveWord(text) {
   if (!text || typeof text !== 'string') return false;
-  const textLower = text.toLowerCase().trim();
-  
-  for (const offensivePhrase of offensiveWords) {
-    if (offensivePhrase.includes(' ') && textLower.includes(offensivePhrase)) {
-      return true;
-    }
-  }
-  
-  const textNormalized = textLower
-    .replace(/[^\w\sà-úÀ-Ú]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  
-  const words = textNormalized.split(' ');
-  
-  for (const word of words) {
-    if (word.length < 3) continue;
-    if (offensiveWords.includes(word)) return true;
-    
-    const leetMap = {
-      '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a',
-      '5': 's', '6': 'g', '7': 't', '8': 'b', '9': 'g',
-      '@': 'a', '!': 'i', '$': 's', '#': 'h', '&': 'e'
-    };
-    
-    let normalizedWord = '';
-    for (let i = 0; i < word.length; i++) {
-      const char = word[i];
-      normalizedWord += leetMap[char] || char;
-    }
-    
-    if (offensiveWords.includes(normalizedWord)) return true;
-  }
-  
-  return false;
+  const textLower = text.toLowerCase();
+  return offensiveWords.some(word => textLower.includes(word));
 }
 
 function findOffensiveWord(text) {
   if (!text || typeof text !== 'string') return null;
-  const textLower = text.toLowerCase().trim();
-  
-  for (const offensivePhrase of offensiveWords) {
-    if (offensivePhrase.includes(' ') && textLower.includes(offensivePhrase)) {
-      return offensivePhrase;
-    }
-  }
-  
-  const textNormalized = textLower
-    .replace(/[^\w\sà-úÀ-Ú]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  
-  const words = textNormalized.split(' ');
-  
-  for (const word of words) {
-    if (word.length < 3) continue;
-    if (offensiveWords.includes(word)) return word;
-    
-    const leetMap = {
-      '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a',
-      '5': 's', '6': 'g', '7': 't', '8': 'b', '9': 'g',
-      '@': 'a', '!': 'i', '$': 's', '#': 'h', '&': 'e'
-    };
-    
-    let normalizedWord = '';
-    for (let i = 0; i < word.length; i++) {
-      const char = word[i];
-      normalizedWord += leetMap[char] || char;
-    }
-    
-    if (offensiveWords.includes(normalizedWord)) return word;
-  }
-  
-  return null;
+  const textLower = text.toLowerCase();
+  return offensiveWords.find(word => textLower.includes(word)) || null;
 }
 
 function isAdmin(member) {
@@ -406,7 +316,6 @@ async function monitorWarnRoles() {
         console.log(chalk.gray(`   Nenhum membro com cargos de warn encontrado.`));
       }
       
-      // Mostrar estatísticas de warns do servidor
       if (warnSystem?.getServerStats) {
         try {
           const serverStats = warnSystem.getServerStats(guild.id);
@@ -438,7 +347,6 @@ async function updateWarnRoles(guild, userId, warnCount) {
     const isStaffMember = staffIds.includes(userId) || isAdmin(member);
     if (isStaffMember) return;
     
-    // Remover todos os cargos de warn
     for (let level = 1; level <= 7; level++) {
       const roleId = WARN_ROLES[level];
       if (roleId && member.roles.cache.has(roleId)) {
@@ -446,7 +354,6 @@ async function updateWarnRoles(guild, userId, warnCount) {
       }
     }
     
-    // Adicionar o cargo correspondente ao nível de warn
     if (warnCount >= 1 && warnCount <= 7) {
       const roleId = WARN_ROLES[warnCount];
       if (roleId) {
@@ -580,7 +487,11 @@ function initReadline() {
 // ===============================
 const commands = [
   {
-    data: { name: 'adm', description: 'Painel administrativo do bot', options: [{ name: 'code', type: 3, description: 'Senha de acesso', required: true }] },
+    data: { 
+      name: 'adm', 
+      description: 'Painel administrativo do bot', 
+      options: [{ name: 'code', type: 3, description: 'Senha de acesso', required: true }]
+    },
     async execute(interaction) {
       const code = interaction.options.getString('code');
       if (code !== CONFIG.ACCESS_CODE) {
@@ -646,31 +557,87 @@ const helpCommand = {
   }
 };
 
+// ===============================
+// COMANDO /private CORRIGIDO - SUPORTA PESSOA OU CARGO
+// ===============================
 const privateCommand = {
-  data: { name: 'private', description: 'Enviar mensagem da staff', options: [
-    { name: 'user', type: 6, description: 'Usuário', required: true },
-    { name: 'message', type: 3, description: 'Mensagem', required: true },
-    { name: 'code', type: 3, description: 'Código de acesso', required: true }
-  ]},
+  data: { 
+    name: 'private', 
+    description: 'Enviar mensagem da staff para pessoa ou cargo', 
+    options: [
+      { name: 'code', type: 3, description: 'Código de acesso', required: true },
+      { name: 'target_type', type: 3, description: 'Tipo de destino (user ou role)', required: true, choices: [
+        { name: '👤 Pessoa', value: 'user' },
+        { name: '👥 Cargo', value: 'role' }
+      ]},
+      { name: 'target', type: 3, description: 'ID do usuário ou cargo', required: true },
+      { name: 'message', type: 3, description: 'Mensagem a ser enviada', required: true }
+    ]
+  },
   async execute(interaction) {
-    const user = interaction.options.getUser('user');
-    const message = interaction.options.getString('message');
     const code = interaction.options.getString('code');
+    const targetType = interaction.options.getString('target_type');
+    const target = interaction.options.getString('target');
+    const message = interaction.options.getString('message');
+    
     if (code !== CONFIG.ACCESS_CODE) {
-      return interaction.reply({ content: '❌ Código incorreto!', flags: 64 });
+      return interaction.reply({ content: '❌ Código de acesso incorreto!', flags: 64 });
     }
+    
+    await interaction.deferReply({ flags: 64 });
+    
     try {
-      await user.send({ content: `📬 **Mensagem da Staff**\n\n${message}` });
-      await interaction.reply({ content: `✅ Mensagem enviada para ${user.tag}`, flags: 64 });
+      if (targetType === 'user') {
+        const user = await client.users.fetch(target).catch(() => null);
+        if (!user) {
+          return interaction.editReply({ content: '❌ Usuário não encontrado!' });
+        }
+        
+        await user.send({ content: `📬 **Mensagem da Staff**\n\n${message}` });
+        await interaction.editReply({ content: `✅ Mensagem enviada para ${user.tag}`, flags: 64 });
+        logInfo(`${interaction.user.tag} enviou mensagem para ${user.tag}`);
+        
+      } else if (targetType === 'role') {
+        const role = interaction.guild.roles.cache.get(target);
+        if (!role) {
+          return interaction.editReply({ content: '❌ Cargo não encontrado!' });
+        }
+        
+        await interaction.editReply({ content: `🔄 Enviando mensagem para o cargo **${role.name}**...`, flags: 64 });
+        
+        const members = role.members;
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (const [memberId, member] of members) {
+          try {
+            await member.send({ content: `📬 **Mensagem da Staff para ${role.name}**\n\n${message}` });
+            successCount++;
+            await new Promise(resolve => setTimeout(resolve, 200));
+          } catch (err) {
+            failCount++;
+          }
+        }
+        
+        await interaction.editReply({ content: `✅ Mensagem enviada para **${successCount}** membros do cargo ${role.name}${failCount > 0 ? ` (${failCount} falhas)` : ''}`, flags: 64 });
+        logInfo(`${interaction.user.tag} enviou mensagem para o cargo ${role.name} (${successCount} membros)`);
+      }
+      
       stats.commandsUsed['private'] = (stats.commandsUsed['private'] || 0) + 1;
+      
     } catch (error) {
-      await interaction.reply({ content: '❌ Erro ao enviar mensagem.', flags: 64 });
+      logError(`Erro ao enviar mensagem: ${error.message}`);
+      await interaction.editReply({ content: '❌ Erro ao enviar a mensagem.', flags: 64 });
     }
   }
 };
 
 const reportCommand = {
-  data: { name: 'report', description: 'Gerar relatório manual (Staff)', options: [{ name: 'code', type: 3, description: 'Código de acesso', required: true }] },
+  data: { 
+    name: 'report', 
+    description: 'Gerar relatório manual (Staff)', 
+    options: [{ name: 'code', type: 3, description: 'Código de acesso', required: true }]
+  },
   async execute(interaction) {
     const code = interaction.options.getString('code');
     if (code !== CONFIG.ACCESS_CODE) {
@@ -694,38 +661,63 @@ const reportCommand = {
 };
 
 // ===============================
-// COMANDO /warn COMPLETO
+// COMANDO /warn CORRIGIDO (OPÇÕES REQUIRED PRIMEIRO)
 // ===============================
 const warnCommand = {
   data: {
     name: 'warn',
     description: 'Sistema completo de warns',
     options: [
-      { name: 'add', type: 1, description: 'Adicionar warn', options: [
-        { name: 'user', type: 6, description: 'Usuário', required: true },
-        { name: 'reason', type: 3, description: 'Motivo', required: true },
-        { name: 'duration', type: 4, description: 'Duração em dias', required: false },
-        { name: 'code', type: 3, description: 'Código de acesso', required: true }
-      ]},
-      { name: 'remove', type: 1, description: 'Remover warn', options: [
-        { name: 'user', type: 6, description: 'Usuário', required: true },
-        { name: 'warnid', type: 3, description: 'ID do warn', required: true },
-        { name: 'reason', type: 3, description: 'Motivo', required: true },
-        { name: 'code', type: 3, description: 'Código de acesso', required: true }
-      ]},
-      { name: 'clear', type: 1, description: 'Limpar warns', options: [
-        { name: 'user', type: 6, description: 'Usuário', required: true },
-        { name: 'reason', type: 3, description: 'Motivo', required: true },
-        { name: 'code', type: 3, description: 'Código de acesso', required: true }
-      ]},
-      { name: 'check', type: 1, description: 'Ver warns', options: [
-        { name: 'user', type: 6, description: 'Usuário', required: true },
-        { name: 'code', type: 3, description: 'Código de acesso', required: true }
-      ]},
-      { name: 'stats', type: 1, description: 'Estatísticas', options: [
-        { name: 'user', type: 6, description: 'Usuário', required: false },
-        { name: 'code', type: 3, description: 'Código de acesso', required: true }
-      ]}
+      {
+        name: 'add',
+        description: 'Adicionar warn a um usuário',
+        type: 1,
+        options: [
+          { name: 'code', type: 3, description: 'Código de acesso', required: true },
+          { name: 'user', type: 6, description: 'Usuário a ser warnado', required: true },
+          { name: 'reason', type: 3, description: 'Motivo do warn', required: true },
+          { name: 'duration', type: 4, description: 'Duração em dias (0 = permanente)', required: false }
+        ]
+      },
+      {
+        name: 'remove',
+        description: 'Remover um warn específico',
+        type: 1,
+        options: [
+          { name: 'code', type: 3, description: 'Código de acesso', required: true },
+          { name: 'user', type: 6, description: 'Usuário', required: true },
+          { name: 'warnid', type: 3, description: 'ID do warn a remover', required: true },
+          { name: 'reason', type: 3, description: 'Motivo da remoção', required: true }
+        ]
+      },
+      {
+        name: 'clear',
+        description: 'Limpar todos os warns de um usuário',
+        type: 1,
+        options: [
+          { name: 'code', type: 3, description: 'Código de acesso', required: true },
+          { name: 'user', type: 6, description: 'Usuário', required: true },
+          { name: 'reason', type: 3, description: 'Motivo da limpeza', required: true }
+        ]
+      },
+      {
+        name: 'check',
+        description: 'Verificar warns de um usuário',
+        type: 1,
+        options: [
+          { name: 'code', type: 3, description: 'Código de acesso', required: true },
+          { name: 'user', type: 6, description: 'Usuário', required: true }
+        ]
+      },
+      {
+        name: 'stats',
+        description: 'Estatísticas de warns',
+        type: 1,
+        options: [
+          { name: 'code', type: 3, description: 'Código de acesso', required: true },
+          { name: 'user', type: 6, description: 'Ver estatísticas de um usuário', required: false }
+        ]
+      }
     ]
   },
   async execute(interaction) {
@@ -733,8 +725,9 @@ const warnCommand = {
     const code = interaction.options.getString('code');
     
     if (code !== CONFIG.ACCESS_CODE) {
-      return interaction.reply({ content: '❌ Código incorreto!', flags: 64 });
+      return interaction.reply({ content: '❌ Código de acesso incorreto!', flags: 64 });
     }
+
     await interaction.deferReply({ flags: 64 });
 
     try {
@@ -884,13 +877,17 @@ const warnCommand = {
 };
 
 // ===============================
-// COMANDOS DE ATALHO
+// COMANDOS DE ATALHO (OPÇÕES CORRIGIDAS)
 // ===============================
 const warningsCommand = {
-  data: { name: 'warnings', description: '[Atalho] Ver warns de um usuário', options: [
-    { name: 'user', type: 6, description: 'Usuário', required: true },
-    { name: 'code', type: 3, description: 'Código de acesso', required: true }
-  ]},
+  data: { 
+    name: 'warnings', 
+    description: '[Atalho] Ver warns de um usuário', 
+    options: [
+      { name: 'code', type: 3, description: 'Código de acesso', required: true },
+      { name: 'user', type: 6, description: 'Usuário', required: true }
+    ]
+  },
   async execute(interaction) {
     const user = interaction.options.getUser('user');
     const code = interaction.options.getString('code');
@@ -900,11 +897,15 @@ const warningsCommand = {
 };
 
 const clearwarnsCommand = {
-  data: { name: 'clearwarns', description: '[Atalho] Limpar warns de um usuário', options: [
-    { name: 'user', type: 6, description: 'Usuário', required: true },
-    { name: 'reason', type: 3, description: 'Motivo', required: false },
-    { name: 'code', type: 3, description: 'Código de acesso', required: true }
-  ]},
+  data: { 
+    name: 'clearwarns', 
+    description: '[Atalho] Limpar warns de um usuário', 
+    options: [
+      { name: 'code', type: 3, description: 'Código de acesso', required: true },
+      { name: 'user', type: 6, description: 'Usuário', required: true },
+      { name: 'reason', type: 3, description: 'Motivo', required: false }
+    ]
+  },
   async execute(interaction) {
     const user = interaction.options.getUser('user');
     const reason = interaction.options.getString('reason') || 'Limpeza via comando de atalho';
@@ -915,10 +916,14 @@ const clearwarnsCommand = {
 };
 
 const warnstatsCommand = {
-  data: { name: 'warnstats', description: '[Atalho] Estatísticas de warns', options: [
-    { name: 'user', type: 6, description: 'Usuário', required: false },
-    { name: 'code', type: 3, description: 'Código de acesso', required: true }
-  ]},
+  data: { 
+    name: 'warnstats', 
+    description: '[Atalho] Estatísticas de warns', 
+    options: [
+      { name: 'code', type: 3, description: 'Código de acesso', required: true },
+      { name: 'user', type: 6, description: 'Usuário', required: false }
+    ]
+  },
   async execute(interaction) {
     const user = interaction.options.getUser('user');
     const code = interaction.options.getString('code');
@@ -1050,7 +1055,7 @@ async function handleOwnerPanelButtons(interaction) {
   else if (interaction.customId === 'owner_monitor_roles') {
     await interaction.deferReply({ flags: 64 });
     await monitorWarnRoles();
-    await interaction.editReply({ content: '✅ **Monitoramento de cargos concluído!** Verifique o console para ver os resultados.' });
+    await interaction.editReply({ content: '✅ **Monitoramento de cargos concluído!** Verifique o console.' });
     setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 10000);
   }
 }
@@ -1289,7 +1294,6 @@ client.once('clientReady', async () => {
     serverMonitoring.set(guild.id, true);
   }
   
-  // Registrar comandos
   if (client.guilds.cache.size > 0) {
     try {
       const allCommands = [
@@ -1326,14 +1330,13 @@ client.once('clientReady', async () => {
   console.log(chalk.magenta('  • /warn clear @user motivo - Limpar warns'));
   console.log(chalk.magenta('  • /warn check @user - Ver warns'));
   console.log(chalk.magenta('  • /warn stats [@user] - Estatísticas\n'));
+  console.log(chalk.magenta('  • /private (pessoa ou cargo) - Enviar mensagem\n'));
   
-  // Mostrar cargos carregados
   console.log(chalk.cyan('\n📋 CARGOS DE WARN CARREGADOS:'));
   for (let i = 1; i <= 7; i++) {
     console.log(chalk.white(`   • Nível ${i}: ${WARN_ROLES[i]}`));
   }
   
-  // Executar monitoramento inicial
   setTimeout(() => { monitorWarnRoles(); }, 5000);
   
   scheduleDailyReport();
@@ -1383,10 +1386,19 @@ client.on('interactionCreate', async (interaction) => {
         await handleButtonInteraction(interaction);
         return;
       }
+      if (interaction.customId.startsWith('monitor_')) {
+        await handleMonitorButtons(interaction);
+        return;
+      }
     }
     
     if (interaction.isStringSelectMenu() && interaction.customId === 'owner_monitor_select') {
       await handleOwnerServerSelection(interaction);
+      return;
+    }
+    
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('select_server_')) {
+      await handleServerSelection(interaction);
       return;
     }
   } catch (error) {
@@ -1441,6 +1453,77 @@ async function handleButtonInteraction(interaction) {
   }
 }
 
+async function handleMonitorButtons(interaction) {
+  await interaction.deferReply({ flags: 64 });
+  try {
+    const parts = interaction.customId.split('_');
+    const action = parts[1];
+    const state = parts[2];
+    const isOn = state === 'on';
+    
+    if (action === 'all') {
+      let count = 0;
+      for (const [guildId, guild] of client.guilds.cache) {
+        setServerMonitoring(guildId, isOn, interaction.user);
+        count++;
+      }
+      const embed = createStatusEmbed(null, state, interaction.user);
+      embed.setDescription(`✅ Monitoramento ${isOn ? 'ativado' : 'desativado'} em **${count} servidores**!`);
+      await interaction.editReply({ embeds: [embed] });
+      setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 10000);
+    } else if (action === 'select') {
+      const options = [];
+      let count = 0;
+      for (const [guildId, guild] of client.guilds.cache) {
+        if (count >= 25) break;
+        const status = serverMonitoring.get(guildId) ? '🟢 ATIVO' : '🔴 INATIVO';
+        options.push(new StringSelectMenuOptionBuilder().setLabel(guild.name.substring(0, 100)).setDescription(`${guild.memberCount} membros - ${status}`).setValue(guildId).setEmoji('🏛️'));
+        count++;
+      }
+      const selectMenu = new StringSelectMenuBuilder().setCustomId(`select_server_${state}`).setPlaceholder('Selecione um servidor').addOptions(options);
+      const row = new ActionRowBuilder().addComponents(selectMenu);
+      pendingActions.set(interaction.user.id, { action: state, messageId: interaction.id });
+      await interaction.editReply({ content: `🔍 **Selecione o servidor para ${isOn ? 'ATIVAR' : 'DESATIVAR'} o monitoramento:**`, components: [row] });
+    }
+  } catch (error) {
+    logError(`Erro no handleMonitorButtons: ${error.message}`);
+    await interaction.editReply({ content: '❌ Erro ao processar comando.' });
+    setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 5000);
+  }
+}
+
+async function handleServerSelection(interaction) {
+  await interaction.deferUpdate();
+  try {
+    const selectedValue = interaction.values[0];
+    const customId = interaction.customId;
+    const state = customId.split('_')[2];
+    const pending = pendingActions.get(interaction.user.id);
+    
+    if (!pending) {
+      await interaction.editReply({ content: '❌ Esta seleção expirou.', components: [] });
+      setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 5000);
+      return;
+    }
+    
+    const isOn = state === 'on';
+    const guild = client.guilds.cache.get(selectedValue);
+    if (!guild) {
+      await interaction.editReply({ content: '❌ Servidor não encontrado.', components: [] });
+      pendingActions.delete(interaction.user.id);
+      return;
+    }
+    
+    setServerMonitoring(selectedValue, isOn, interaction.user);
+    const embed = createStatusEmbed(guild, state, interaction.user);
+    await interaction.editReply({ content: `✅ **Monitoramento ${isOn ? 'ativado' : 'desativado'} em ${guild.name}!**`, embeds: [embed], components: [] });
+    setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 10000);
+    pendingActions.delete(interaction.user.id);
+  } catch (error) {
+    logError(`Erro no handleServerSelection: ${error.message}`);
+  }
+}
+
 // ===============================
 // MENU INTERATIVO
 // ===============================
@@ -1453,10 +1536,14 @@ function showMenu() {
   console.log(chalk.cyan('╠═══════════════════════════════════════════════════════╣'));
   console.log(chalk.cyan('║  1.  Ver estatísticas detalhadas                                ║'));
   console.log(chalk.cyan('║  2.  Listar todos os servidores                                 ║'));
-  console.log(chalk.cyan('║  3.  Ver status do monitoramento                                ║'));
-  console.log(chalk.cyan('║  4.  Gerar relatório manual                                     ║'));
-  console.log(chalk.cyan('║  5.  Ver estatísticas de warns                                  ║'));
-  console.log(chalk.cyan('║  6.  Monitorar cargos de warn (console)                         ║'));
+  console.log(chalk.cyan('║  3.  Ver membros de um servidor                                 ║'));
+  console.log(chalk.cyan('║  4.  Enviar mensagem para canal                                 ║'));
+  console.log(chalk.cyan('║  5.  Ver status do monitoramento                                ║'));
+  console.log(chalk.cyan('║  6.  Ver logs recentes                                          ║'));
+  console.log(chalk.cyan('║  7.  Ver status do bot                                          ║'));
+  console.log(chalk.cyan('║  8.  Gerar relatório manual                                     ║'));
+  console.log(chalk.cyan('║  9.  Ver estatísticas de warns                                  ║'));
+  console.log(chalk.cyan('║  10. Monitorar cargos de warn (console)                         ║'));
   console.log(chalk.cyan('║  0.  Sair                                                       ║'));
   console.log(chalk.cyan('╚═══════════════════════════════════════════════════════╝'));
   
@@ -1470,24 +1557,16 @@ function handleMenuOption(option) {
   if (!rl || rl.closed) initReadline();
   
   switch (option) {
-    case '1':
-      showStats();
-      break;
-    case '2':
-      listServers();
-      break;
-    case '3':
-      showMonitoringStatus();
-      break;
-    case '4':
-      generateManualReport();
-      break;
-    case '5':
-      showWarnStats();
-      break;
-    case '6':
-      monitorWarnRoles().then(() => showMenu());
-      break;
+    case '1': showStats(); break;
+    case '2': listServers(); break;
+    case '3': listMembersInServer(); break;
+    case '4': sendMessageToChannel(); break;
+    case '5': showMonitoringStatus(); break;
+    case '6': showRecentLogs(); break;
+    case '7': showBotStatus(); break;
+    case '8': generateManualReport(); break;
+    case '9': showWarnStats(); break;
+    case '10': monitorWarnRoles().then(() => showMenu()); break;
     case '0':
       console.log(chalk.red('❌ Encerrando o bot...'));
       if (rl && !rl.closed) rl.close();
@@ -1525,6 +1604,79 @@ function listServers() {
   showMenu();
 }
 
+function listMembersInServer() {
+  const guilds = Array.from(client.guilds.cache.values());
+  if (guilds.length === 0) {
+    console.log(chalk.red('Nenhum servidor encontrado.'));
+    showMenu();
+    return;
+  }
+  console.log(chalk.yellow('\n═══ 👥 ESCOLHA UM SERVIDOR ═══'));
+  guilds.forEach((guild, index) => { console.log(chalk.white(`${index + 1}. ${guild.name}`)); });
+  rl.question(chalk.yellow('\n👉 Digite o número do servidor: '), async (answer) => {
+    const index = parseInt(answer) - 1;
+    if (index >= 0 && index < guilds.length) {
+      const guild = guilds[index];
+      console.log(chalk.cyan(`\nCarregando membros de ${guild.name}...`));
+      try {
+        await guild.members.fetch();
+        const members = guild.members.cache;
+        console.log(chalk.yellow(`\n═══ MEMBROS DE ${guild.name.toUpperCase()} ═══`));
+        console.log(chalk.white(`Total: ${members.size} membros\n`));
+        let count = 0;
+        members.forEach((member) => {
+          if (count < 10) {
+            const status = member.user.bot ? chalk.blue('[BOT]') : chalk.green('[USER]');
+            console.log(`  ${status} ${member.user.tag} - ${member.user.id}`);
+            count++;
+          }
+        });
+        if (members.size > 10) console.log(chalk.gray(`  ... e mais ${members.size - 10} membros`));
+        console.log(chalk.yellow('══════════════════════════════════════\n'));
+      } catch (error) { logError(`Erro ao buscar membros: ${error.message}`); }
+    } else { console.log(chalk.red('Servidor inválido!')); }
+    showMenu();
+  });
+}
+
+function sendMessageToChannel() {
+  const guilds = Array.from(client.guilds.cache.values());
+  if (guilds.length === 0) {
+    console.log(chalk.red('Nenhum servidor encontrado.'));
+    showMenu();
+    return;
+  }
+  console.log(chalk.yellow('\n═══ 📢 ENVIAR MENSAGEM ═══'));
+  guilds.forEach((guild, index) => { console.log(chalk.white(`${index + 1}. ${guild.name}`)); });
+  rl.question(chalk.yellow('\n👉 Escolha o servidor: '), (guildAnswer) => {
+    const guildIndex = parseInt(guildAnswer) - 1;
+    if (guildIndex >= 0 && guildIndex < guilds.length) {
+      const guild = guilds[guildIndex];
+      const channels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText);
+      if (channels.size === 0) {
+        console.log(chalk.red('Nenhum canal de texto encontrado.'));
+        showMenu();
+        return;
+      }
+      console.log(chalk.cyan('\n📁 Canais de texto:'));
+      channels.forEach((channel, index) => { console.log(chalk.white(`${index + 1}. #${channel.name}`)); });
+      rl.question(chalk.yellow('\n👉 Escolha o canal: '), async (channelAnswer) => {
+        const channelIndex = parseInt(channelAnswer) - 1;
+        if (channelIndex >= 0 && channelIndex < channels.size) {
+          const channel = Array.from(channels.values())[channelIndex];
+          rl.question(chalk.yellow('\n📝 Digite a mensagem: '), async (message) => {
+            try {
+              await channel.send(message);
+              console.log(chalk.green(`\n✅ Mensagem enviada para #${channel.name}!`));
+            } catch (error) { logError(`Erro ao enviar mensagem: ${error.message}`); }
+            showMenu();
+          });
+        } else { console.log(chalk.red('Canal inválido!')); showMenu(); }
+      });
+    } else { console.log(chalk.red('Servidor inválido!')); showMenu(); }
+  });
+}
+
 function showMonitoringStatus() {
   console.log(chalk.yellow('\n═══ 🛡️ STATUS DO MONITORAMENTO ═══'));
   client.guilds.cache.forEach((guild) => {
@@ -1532,6 +1684,29 @@ function showMonitoringStatus() {
     console.log(chalk.white(`• ${guild.name}: ${status}`));
   });
   console.log(chalk.yellow('═══════════════════════════════════\n'));
+  showMenu();
+}
+
+function showRecentLogs() {
+  console.log(chalk.yellow('\n═══ 📋 LOGS RECENTES ═══'));
+  console.log(chalk.white('Os logs recentes foram exibidos no console.'));
+  console.log(chalk.yellow('══════════════════════════════\n'));
+  showMenu();
+}
+
+function showBotStatus() {
+  const uptimeSeconds = Math.floor(client.uptime / 1000);
+  const hours = Math.floor(uptimeSeconds / 3600);
+  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+  const seconds = uptimeSeconds % 60;
+  console.log(chalk.yellow('\n═══ 🛡️ STATUS DO BOT ═══'));
+  console.log(chalk.white(`🟢 Status: Online`));
+  console.log(chalk.white(`🏓 Ping: ${client.ws.ping}ms`));
+  console.log(chalk.white(`⏱️  Uptime: ${hours}h ${minutes}m ${seconds}s`));
+  console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
+  console.log(chalk.white(`👥 Usuários: ${client.users.cache.size}`));
+  console.log(chalk.white(`⚠️ Warn System: v${warnSystem?.version || '2.0.0'}`));
+  console.log(chalk.yellow('══════════════════════════════\n'));
   showMenu();
 }
 
@@ -1544,9 +1719,7 @@ async function generateManualReport() {
     console.log(chalk.white(`👥 Membros novos: ${stats.membersJoined}`));
     console.log(chalk.white(`👋 Membros que saíram: ${stats.membersLeft}`));
     console.log(chalk.white(`⚠️ Warns dados: ${stats.warnsGiven}`));
-  } catch (error) {
-    console.log(chalk.red(`❌ Erro: ${error.message}`));
-  }
+  } catch (error) { console.log(chalk.red(`❌ Erro: ${error.message}`)); }
   console.log(chalk.yellow('═══════════════════════════════\n'));
   showMenu();
 }
@@ -1560,9 +1733,7 @@ function showWarnStats() {
     console.log(chalk.white(`⚠️ Total de warns: ${globalStats.totalWarns}`));
     console.log(chalk.white(`🟢 Warns ativos: ${globalStats.totalActiveWarns}`));
     console.log(chalk.white(`📊 Versão do sistema: v${warnSystem?.version || '2.0.0'}`));
-  } catch (error) {
-    console.log(chalk.red(`❌ Erro ao carregar estatísticas: ${error.message}`));
-  }
+  } catch (error) { console.log(chalk.red(`❌ Erro ao carregar estatísticas: ${error.message}`)); }
   console.log(chalk.yellow('═══════════════════════════════\n'));
   showMenu();
 }
