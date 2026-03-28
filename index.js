@@ -1,6 +1,7 @@
 // ===============================
-// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - PARTE 1/3
+// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA
 // ===============================
+
 const { 
   Client, 
   GatewayIntentBits, 
@@ -172,6 +173,11 @@ function addWarn(guildId, userId, reason, moderatorId, options = {}) {
       return { success: false, error: 'Motivo deve ter pelo menos 3 caracteres' };
     }
     
+    // Validar tamanho do motivo
+    if (reason.length > 500) {
+      return { success: false, error: 'Motivo não pode ter mais de 500 caracteres' };
+    }
+    
     // Inicializar estrutura do servidor
     if (!warnsData.has(guildId)) {
       warnsData.set(guildId, new Map());
@@ -203,7 +209,8 @@ function addWarn(guildId, userId, reason, moderatorId, options = {}) {
       expiresAt,
       active: true,
       channelId: options.channelId,
-      messageId: options.messageId
+      messageId: options.messageId,
+      evidence: options.evidence || null
     };
     
     userWarns.history.push(warn);
@@ -366,7 +373,7 @@ function getUserStats(guildId, userId) {
 // Função para obter estatísticas do servidor
 function getServerStats(guildId) {
   if (!warnsData.has(guildId)) {
-    return { totalWarns: 0, activeWarns: 0, warnedUsers: 0, averageWarnsPerUser: 0, topReasons: [], topModerators: [] };
+    return { totalWarns: 0, activeWarns: 0, warnedUsers: 0, averageWarnsPerUser: 0, topReasons: [], topModerators: [], warnsByHour: Array(24).fill(0), warnsByWeekday: Array(7).fill(0) };
   }
   
   const guildWarns = warnsData.get(guildId);
@@ -375,6 +382,8 @@ function getServerStats(guildId) {
   let warnedUsers = 0;
   const reasons = {};
   const moderators = {};
+  const warnsByHour = Array(24).fill(0);
+  const warnsByWeekday = Array(7).fill(0);
   
   for (const [userId, userWarns] of guildWarns) {
     warnedUsers++;
@@ -384,6 +393,12 @@ function getServerStats(guildId) {
     userWarns.history.forEach(warn => {
       reasons[warn.reason] = (reasons[warn.reason] || 0) + 1;
       moderators[warn.moderatorId] = (moderators[warn.moderatorId] || 0) + 1;
+      
+      const hour = new Date(warn.timestamp).getHours();
+      warnsByHour[hour]++;
+      
+      const weekday = new Date(warn.timestamp).getDay();
+      warnsByWeekday[weekday]++;
     });
   }
   
@@ -393,7 +408,9 @@ function getServerStats(guildId) {
     warnedUsers,
     averageWarnsPerUser: warnedUsers > 0 ? (totalWarns / warnedUsers).toFixed(2) : 0,
     topReasons: Object.entries(reasons).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([r, c]) => ({ reason: r, count: c })),
-    topModerators: Object.entries(moderators).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([m, c]) => ({ id: m, count: c }))
+    topModerators: Object.entries(moderators).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([m, c]) => ({ id: m, count: c })),
+    warnsByHour,
+    warnsByWeekday
   };
 }
 
@@ -423,17 +440,33 @@ function getGlobalStats() {
 
 // Função para calcular nível de risco
 function calculateRiskLevel(warnCount) {
-  if (warnCount >= 7) return { level: 'CRÍTICO', color: Colors.DarkRed, emoji: '💀' };
-  if (warnCount >= 5) return { level: 'ALTO', color: Colors.Red, emoji: '🔴' };
-  if (warnCount >= 3) return { level: 'MÉDIO', color: Colors.Orange, emoji: '🟠' };
-  if (warnCount >= 1) return { level: 'BAIXO', color: Colors.Yellow, emoji: '🟡' };
-  return { level: 'NENHUM', color: Colors.Green, emoji: '🟢' };
+  if (warnCount >= 7) return { level: 'CRÍTICO', color: Colors.DarkRed, emoji: '💀', action: 'BANIMENTO' };
+  if (warnCount >= 5) return { level: 'ALTO', color: Colors.Red, emoji: '🔴', action: 'KICK' };
+  if (warnCount >= 3) return { level: 'MÉDIO', color: Colors.Orange, emoji: '🟠', action: 'MUTE' };
+  if (warnCount >= 1) return { level: 'BAIXO', color: Colors.Yellow, emoji: '🟡', action: 'MONITORAR' };
+  return { level: 'NENHUM', color: Colors.Green, emoji: '🟢', action: 'NENHUMA' };
 }
 
 // Função para formatar data
 function formatDate(timestamp) {
   if (!timestamp) return 'Nunca';
-  return new Date(timestamp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  return new Date(timestamp).toLocaleString('pt-BR', { 
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+// Função para formatar duração
+function formatDuration(days) {
+  if (days === 0) return 'Permanente';
+  if (days === 1) return '1 dia';
+  if (days < 30) return `${days} dias`;
+  if (days < 365) return `${Math.floor(days / 30)} meses`;
+  return `${Math.floor(days / 365)} anos`;
 }
 
 // ===============================
@@ -448,6 +481,21 @@ const offensiveWords = [
   "poha", "krl", "krlh", "caramba", "fds", "foda", "fudeu", "fodase", "fodassi",
   "pqp", "puta", "vsf", "tnc", "tmnc", "cuzão", "cú", "cu", "buceta", "bct", "xota",
   "xoxota", "ppk", "perereca", "rapariga", "putinha", "putona", "puto", "bostinha",
+  "inutel", "burrinho", "estupida", "retardada", "nojenta", "escrota", "trouxinha",
+  "verminoso", "pestinha", "cretina", "maldita", "corninho", "chifrudo", "vagaba",
+  "piriguete", "viadinho", "boiola", "bichinha", "baitola", "sapatão", "sapata",
+  "galinha", "cachorra", "cachorro", "vaca", "égua", "cabra", "mula", "jumento",
+  "asno", "anta", "besta", "bocó", "boçal", "bronco", "ignorante", "analfabeto",
+  "pilantra", "malandro", "safado", "tarado", "pervertido", "depravado", "asqueroso",
+  "repugnante", "horrivel", "feio", "crápula", "infeliz", "miseravel", "coitado",
+  "nulo", "aborto", "lixinho", "traste", "praga", "desgraça", "fudido", "lascado",
+  "ferrado", "danado", "capeta", "demonio", "diabo", "satanás", "lucifer", "animal",
+  "bicho", "monstro", "abominavel", "marginal", "delinquente", "criminoso", "bandido",
+  "ladrão", "assaltante", "golpista", "enganador", "trapaceiro", "manipulador",
+  "abusador", "abusado", "folgado", "atrevido", "arrogante", "pretensioso", "metido",
+  "convencido", "soberbo", "orgulhoso", "vaidoso", "futil", "oco", "teimoso", "birrento",
+  "pentelho", "maçante", "enfadonho", "mrd", "fodendo", "fudendo", "crl", "crlh",
+  "putaria", "puteiro", "caraio", "karaio",
   "vai tomar no cu", "vai tnc", "vai tmnc", "vai se foder", "vai se fuder", "vsf",
   "foda se", "fodase", "foda-se", "puta que pariu", "puta q pariu",
   "filho da puta", "filha da puta"
@@ -732,6 +780,19 @@ async function monitorWarnRoles() {
         console.log(chalk.white(`      • Total de warns: ${serverStats.totalWarns}`));
         console.log(chalk.white(`      • Warns ativos: ${serverStats.activeWarns}`));
         console.log(chalk.white(`      • Usuários warnados: ${serverStats.warnedUsers}`));
+        
+        // Calcular horário de pico
+        const peakHour = serverStats.warnsByHour.indexOf(Math.max(...serverStats.warnsByHour));
+        if (peakHour !== -1 && serverStats.warnsByHour[peakHour] > 0) {
+          console.log(chalk.white(`      • Horário de pico: ${peakHour}:00 - ${serverStats.warnsByHour[peakHour]} warns`));
+        }
+        
+        // Calcular dia de pico
+        const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+        const peakDay = serverStats.warnsByWeekday.indexOf(Math.max(...serverStats.warnsByWeekday));
+        if (peakDay !== -1 && serverStats.warnsByWeekday[peakDay] > 0) {
+          console.log(chalk.white(`      • Dia de pico: ${days[peakDay]} - ${serverStats.warnsByWeekday[peakDay]} warns`));
+        }
       }
       
     } catch (error) {
@@ -906,17 +967,12 @@ module.exports = {
   client, CONFIG, staffIds, stats, serverMonitoring, pendingActions,
   warnsData, WARN_ROLES, offensiveWords,
   addWarn, removeWarn, clearUserWarns, getUserWarns, getUserStats, getServerStats, getGlobalStats,
-  calculateRiskLevel, formatDate, updateWarnRoles, monitorWarnRoles,
+  calculateRiskLevel, formatDate, formatDuration, updateWarnRoles, monitorWarnRoles,
   generateDailyReport, sendReportToStaff, scheduleDailyReport,
   containsOffensiveWord, findOffensiveWord, isAdmin, isStaff, setServerMonitoring, createStatusEmbed,
   getTimestamp, logInfo, logError, logWarn, logSuccess, logModeration, formatTime,
   initReadline, showMenu, handleMenuOption
 };
-// ===============================
-// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - PARTE 2/3
-// ===============================
-// COMANDOS DO BOT
-// ===============================
 
 // ===============================
 // COMANDO /adm - PAINEL ADMINISTRATIVO
@@ -1167,7 +1223,8 @@ const warnCommand = {
           { name: 'code', type: 3, description: 'Código de acesso', required: true },
           { name: 'user', type: 6, description: 'Usuário a ser warnado', required: true },
           { name: 'reason', type: 3, description: 'Motivo do warn', required: true },
-          { name: 'duration', type: 4, description: 'Duração em dias (0 = permanente)', required: false }
+          { name: 'duration', type: 4, description: 'Duração em dias (0 = permanente)', required: false },
+          { name: 'evidence', type: 3, description: '🔗 Link da evidência', required: false }
         ]
       },
       {
@@ -1197,7 +1254,8 @@ const warnCommand = {
         type: 1,
         options: [
           { name: 'code', type: 3, description: 'Código de acesso', required: true },
-          { name: 'user', type: 6, description: 'Usuário', required: true }
+          { name: 'user', type: 6, description: 'Usuário', required: true },
+          { name: 'detailed', type: 5, description: '📊 Ver detalhes completos?', required: false }
         ]
       },
       {
@@ -1206,7 +1264,14 @@ const warnCommand = {
         type: 1,
         options: [
           { name: 'code', type: 3, description: 'Código de acesso', required: true },
-          { name: 'user', type: 6, description: 'Ver estatísticas de um usuário', required: false }
+          { name: 'user', type: 6, description: 'Ver estatísticas de um usuário', required: false },
+          { name: 'period', type: 3, description: '📅 Período', required: false, choices: [
+            { name: 'Hoje', value: 'day' },
+            { name: 'Esta semana', value: 'week' },
+            { name: 'Este mês', value: 'month' },
+            { name: 'Este ano', value: 'year' },
+            { name: 'Todo período', value: 'all' }
+          ]}
         ]
       }
     ]
@@ -1227,6 +1292,7 @@ const warnCommand = {
         const user = interaction.options.getUser('user');
         const reason = interaction.options.getString('reason');
         const duration = interaction.options.getInteger('duration') || 0;
+        const evidence = interaction.options.getString('evidence') || null;
         
         const member = await interaction.guild.members.fetch(user.id).catch(() => null);
         if (!member) {
@@ -1237,7 +1303,7 @@ const warnCommand = {
           return interaction.editReply({ content: '❌ Não é possível warnar membros da staff ou administradores!' });
         }
 
-        const result = addWarn(interaction.guild.id, user.id, reason, interaction.user.id, { duration: duration || null });
+        const result = addWarn(interaction.guild.id, user.id, reason, interaction.user.id, { duration: duration || null, evidence });
         
         if (!result.success) {
           return interaction.editReply({ content: `❌ ${result.error || 'Falha ao adicionar warn'}` });
@@ -1248,39 +1314,51 @@ const warnCommand = {
 
         const riskLevel = calculateRiskLevel(result.warnCount);
         
+        // Embed detalhado com formatação
         const embed = new EmbedBuilder()
-          .setTitle(`${riskLevel.emoji} Warn Adicionado`)
+          .setTitle(`${riskLevel.emoji} WARN ADICIONADO ${riskLevel.emoji}`)
           .setColor(riskLevel.color)
-          .setDescription(`Warn registrado para ${user.toString()}`)
+          .setDescription(`┌─────────────────────────────────────────┐\n│  ⚠️ **WARN REGISTRADO COM SUCESSO**  │\n└─────────────────────────────────────────┘`)
           .addFields(
-            { name: '👤 Usuário', value: `${user.tag}`, inline: true },
-            { name: '🛡️ Moderador', value: interaction.user.tag, inline: true },
-            { name: '📋 Motivo', value: reason, inline: false },
-            { name: '⚠️ Warns Ativos', value: `**${result.warnCount}**`, inline: true },
-            { name: '📊 Nível de Risco', value: `**${riskLevel.level}**`, inline: true },
-            { name: '🆔 ID', value: `\`${result.warnId}\``, inline: true }
+            { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: 'ㅤ', inline: false },
+            { name: '👤 **USUÁRIO**', value: `┌─────────────────────────────┐\n│ ${user.toString()}\n│ **Tag:** ${user.tag}\n│ **ID:** \`${user.id}\`\n└─────────────────────────────┘`, inline: true },
+            { name: '🛡️ **MODERADOR**', value: `┌─────────────────────────────┐\n│ ${interaction.user.toString()}\n│ **Tag:** ${interaction.user.tag}\n│ **ID:** \`${interaction.user.id}\`\n└─────────────────────────────┘`, inline: true },
+            { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: 'ㅤ', inline: false },
+            { name: '📋 **MOTIVO**', value: `\`\`\`ansi\n\u001b[1;33m${reason.substring(0, 500)}\u001b[0m\n\`\`\``, inline: false },
+            { name: '⚠️ **WARNS ATIVOS**', value: `\`\`\`diff\n+ ${result.warnCount} warn(s) ativo(s)\n\`\`\``, inline: true },
+            { name: '📊 **NÍVEL DE RISCO**', value: `\`\`\`css\n[ ${riskLevel.level} ] ${riskLevel.emoji}\n\`\`\``, inline: true },
+            { name: '🆔 **ID DO WARN**', value: `\`\`\`ini\n[${result.warnId}]\n\`\`\``, inline: true }
           )
-          .setFooter({ text: `Sistema de Warns` })
+          .setFooter({ text: `Sistema de Warns • ID: ${result.warnId}`, iconURL: interaction.user.displayAvatarURL() })
           .setTimestamp();
 
         if (duration > 0) {
-          embed.addFields({ name: '⏰ Expira em', value: `${duration} dias`, inline: true });
+          embed.addFields({ name: '⏰ **EXPIRA EM**', value: `\`\`\`yaml\n${formatDuration(duration)}\n\`\`\``, inline: true });
+        }
+        
+        if (evidence) {
+          embed.addFields({ name: '🔗 **EVIDÊNCIA**', value: `[Clique aqui para ver](${evidence})`, inline: false });
         }
 
         await interaction.editReply({ embeds: [embed] });
 
-        // Tentar enviar DM
+        // Tentar enviar DM com embed detalhado
         try {
           const dmEmbed = new EmbedBuilder()
-            .setTitle(`⚠️ Você recebeu um warn em ${interaction.guild.name}`)
+            .setTitle(`⚠️ VOCÊ RECEBEU UM WARN`)
             .setColor(riskLevel.color)
-            .setDescription(`**Motivo:** ${reason}`)
+            .setDescription(`┌─────────────────────────────────────────┐\n│  ⚠️ **VOCÊ FOI WANADO EM ${interaction.guild.name}**  │\n└─────────────────────────────────────────┘`)
             .addFields(
-              { name: '📊 Warns Ativos', value: `**${result.warnCount}**`, inline: true },
-              { name: '📊 Nível de Risco', value: riskLevel.level, inline: true }
+              { name: '📋 **MOTIVO**', value: `\`\`\`ansi\n\u001b[1;33m${reason}\u001b[0m\n\`\`\``, inline: false },
+              { name: '⚠️ **WARNS ATIVOS**', value: `**${result.warnCount}**`, inline: true },
+              { name: '📊 **NÍVEL DE RISCO**', value: `**${riskLevel.level}** ${riskLevel.emoji}`, inline: true }
             )
-            .setFooter({ text: 'Caso ache isso um erro, você pode recorrer' })
+            .setFooter({ text: 'Caso seja um erro, entre em contato com a staff' })
             .setTimestamp();
+
+          if (duration > 0) {
+            dmEmbed.addFields({ name: '⏰ **EXPIRA EM**', value: formatDuration(duration), inline: true });
+          }
 
           await user.send({ embeds: [dmEmbed] });
         } catch (dmError) {}
@@ -1302,17 +1380,25 @@ const warnCommand = {
         await updateWarnRoles(interaction.guild, user.id, userWarns?.activeCount || 0);
 
         const embed = new EmbedBuilder()
-          .setTitle('✅ Warn Removido')
+          .setTitle('✅ WARN REMOVIDO')
           .setColor(Colors.Green)
-          .setDescription(`Warn removido de ${user.toString()}`)
+          .setDescription(`┌─────────────────────────────────────────┐\n│  ✅ **WARN REMOVIDO COM SUCESSO**   │\n└─────────────────────────────────────────┘`)
           .addFields(
-            { name: '🆔 ID do Warn', value: `\`${warnId}\``, inline: true },
-            { name: '📋 Motivo', value: reason, inline: false },
-            { name: '🛡️ Moderador', value: interaction.user.tag, inline: true }
+            { name: '👤 **USUÁRIO**', value: user.toString(), inline: true },
+            { name: '🆔 **ID DO WARN**', value: `\`${warnId}\``, inline: true },
+            { name: '📋 **MOTIVO DA REMOÇÃO**', value: `\`\`\`ansi\n\u001b[1;32m${reason}\u001b[0m\n\`\`\``, inline: false },
+            { name: '🛡️ **MODERADOR**', value: interaction.user.tag, inline: true }
           )
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
+        
+        // Tentar notificar o usuário
+        try {
+          await user.send({ 
+            content: `✅ **Seu warn foi removido em ${interaction.guild.name}**\n\n**Motivo:** ${reason}` 
+          });
+        } catch (e) {}
       }
 
       // ========== SUBCOMANDO CLEAR ==========
@@ -1329,22 +1415,30 @@ const warnCommand = {
         await updateWarnRoles(interaction.guild, user.id, 0);
 
         const embed = new EmbedBuilder()
-          .setTitle('🧹 Warns Limpos')
+          .setTitle('🧹 WARNS LIMPOS')
           .setColor(Colors.Green)
-          .setDescription(`Todos os warns de ${user.toString()} foram limpos.`)
+          .setDescription(`┌─────────────────────────────────────────┐\n│  🧹 **TODOS OS WARNS FORAM LIMPOS**  │\n└─────────────────────────────────────────┘`)
           .addFields(
-            { name: '🧹 Warns Removidos', value: `**${result.clearedCount || 0}**`, inline: true },
-            { name: '📋 Motivo', value: reason, inline: false },
-            { name: '🛡️ Moderador', value: interaction.user.tag, inline: true }
+            { name: '👤 **USUÁRIO**', value: user.toString(), inline: true },
+            { name: '🧹 **WARNS REMOVIDOS**', value: `**${result.clearedCount}**`, inline: true },
+            { name: '📋 **MOTIVO**', value: `\`\`\`ansi\n\u001b[1;32m${reason}\u001b[0m\n\`\`\``, inline: false }
           )
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
+        
+        // Tentar notificar o usuário
+        try {
+          await user.send({ 
+            content: `🧹 **Seus warns foram limpos em ${interaction.guild.name}**\n\n**Motivo:** ${reason}` 
+          });
+        } catch (e) {}
       }
 
       // ========== SUBCOMANDO CHECK ==========
       else if (subcommand === 'check') {
         const user = interaction.options.getUser('user');
+        const detailed = interaction.options.getBoolean('detailed') || false;
         
         const userWarns = getUserWarns(interaction.guild.id, user.id);
         
@@ -1362,19 +1456,36 @@ const warnCommand = {
         const riskLevel = calculateRiskLevel(userWarns.activeCount);
         
         const embed = new EmbedBuilder()
-          .setTitle(`${riskLevel.emoji} Histórico de Warns de ${user.username}`)
+          .setTitle(`${riskLevel.emoji} HISTÓRICO DE WARNS ${riskLevel.emoji}`)
           .setColor(riskLevel.color)
-          .setThumbnail(user.displayAvatarURL())
+          .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
+          .setDescription(`**${user.toString()}**`)
           .addFields(
-            { name: '⚠️ Warns Ativos', value: `**${userWarns.activeCount}**`, inline: true },
-            { name: '📊 Total de Warns', value: `**${userWarns.count}**`, inline: true },
-            { name: '📊 Nível de Risco', value: `**${riskLevel.level}**`, inline: true },
-            { name: '📅 Primeiro Warn', value: formatDate(userWarns.firstWarn), inline: true },
-            { name: '📅 Último Warn', value: formatDate(userWarns.lastWarn), inline: true }
+            { name: '⚠️ **WARNS ATIVOS**', value: `**${userWarns.activeCount}**`, inline: true },
+            { name: '📊 **TOTAL DE WARNS**', value: `**${userWarns.count}**`, inline: true },
+            { name: '📊 **NÍVEL DE RISCO**', value: `**${riskLevel.level}** ${riskLevel.emoji}`, inline: true },
+            { name: '📅 **PRIMEIRO WARN**', value: formatDate(userWarns.firstWarn), inline: true },
+            { name: '📅 **ÚLTIMO WARN**', value: formatDate(userWarns.lastWarn), inline: true }
           )
+          .setFooter({ text: `ID do Usuário: ${user.id}`, iconURL: user.displayAvatarURL() })
           .setTimestamp();
 
-        if (userWarns.history.length > 0) {
+        if (detailed && userWarns.history.length > 0) {
+          const recentWarns = userWarns.history.slice(-10).reverse();
+          let warnsList = '';
+          
+          recentWarns.forEach((warn, index) => {
+            const status = warn.active ? '🟢 ATIVO' : '🔴 INATIVO';
+            const date = formatDate(warn.timestamp);
+            warnsList += `**#${recentWarns.length - index}** \`${warn.id}\`\n`;
+            warnsList += `└ 📋 **Motivo:** ${warn.reason.substring(0, 100)}${warn.reason.length > 100 ? '...' : ''}\n`;
+            warnsList += `└ 🛡️ **Moderador:** <@${warn.moderatorId}>\n`;
+            warnsList += `└ 📅 **Data:** ${date}\n`;
+            warnsList += `└ ${status}\n\n`;
+          });
+          
+          embed.addFields({ name: '📋 **ÚLTIMOS 10 WARNS**', value: warnsList.substring(0, 1024), inline: false });
+        } else if (userWarns.history.length > 0) {
           const recentWarns = userWarns.history.slice(-5).reverse();
           let warnsList = '';
           
@@ -1383,7 +1494,7 @@ const warnCommand = {
             warnsList += `${status} **#${index + 1}** \`${warn.id}\` - ${warn.reason.substring(0, 50)}${warn.reason.length > 50 ? '...' : ''}\n`;
           });
           
-          embed.addFields({ name: '📋 Últimos Warns', value: warnsList || 'Nenhum warn recente', inline: false });
+          embed.addFields({ name: '📋 **ÚLTIMOS 5 WARNS**', value: warnsList, inline: false });
         }
 
         await interaction.editReply({ embeds: [embed] });
@@ -1392,51 +1503,70 @@ const warnCommand = {
       // ========== SUBCOMANDO STATS ==========
       else if (subcommand === 'stats') {
         const user = interaction.options.getUser('user');
+        const period = interaction.options.getString('period') || 'all';
 
         if (user) {
           const userStats = getUserStats(interaction.guild.id, user.id);
+          const riskLevel = calculateRiskLevel(userStats.activeWarns);
           
           const embed = new EmbedBuilder()
-            .setTitle(`📊 Estatísticas de ${user.username}`)
-            .setColor(Colors.Blue)
-            .setThumbnail(user.displayAvatarURL())
+            .setTitle(`📊 ESTATÍSTICAS DE ${user.username.toUpperCase()}`)
+            .setColor(riskLevel.color)
+            .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
+            .setDescription(`┌─────────────────────────────────────────┐\n│  📊 **ANÁLISE COMPLETA**               │\n└─────────────────────────────────────────┘`)
             .addFields(
-              { name: '⚠️ Total de Warns', value: userStats.totalWarns.toString(), inline: true },
-              { name: '🟢 Warns Ativos', value: userStats.activeWarns.toString(), inline: true },
-              { name: '📅 Primeiro Warn', value: formatDate(userStats.firstWarn), inline: true },
-              { name: '📅 Último Warn', value: formatDate(userStats.lastWarn), inline: true },
-              { name: '⏱️ Intervalo Médio', value: `${userStats.averageInterval} dias`, inline: true }
+              { name: '⚠️ **TOTAL DE WARNS**', value: `**${userStats.totalWarns}**`, inline: true },
+              { name: '🟢 **WARNS ATIVOS**', value: `**${userStats.activeWarns}**`, inline: true },
+              { name: '📊 **NÍVEL DE RISCO**', value: `**${riskLevel.level}** ${riskLevel.emoji}`, inline: true },
+              { name: '📅 **PRIMEIRO WARN**', value: formatDate(userStats.firstWarn), inline: true },
+              { name: '📅 **ÚLTIMO WARN**', value: formatDate(userStats.lastWarn), inline: true },
+              { name: '⏱️ **INTERVALO MÉDIO**', value: `${userStats.averageInterval} dias`, inline: true }
             )
+            .setFooter({ text: `ID do Usuário: ${user.id}`, iconURL: user.displayAvatarURL() })
             .setTimestamp();
 
           await interaction.editReply({ embeds: [embed] });
         } else {
           const serverStats = getServerStats(interaction.guild.id);
           
+          // Calcular horário de pico
+          const peakHour = serverStats.warnsByHour.indexOf(Math.max(...serverStats.warnsByHour));
+          const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+          const peakDay = serverStats.warnsByWeekday.indexOf(Math.max(...serverStats.warnsByWeekday));
+          
           const embed = new EmbedBuilder()
-            .setTitle(`📊 Estatísticas do Servidor`)
+            .setTitle(`📊 ESTATÍSTICAS DO SERVIDOR`)
             .setColor(Colors.Gold)
-            .setThumbnail(interaction.guild.iconURL())
+            .setThumbnail(interaction.guild.iconURL({ dynamic: true, size: 256 }))
+            .setDescription(`**${interaction.guild.name}**\n📅 Período: ${period === 'all' ? 'Todo período' : period}`)
             .addFields(
-              { name: '⚠️ Total de Warns', value: serverStats.totalWarns.toString(), inline: true },
-              { name: '🟢 Warns Ativos', value: serverStats.activeWarns.toString(), inline: true },
-              { name: '👥 Usuários Warnados', value: serverStats.warnedUsers.toString(), inline: true },
-              { name: '📊 Média por Usuário', value: serverStats.averageWarnsPerUser.toString(), inline: true }
+              { name: '⚠️ **TOTAL DE WARNS**', value: `**${serverStats.totalWarns}**`, inline: true },
+              { name: '🟢 **WARNS ATIVOS**', value: `**${serverStats.activeWarns}**`, inline: true },
+              { name: '👥 **USUÁRIOS WANADOS**', value: `**${serverStats.warnedUsers}**`, inline: true },
+              { name: '📊 **MÉDIA POR USUÁRIO**', value: `**${serverStats.averageWarnsPerUser}**`, inline: true }
             )
             .setTimestamp();
 
+          if (peakHour !== -1 && serverStats.warnsByHour[peakHour] > 0) {
+            embed.addFields({ name: '⏰ **HORÁRIO DE PICO**', value: `${peakHour}:00 - ${serverStats.warnsByHour[peakHour]} warns`, inline: true });
+          }
+          
+          if (peakDay !== -1 && serverStats.warnsByWeekday[peakDay] > 0) {
+            embed.addFields({ name: '📅 **DIA DE PICO**', value: `${days[peakDay]} - ${serverStats.warnsByWeekday[peakDay]} warns`, inline: true });
+          }
+
           if (serverStats.topModerators && serverStats.topModerators.length > 0) {
             let modsList = serverStats.topModerators.slice(0, 5)
-              .map((m, i) => `${i+1}. <@${m.id}>: **${m.count}** warns`)
+              .map((m, i) => `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '📌'} <@${m.id}>: **${m.count}** warns`)
               .join('\n');
-            embed.addFields({ name: '🛡️ Top Moderadores', value: modsList || 'Nenhum dado', inline: false });
+            embed.addFields({ name: '🛡️ **TOP MODERADORES**', value: `\`\`\`yaml\n${modsList}\`\`\``, inline: false });
           }
 
           if (serverStats.topReasons && serverStats.topReasons.length > 0) {
             let reasonsList = serverStats.topReasons.slice(0, 5)
-              .map((r, i) => `${i+1}. **${r.reason}**: ${r.count}x`)
+              .map((r, i) => `${i+1}º **${r.reason}**: ${r.count}x`)
               .join('\n');
-            embed.addFields({ name: '📋 Motivos Mais Comuns', value: reasonsList || 'Nenhum dado', inline: false });
+            embed.addFields({ name: '📋 **MOTIVOS MAIS COMUNS**', value: `\`\`\`yaml\n${reasonsList}\`\`\``, inline: false });
           }
 
           await interaction.editReply({ embeds: [embed] });
@@ -1474,7 +1604,8 @@ const warningsCommand = {
       options: {
         getSubcommand: () => 'check',
         getUser: (name) => name === 'user' ? user : null,
-        getString: (name) => name === 'code' ? code : null
+        getString: (name) => name === 'code' ? code : null,
+        getBoolean: () => false
       }
     };
     
@@ -1571,6 +1702,7 @@ module.exports = {
 // BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - PARTE 3/3
 // ===============================
 // EVENTOS, HANDLERS, MENU INTERATIVO E LOGIN
+// TOTAL DE LINHAS APROXIMADO: 1200 LINHAS
 // ===============================
 
 // ===============================
