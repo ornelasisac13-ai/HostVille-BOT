@@ -89,12 +89,33 @@ const stats = {
 };
 
 // ===============================
-// IMPORTAÇÃO DO SISTEMA DE WARNS ULTRA COMPLETO
+// IMPORTAÇÃO DO SISTEMA DE WARNS
 // ===============================
 let warnSystem;
 try {
   warnSystem = require('./modules/warnSystem.js');
   console.log(chalk.green(`✅ Sistema de warns v${warnSystem.version || '2.0.0'} carregado com sucesso!`));
+  
+  // Verificar se os cargos estão configurados
+  if (warnSystem.CONFIG && warnSystem.CONFIG.autoRoles) {
+    console.log(chalk.cyan(`\n📋 Cargos de warn configurados no warnSystem.js:`));
+    for (let i = 1; i <= 7; i++) {
+      if (warnSystem.CONFIG.autoRoles[i]) {
+        console.log(chalk.white(`   • Nível ${i}: ${warnSystem.CONFIG.autoRoles[i]}`));
+      }
+    }
+  }
+  
+  // Verificar PUNISHMENT_CONFIG
+  if (warnSystem.PUNISHMENT_CONFIG && warnSystem.PUNISHMENT_CONFIG.roles && warnSystem.PUNISHMENT_CONFIG.roles.warnRoles) {
+    console.log(chalk.cyan(`\n📋 Cargos de warn configurados no PUNISHMENT_CONFIG:`));
+    for (let i = 1; i <= 5; i++) {
+      if (warnSystem.PUNISHMENT_CONFIG.roles.warnRoles[i]) {
+        console.log(chalk.white(`   • Nível ${i}: ${warnSystem.PUNISHMENT_CONFIG.roles.warnRoles[i]}`));
+      }
+    }
+  }
+  
 } catch (error) {
   console.log(chalk.red('❌ Erro fatal ao carregar sistema de warns:'), error.message);
   console.log(chalk.yellow('⚠️ Certifique-se de que o arquivo ./modules/warnSystem.js existe e não contém erros.'));
@@ -102,50 +123,167 @@ try {
 }
 
 // ===============================
-// LISTA DE PALAVRAS OFENSIVAS
+// FUNÇÃO PARA MONITORAR CARGOS DE WARN NO CONSOLE
 // ===============================
-const offensiveWords = [
-  // PALAVRAS BASE (TODAS LIMPAS, SEM REGEX INVÁLIDOS)
-  "idiota", "burro", "estupido", "retardado", "lixo",
-  "merda", "fdp", "otario", "hilter", "sybau", "vsfd", "nazista", "nazismo", "perereca", "stfu", "desgracado",
-  "vtnc", "imbecil", "inutil", "arrombado", "viado", "bicha", 
-  "piranha", "prostituta", "corno", "babaca", "palhaco", "nojento", 
-  "escroto", "cretino", "canalha", "maldito", "peste", "verme", 
-  "trouxa", "otaria", "burra", "cacete", "caralho", "merdinha",
-  "vagabundo", "vagabunda", "cuzao", "idiotinha", "fodido", "bosta",
-  "porra", "prr", "poha", "krl", "krlh", "caramba",
-  "fds", "foda", "fudeu", "fodase", "fodassi",
-  "pqp", "puta", "vsf", "tnc", "tmnc", "cuzão", "cú", "cu",
-  "buceta", "bct", "xota", "xoxota", "ppk", "perereca",
-  "rapariga", "putinha", "putona", "puto", "bosta", "bostinha", 
-  "inutel", "idiota", "burrinho", "estupida", "retardada", "nojenta", 
-  "escrota", "trouxinha", "verminoso", "pestinha", "cretina", "maldita",
-  "corninho", "chifrudo", "vagaba", "piriguete", "viadinho", "boiola", 
-  "bichinha", "baitola", "sapatão", "sapata", "galinha", "cachorra", 
-  "cachorro", "vaca", "égua", "cabra", "mula", "jumento", "asno", 
-  "anta", "besta", "bocó", "boçal", "bronco", "ignorante", 
-  "analfabeto", "pilantra", "malandro", "safado", "tarado", 
-  "pervertido", "depravado", "asqueroso", "repugnante", "horrivel", 
-  "feio", "crápula", "infeliz", "miseravel", "coitado", "nulo", 
-  "aborto", "lixinho", "traste", "praga", "desgraça", "fudido", 
-  "lascado", "ferrado", "danado", "capeta", "demonio", "diabo", 
-  "satanás", "lucifer", "animal", "bicho", "monstro", "abominavel", 
-  "marginal", "delinquente", "criminoso", "bandido", "ladrão", 
-  "assaltante", "golpista", "enganador", "trapaceiro", "manipulador", 
-  "abusador", "abusado", "folgado", "atrevido", "arrogante", 
-  "pretensioso", "metido", "convencido", "soberbo", "orgulhoso", 
-  "vaidoso", "futil", "oco", "teimoso", "birrento", "pentelho", 
-  "maçante", "enfadonho", "mrd", "fodendo", "fudendo", "crl", 
-  "crlh", "putaria", "puteiro", "caraio", "karaio",
+async function monitorWarnRoles() {
+  console.log(chalk.yellow('\n╔═══════════════════════════════════════════════════════════════╗'));
+  console.log(chalk.yellow('║              📊 MONITORAMENTO DE CARGOS DE WARN                ║'));
+  console.log(chalk.yellow('╚═══════════════════════════════════════════════════════════════╝'));
   
-  // EXPRESSÕES COMUNS (FRASES)
-  "vai tomar no cu", "vai tnc", "vai tmnc",
-  "vai se foder", "vai se fuder", "vsf",
-  "foda se", "fodase", "foda-se",
-  "puta que pariu", "puta q pariu",
-  "filho da puta", "filha da puta"
-];
+  for (const guild of client.guilds.cache.values()) {
+    console.log(chalk.cyan(`\n🏛️ Servidor: ${guild.name} (${guild.id})`));
+    console.log(chalk.gray('─'.repeat(60)));
+    
+    try {
+      await guild.members.fetch();
+      const members = guild.members.cache;
+      
+      // Buscar cargos de warn do warnSystem
+      const warnRoles = {};
+      
+      // Tentar pegar do CONFIG.autoRoles
+      if (warnSystem.CONFIG && warnSystem.CONFIG.autoRoles) {
+        for (let i = 1; i <= 7; i++) {
+          if (warnSystem.CONFIG.autoRoles[i]) {
+            warnRoles[i] = warnSystem.CONFIG.autoRoles[i];
+          }
+        }
+      }
+      
+      // Tentar pegar do PUNISHMENT_CONFIG.roles.warnRoles
+      if (warnSystem.PUNISHMENT_CONFIG && warnSystem.PUNISHMENT_CONFIG.roles && warnSystem.PUNISHMENT_CONFIG.roles.warnRoles) {
+        for (let i = 1; i <= 5; i++) {
+          if (warnSystem.PUNISHMENT_CONFIG.roles.warnRoles[i]) {
+            warnRoles[i] = warnSystem.PUNISHMENT_CONFIG.roles.warnRoles[i];
+          }
+        }
+      }
+      
+      // Verificar cada nível de warn
+      let hasAnyRole = false;
+      for (let level = 1; level <= 7; level++) {
+        const roleId = warnRoles[level];
+        
+        if (!roleId) {
+          if (level === 1) console.log(chalk.gray(`   Nível ${level}: ⚠️ Cargo não configurado no warnSystem`));
+          continue;
+        }
+        
+        const role = guild.roles.cache.get(roleId);
+        if (!role) {
+          console.log(chalk.yellow(`   Nível ${level}: ❌ Cargo não encontrado (ID: ${roleId})`));
+          continue;
+        }
+        
+        const membersWithRole = members.filter(member => member.roles.cache.has(roleId));
+        
+        if (membersWithRole.size === 0) {
+          console.log(chalk.gray(`   Nível ${level} (${role.name}): Nenhum membro`));
+        } else {
+          hasAnyRole = true;
+          console.log(chalk.red(`   🔴 Nível ${level} (${role.name}): ${membersWithRole.size} membros`));
+          
+          // Listar os membros com este cargo
+          membersWithRole.forEach(member => {
+            // Verificar quantos warns o usuário tem
+            let warnCount = 0;
+            try {
+              const userWarns = warnSystem.getUserWarns ? warnSystem.getUserWarns(guild.id, member.id) : null;
+              warnCount = userWarns?.activeCount || 0;
+            } catch (err) {
+              // Ignorar erro
+            }
+            
+            const riskLevel = warnSystem.calculateRiskLevel ? warnSystem.calculateRiskLevel(warnCount) : { emoji: '⚠️' };
+            console.log(chalk.white(`      • ${member.user.tag} (${member.id}) - Warns: ${warnCount} ${riskLevel.emoji || '⚠️'}`));
+          });
+        }
+      }
+      
+      if (!hasAnyRole) {
+        console.log(chalk.gray(`   Nenhum membro com cargos de warn encontrado.`));
+      }
+      
+      // Mostrar estatísticas de warns do servidor
+      if (warnSystem.getServerStats) {
+        try {
+          const serverStats = warnSystem.getServerStats(guild.id);
+          if (serverStats && serverStats.totalWarns > 0) {
+            console.log(chalk.green(`\n   📊 Estatísticas do servidor:`));
+            console.log(chalk.white(`      • Total de warns: ${serverStats.totalWarns || 0}`));
+            console.log(chalk.white(`      • Warns ativos: ${serverStats.activeWarns || 0}`));
+            console.log(chalk.white(`      • Usuários warnados: ${serverStats.warnedUsers || 0}`));
+          }
+        } catch (err) {
+          // Ignorar erro
+        }
+      }
+      
+    } catch (error) {
+      console.log(chalk.red(`   Erro ao carregar membros: ${error.message}`));
+    }
+  }
+  
+  console.log(chalk.yellow('\n═══════════════════════════════════════════════════════════════\n'));
+}
 
+// ===============================
+// FUNÇÃO PARA ATUALIZAR CARGOS DE WARN AUTOMATICAMENTE
+// ===============================
+async function updateWarnRoles(guild, userId, warnCount) {
+  try {
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (!member) return;
+    
+    // Verificar se o membro é staff ou admin
+    const isStaffMember = staffIds.includes(userId) || member.roles.cache.some(role => 
+      CONFIG.adminRoles.includes(role.id) || CONFIG.adminRoles.includes(role.name)
+    );
+    
+    if (isStaffMember) return;
+    
+    // Buscar cargos de warn do warnSystem
+    const warnRoles = {};
+    
+    if (warnSystem.CONFIG && warnSystem.CONFIG.autoRoles) {
+      for (let i = 1; i <= 7; i++) {
+        if (warnSystem.CONFIG.autoRoles[i]) {
+          warnRoles[i] = warnSystem.CONFIG.autoRoles[i];
+        }
+      }
+    }
+    
+    if (warnSystem.PUNISHMENT_CONFIG && warnSystem.PUNISHMENT_CONFIG.roles && warnSystem.PUNISHMENT_CONFIG.roles.warnRoles) {
+      for (let i = 1; i <= 5; i++) {
+        if (warnSystem.PUNISHMENT_CONFIG.roles.warnRoles[i]) {
+          warnRoles[i] = warnSystem.PUNISHMENT_CONFIG.roles.warnRoles[i];
+        }
+      }
+    }
+    
+    // Remover todos os cargos de warn
+    for (let level = 1; level <= 7; level++) {
+      const roleId = warnRoles[level];
+      if (roleId && member.roles.cache.has(roleId)) {
+        await member.roles.remove(roleId).catch(() => {});
+      }
+    }
+    
+    // Adicionar o cargo correspondente ao nível de warn
+    if (warnCount >= 1 && warnCount <= 7) {
+      const roleId = warnRoles[warnCount];
+      if (roleId) {
+        await member.roles.add(roleId).catch(() => {});
+        console.log(chalk.green(`✅ Cargo de warn nível ${warnCount} adicionado a ${member.user.tag}`));
+      }
+    }
+    
+  } catch (error) {
+    console.log(chalk.red(`❌ Erro ao atualizar cargo de warn: ${error.message}`));
+  }
+}
+
+// ===============================
 // FUNÇÕES DE LOG PERSONALIZADAS
 // ===============================
 function getTimestamp() {
@@ -214,7 +352,12 @@ async function generateDailyReport() {
   }
   
   // Adicionar estatísticas de warns
-  const globalWarnStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : { totalWarns: 0, totalActiveWarns: 0 };
+  let globalWarnStats = { totalWarns: 0, totalActiveWarns: 0 };
+  try {
+    globalWarnStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : globalWarnStats;
+  } catch (err) {
+    // Ignorar erro
+  }
   
   const reportEmbed = new EmbedBuilder()
     .setTitle('📊 Relatório Diário do Bot')
@@ -327,6 +470,21 @@ function scheduleDailyReport() {
 // ===============================
 // FUNÇÃO PARA CHECAR PALAVRAS OFENSIVAS
 // ===============================
+const offensiveWords = [
+  "idiota", "burro", "estupido", "retardado", "lixo",
+  "merda", "fdp", "otario", "hilter", "sybau", "vsfd", "nazista", "nazismo", "desgracado",
+  "vtnc", "imbecil", "inutil", "arrombado", "viado", "bicha", 
+  "piranha", "prostituta", "corno", "babaca", "palhaco", "nojento", 
+  "escroto", "cretino", "canalha", "maldito", "peste", "verme", 
+  "trouxa", "otaria", "burra", "cacete", "caralho", "merdinha",
+  "vagabundo", "vagabunda", "cuzao", "idiotinha", "fodido", "bosta",
+  "porra", "prr", "poha", "krl", "krlh", "caramba",
+  "fds", "foda", "fudeu", "fodase", "fodassi",
+  "pqp", "puta", "vsf", "tnc", "tmnc", "cuzão", "cú", "cu",
+  "buceta", "bct", "xota", "xoxota", "ppk", "perereca",
+  "vai tomar no cu", "vai tnc", "vai tmnc", "vai se foder"
+];
+
 function containsOffensiveWord(text) {
   if (!text || typeof text !== 'string') return false;
   
@@ -372,9 +530,6 @@ function containsOffensiveWord(text) {
   return false;
 }
 
-// ===============================
-// FUNÇÃO PARA ENCONTRAR PALAVRA OFENSIVA
-// ===============================
 function findOffensiveWord(text) {
   if (!text || typeof text !== 'string') return null;
   
@@ -599,7 +754,7 @@ const helpCommand = {
         { name: '/adm', value: 'Acesso ao painel administrativo (Staff)', inline: false },
         { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
         { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false },
-        { name: '/warn', value: 'Sistema completo de warns (Staff) - Use /warn para ver subcomandos', inline: false },
+        { name: '/warn', value: 'Sistema completo de warns (Staff)', inline: false },
         { name: '/warnings', value: '[Atalho] Ver warns de um usuário', inline: false },
         { name: '/clearwarns', value: '[Atalho] Limpar warns de um usuário', inline: false },
         { name: '/warnstats', value: '[Atalho] Estatísticas de warns', inline: false }
@@ -752,7 +907,7 @@ const reportCommand = {
 };
 
 // ===============================
-// COMANDO /warn ULTRA COMPLETO (COM SUBCOMANDOS)
+// COMANDO /warn
 // ===============================
 const warnCommand = {
   data: {
@@ -762,38 +917,12 @@ const warnCommand = {
       {
         name: 'add',
         description: 'Adicionar warn a um usuário',
-        type: 1, // Subcomando
+        type: 1,
         options: [
-          {
-            name: 'user',
-            description: 'Usuário a ser warnado',
-            type: 6,
-            required: true
-          },
-          {
-            name: 'reason',
-            description: 'Motivo do warn',
-            type: 3,
-            required: true
-          },
-          {
-            name: 'duration',
-            description: 'Duração em dias (0 = permanente)',
-            type: 4,
-            required: false
-          },
-          {
-            name: 'template',
-            description: 'Usar template pré-definido',
-            type: 3,
-            required: false
-          },
-          {
-            name: 'code',
-            description: 'Código de acesso',
-            type: 3,
-            required: true
-          }
+          { name: 'user', description: 'Usuário a ser warnado', type: 6, required: true },
+          { name: 'reason', description: 'Motivo do warn', type: 3, required: true },
+          { name: 'duration', description: 'Duração em dias (0 = permanente)', type: 4, required: false },
+          { name: 'code', description: 'Código de acesso', type: 3, required: true }
         ]
       },
       {
@@ -801,30 +930,10 @@ const warnCommand = {
         description: 'Remover um warn específico',
         type: 1,
         options: [
-          {
-            name: 'user',
-            description: 'Usuário',
-            type: 6,
-            required: true
-          },
-          {
-            name: 'warnid',
-            description: 'ID do warn a remover',
-            type: 3,
-            required: true
-          },
-          {
-            name: 'reason',
-            description: 'Motivo da remoção',
-            type: 3,
-            required: true
-          },
-          {
-            name: 'code',
-            description: 'Código de acesso',
-            type: 3,
-            required: true
-          }
+          { name: 'user', description: 'Usuário', type: 6, required: true },
+          { name: 'warnid', description: 'ID do warn a remover', type: 3, required: true },
+          { name: 'reason', description: 'Motivo da remoção', type: 3, required: true },
+          { name: 'code', description: 'Código de acesso', type: 3, required: true }
         ]
       },
       {
@@ -832,24 +941,9 @@ const warnCommand = {
         description: 'Limpar todos os warns de um usuário',
         type: 1,
         options: [
-          {
-            name: 'user',
-            description: 'Usuário',
-            type: 6,
-            required: true
-          },
-          {
-            name: 'reason',
-            description: 'Motivo da limpeza',
-            type: 3,
-            required: true
-          },
-          {
-            name: 'code',
-            description: 'Código de acesso',
-            type: 3,
-            required: true
-          }
+          { name: 'user', description: 'Usuário', type: 6, required: true },
+          { name: 'reason', description: 'Motivo da limpeza', type: 3, required: true },
+          { name: 'code', description: 'Código de acesso', type: 3, required: true }
         ]
       },
       {
@@ -857,18 +951,8 @@ const warnCommand = {
         description: 'Verificar warns de um usuário',
         type: 1,
         options: [
-          {
-            name: 'user',
-            description: 'Usuário',
-            type: 6,
-            required: true
-          },
-          {
-            name: 'code',
-            description: 'Código de acesso',
-            type: 3,
-            required: true
-          }
+          { name: 'user', description: 'Usuário', type: 6, required: true },
+          { name: 'code', description: 'Código de acesso', type: 3, required: true }
         ]
       },
       {
@@ -876,54 +960,8 @@ const warnCommand = {
         description: 'Estatísticas de warns',
         type: 1,
         options: [
-          {
-            name: 'user',
-            description: 'Ver estatísticas de um usuário',
-            type: 6,
-            required: false
-          },
-          {
-            name: 'code',
-            description: 'Código de acesso',
-            type: 3,
-            required: true
-          }
-        ]
-      },
-      {
-        name: 'template',
-        description: 'Gerenciar templates de warns',
-        type: 1,
-        options: [
-          {
-            name: 'action',
-            description: 'Ação (list, create, delete)',
-            type: 3,
-            required: true,
-            choices: [
-              { name: 'Listar templates', value: 'list' },
-              { name: 'Criar template', value: 'create' },
-              { name: 'Deletar template', value: 'delete' }
-            ]
-          },
-          {
-            name: 'name',
-            description: 'Nome do template (para criar)',
-            type: 3,
-            required: false
-          },
-          {
-            name: 'reason',
-            description: 'Motivo padrão (para criar)',
-            type: 3,
-            required: false
-          },
-          {
-            name: 'code',
-            description: 'Código de acesso',
-            type: 3,
-            required: true
-          }
+          { name: 'user', description: 'Ver estatísticas de um usuário', type: 6, required: false },
+          { name: 'code', description: 'Código de acesso', type: 3, required: true }
         ]
       }
     ]
@@ -933,63 +971,37 @@ const warnCommand = {
     const code = interaction.options.getString('code');
     
     if (code !== CONFIG.ACCESS_CODE) {
-      return interaction.reply({ 
-        content: '❌ Código de acesso incorreto!', 
-        flags: 64 
-      });
+      return interaction.reply({ content: '❌ Código de acesso incorreto!', flags: 64 });
     }
 
     await interaction.deferReply({ flags: 64 });
 
     try {
-      // SUBCOMANDO: ADD
       if (subcommand === 'add') {
         const user = interaction.options.getUser('user');
         const reason = interaction.options.getString('reason');
         const duration = interaction.options.getInteger('duration') || 0;
-        const templateId = interaction.options.getString('template');
         
         const member = await interaction.guild.members.fetch(user.id).catch(() => null);
         if (!member) {
           return interaction.editReply({ content: '❌ Usuário não está no servidor.' });
         }
 
-        // Verificar se é staff
         if (isStaff(user.id) || isAdmin(member)) {
-          return interaction.editReply({ 
-            content: '❌ Não é possível warnar membros da staff ou administradores!' 
-          });
-        }
-
-        // Validar motivo
-        const validation = warnSystem.validateReason ? warnSystem.validateReason(reason) : { valid: true };
-        if (!validation.valid) {
-          return interaction.editReply({ content: `❌ ${validation.error}` });
+          return interaction.editReply({ content: '❌ Não é possível warnar membros da staff ou administradores!' });
         }
 
         let result;
-        if (templateId) {
-          // Usar template
-          result = warnSystem.useWarnTemplate(
-            interaction.guild.id,
-            templateId,
-            user.id,
-            interaction.user.id,
-            reason
-          );
-        } else {
-          // Warn normal
+        if (warnSystem.addWarn) {
           result = warnSystem.addWarn(
             interaction.guild.id,
             user.id,
             reason,
             interaction.user.id,
-            {
-              duration: duration > 0 ? duration : null,
-              channelId: interaction.channel.id,
-              messageId: interaction.id
-            }
+            { duration: duration > 0 ? duration : null }
           );
+        } else {
+          return interaction.editReply({ content: '❌ Sistema de warns não disponível.' });
         }
 
         if (!result || !result.success) {
@@ -998,12 +1010,10 @@ const warnCommand = {
 
         stats.warnsGiven++;
 
-        // Calcular nível de risco
         const riskLevel = warnSystem.calculateRiskLevel ? 
           warnSystem.calculateRiskLevel(result.warnCount) : 
           { level: 'DESCONHECIDO', color: Colors.Orange, emoji: '⚠️' };
 
-        // Criar embed
         const embed = new EmbedBuilder()
           .setTitle(`${riskLevel.emoji || '⚠️'} Warn Adicionado`)
           .setColor(riskLevel.color || Colors.Orange)
@@ -1013,74 +1023,38 @@ const warnCommand = {
             { name: '🛡️ Moderador', value: interaction.user.tag, inline: true },
             { name: '📋 Motivo', value: reason, inline: false },
             { name: '⚠️ Warns Ativos', value: `**${result.warnCount}**`, inline: true },
-            { name: '📊 Nível de Risco', value: `**${riskLevel.level || 'N/A'}**`, inline: true },
             { name: '🆔 ID', value: `\`${result.warnId}\``, inline: true }
           )
-          .setFooter({ text: `Sistema de Warns v${warnSystem.version || '2.0.0'}` })
           .setTimestamp();
 
         if (duration > 0) {
-          embed.addFields({
-            name: '⏰ Expira em',
-            value: warnSystem.formatDate ? 
-              warnSystem.formatDate(new Date(Date.now() + duration * 24 * 60 * 60 * 1000)) : 
-              new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toLocaleString('pt-BR'),
-            inline: true
-          });
+          embed.addFields({ name: '⏰ Expira em', value: `${duration} dias`, inline: true });
         }
 
         await interaction.editReply({ embeds: [embed] });
 
-        // Aplicar punições automáticas
-        if (warnSystem.applyAutomaticPunishments) {
-          const punishment = await warnSystem.applyAutomaticPunishments(
-            interaction.guild,
-            member,
-            result.warnCount
-          );
+        // Atualizar cargo de warn
+        await updateWarnRoles(interaction.guild, user.id, result.warnCount);
 
-          if (punishment && punishment.length > 0) {
-            const punishEmbed = new EmbedBuilder()
-              .setTitle(`⚡ Punição Automática`)
-              .setColor(Colors.Red)
-              .setDescription(`O usuário ${user.toString()} foi punido automaticamente.`)
-              .addFields(
-                { name: '📊 Warns Atuais', value: result.warnCount.toString(), inline: true },
-                { name: '⚡ Punições', value: punishment.join(', ').toUpperCase(), inline: true }
-              )
-              .setTimestamp();
-
-            await interaction.followUp({ embeds: [punishEmbed], flags: 64 });
-          }
-        }
-
-        // Tentar enviar DM
         try {
           const dmEmbed = new EmbedBuilder()
             .setTitle(`⚠️ Você recebeu um warn em ${interaction.guild.name}`)
             .setColor(riskLevel.color || Colors.Orange)
             .setDescription(`**Motivo:** ${reason}`)
-            .addFields(
-              { name: '📊 Warns Ativos', value: `**${result.warnCount}**`, inline: true },
-              { name: '📊 Nível de Risco', value: riskLevel.level || 'N/A', inline: true }
-            )
-            .setFooter({ text: 'Caso ache isso um erro, você pode recorrer' })
+            .addFields({ name: '📊 Warns Ativos', value: `**${result.warnCount}**`, inline: true })
             .setTimestamp();
 
           await user.send({ embeds: [dmEmbed] });
-        } catch (dmError) {
-          // Ignorar se DM estiver fechada
-        }
+        } catch (dmError) {}
       }
 
-      // SUBCOMANDO: REMOVE
       else if (subcommand === 'remove') {
         const user = interaction.options.getUser('user');
         const warnId = interaction.options.getString('warnid');
         const reason = interaction.options.getString('reason');
 
         if (!warnSystem.removeWarn) {
-          return interaction.editReply({ content: '❌ Função removeWarn não disponível no sistema de warns.' });
+          return interaction.editReply({ content: '❌ Função removeWarn não disponível.' });
         }
 
         const result = warnSystem.removeWarn(
@@ -1095,27 +1069,29 @@ const warnCommand = {
           return interaction.editReply({ content: `❌ ${result?.error || 'Erro ao remover warn'}` });
         }
 
+        // Atualizar cargo após remoção
+        const currentWarns = warnSystem.getUserWarns ? warnSystem.getUserWarns(interaction.guild.id, user.id) : null;
+        await updateWarnRoles(interaction.guild, user.id, currentWarns?.activeCount || 0);
+
         const embed = new EmbedBuilder()
           .setTitle('✅ Warn Removido')
           .setColor(Colors.Green)
           .setDescription(`Warn removido de ${user.toString()}`)
           .addFields(
             { name: '🆔 ID do Warn', value: `\`${warnId}\``, inline: true },
-            { name: '📋 Motivo', value: reason, inline: false },
-            { name: '🛡️ Moderador', value: interaction.user.tag, inline: true }
+            { name: '📋 Motivo', value: reason, inline: false }
           )
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
       }
 
-      // SUBCOMANDO: CLEAR
       else if (subcommand === 'clear') {
         const user = interaction.options.getUser('user');
         const reason = interaction.options.getString('reason');
 
         if (!warnSystem.clearUserWarns) {
-          return interaction.editReply({ content: '❌ Função clearUserWarns não disponível no sistema de warns.' });
+          return interaction.editReply({ content: '❌ Função clearUserWarns não disponível.' });
         }
 
         const result = warnSystem.clearUserWarns(
@@ -1129,25 +1105,26 @@ const warnCommand = {
           return interaction.editReply({ content: `❌ ${result?.error || 'Erro ao limpar warns'}` });
         }
 
+        // Remover cargos de warn
+        await updateWarnRoles(interaction.guild, user.id, 0);
+
         const embed = new EmbedBuilder()
           .setTitle('🧹 Warns Limpos')
           .setColor(Colors.Green)
           .setDescription(`Todos os warns de ${user.toString()} foram limpos.`)
           .addFields(
             { name: '🧹 Warns Removidos', value: `**${result.clearedCount || 0}**`, inline: true },
-            { name: '📋 Motivo', value: reason, inline: false },
-            { name: '🛡️ Moderador', value: interaction.user.tag, inline: true }
+            { name: '📋 Motivo', value: reason, inline: false }
           )
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
       }
 
-      // SUBCOMANDO: CHECK
       else if (subcommand === 'check') {
         const user = interaction.options.getUser('user');
         
-        const userWarns = warnSystem.getUserWarns(interaction.guild.id, user.id);
+        const userWarns = warnSystem.getUserWarns ? warnSystem.getUserWarns(interaction.guild.id, user.id) : null;
         
         if (!userWarns || !userWarns.history || userWarns.history.length === 0) {
           const embed = new EmbedBuilder()
@@ -1171,176 +1148,58 @@ const warnCommand = {
           .addFields(
             { name: '⚠️ Warns Ativos', value: `**${userWarns.activeCount || 0}**`, inline: true },
             { name: '📊 Total de Warns', value: `**${userWarns.count || 0}**`, inline: true },
-            { name: '📊 Nível de Risco', value: `**${riskLevel.level || 'N/A'}**`, inline: true },
-            { name: '📅 Primeiro Warn', value: userWarns.firstWarn ? 
-              (warnSystem.formatDate ? warnSystem.formatDate(userWarns.firstWarn) : new Date(userWarns.firstWarn).toLocaleString('pt-BR')) : 'Nunca', 
-              inline: true },
-            { name: '📅 Último Warn', value: userWarns.lastWarn ? 
-              (warnSystem.formatDate ? warnSystem.formatDate(userWarns.lastWarn) : new Date(userWarns.lastWarn).toLocaleString('pt-BR')) : 'Nunca', 
-              inline: true }
+            { name: '📊 Nível de Risco', value: `**${riskLevel.level || 'N/A'}**`, inline: true }
           )
           .setTimestamp();
 
-        // Adicionar últimos 5 warns
         if (userWarns.history.length > 0) {
           const recentWarns = userWarns.history.slice(-5).reverse();
           let warnsList = '';
           
           recentWarns.forEach((warn, index) => {
-            warnsList += `**#${index + 1}** \`${warn.id}\` - ${warn.reason.substring(0, 50)}${warn.reason.length > 50 ? '...' : ''}\n`;
+            const status = warn.active ? '🟢' : '🔴';
+            warnsList += `${status} **#${index + 1}** \`${warn.id}\` - ${warn.reason.substring(0, 50)}${warn.reason.length > 50 ? '...' : ''}\n`;
           });
           
-          embed.addFields({
-            name: '📋 Últimos Warns',
-            value: warnsList || 'Nenhum warn recente',
-            inline: false
-          });
+          embed.addFields({ name: '📋 Últimos Warns', value: warnsList || 'Nenhum warn recente', inline: false });
         }
 
         await interaction.editReply({ embeds: [embed] });
       }
 
-      // SUBCOMANDO: STATS
       else if (subcommand === 'stats') {
         const user = interaction.options.getUser('user');
 
         if (user) {
-          // Estatísticas do usuário
-          const stats = warnSystem.getUserStats ? 
-            warnSystem.getUserStats(interaction.guild.id, user.id) : 
-            { totalWarns: 0, activeWarns: 0, firstWarn: null, lastWarn: null, averageInterval: 0 };
+          const userStats = warnSystem.getUserStats ? warnSystem.getUserStats(interaction.guild.id, user.id) : null;
           
           const embed = new EmbedBuilder()
             .setTitle(`📊 Estatísticas de ${user.username}`)
             .setColor(Colors.Blue)
             .setThumbnail(user.displayAvatarURL())
             .addFields(
-              { name: '⚠️ Total de Warns', value: stats.totalWarns?.toString() || '0', inline: true },
-              { name: '🟢 Warns Ativos', value: stats.activeWarns?.toString() || '0', inline: true },
-              { name: '📅 Primeiro Warn', value: stats.firstWarn ? 
-                (warnSystem.formatDate ? warnSystem.formatDate(stats.firstWarn) : new Date(stats.firstWarn).toLocaleString('pt-BR')) : 'Nunca', 
-                inline: true },
-              { name: '📅 Último Warn', value: stats.lastWarn ? 
-                (warnSystem.formatDate ? warnSystem.formatDate(stats.lastWarn) : new Date(stats.lastWarn).toLocaleString('pt-BR')) : 'Nunca', 
-                inline: true },
-              { name: '⏱️ Intervalo Médio', value: `${stats.averageInterval || 0} dias`, inline: true }
+              { name: '⚠️ Total de Warns', value: userStats?.totalWarns?.toString() || '0', inline: true },
+              { name: '🟢 Warns Ativos', value: userStats?.activeWarns?.toString() || '0', inline: true },
+              { name: '📅 Primeiro Warn', value: userStats?.firstWarn ? new Date(userStats.firstWarn).toLocaleString('pt-BR') : 'Nunca', inline: true }
             )
             .setTimestamp();
 
           await interaction.editReply({ embeds: [embed] });
         } else {
-          // Estatísticas do servidor
-          const stats = warnSystem.getServerStats ? 
-            warnSystem.getServerStats(interaction.guild.id) : 
-            { totalWarns: 0, activeWarns: 0, warnedUsers: 0, averageWarnsPerUser: 0, topModerators: [], topReasons: [] };
+          const serverStats = warnSystem.getServerStats ? warnSystem.getServerStats(interaction.guild.id) : null;
           
           const embed = new EmbedBuilder()
             .setTitle(`📊 Estatísticas do Servidor`)
             .setColor(Colors.Gold)
             .setThumbnail(interaction.guild.iconURL())
             .addFields(
-              { name: '⚠️ Total de Warns', value: stats.totalWarns?.toString() || '0', inline: true },
-              { name: '🟢 Warns Ativos', value: stats.activeWarns?.toString() || '0', inline: true },
-              { name: '👥 Usuários Warnados', value: stats.warnedUsers?.toString() || '0', inline: true },
-              { name: '📊 Média por Usuário', value: stats.averageWarnsPerUser?.toString() || '0', inline: true }
+              { name: '⚠️ Total de Warns', value: serverStats?.totalWarns?.toString() || '0', inline: true },
+              { name: '🟢 Warns Ativos', value: serverStats?.activeWarns?.toString() || '0', inline: true },
+              { name: '👥 Usuários Warnados', value: serverStats?.warnedUsers?.toString() || '0', inline: true }
             )
             .setTimestamp();
 
-          if (stats.topModerators && stats.topModerators.length > 0) {
-            let modsList = stats.topModerators.slice(0, 5)
-              .map((m, i) => `${i+1}. <@${m.id || m.moderatorId}>: **${m.count || m.totalWarns}** warns`)
-              .join('\n');
-            
-            embed.addFields({
-              name: '🛡️ Top Moderadores',
-              value: modsList || 'Nenhum dado',
-              inline: false
-            });
-          }
-
-          if (stats.topReasons && stats.topReasons.length > 0) {
-            let reasonsList = stats.topReasons.slice(0, 5)
-              .map((r, i) => `${i+1}. **${r.reason}**: ${r.count || r.totalWarns}x`)
-              .join('\n');
-            
-            embed.addFields({
-              name: '📋 Motivos Mais Comuns',
-              value: reasonsList || 'Nenhum dado',
-              inline: false
-            });
-          }
-
           await interaction.editReply({ embeds: [embed] });
-        }
-      }
-
-      // SUBCOMANDO: TEMPLATE
-      else if (subcommand === 'template') {
-        const action = interaction.options.getString('action');
-        
-        if (action === 'list') {
-          const templates = warnSystem.getWarnTemplates ? 
-            warnSystem.getWarnTemplates(interaction.guild.id) : [];
-          
-          if (!templates || templates.length === 0) {
-            return interaction.editReply({ content: '📭 Nenhum template encontrado neste servidor.' });
-          }
-          
-          const embed = new EmbedBuilder()
-            .setTitle('📋 Templates de Warns')
-            .setColor(Colors.Blue)
-            .setDescription(`Total de **${templates.length}** templates disponíveis`)
-            .setTimestamp();
-          
-          templates.slice(0, 10).forEach(t => {
-            embed.addFields({
-              name: `${t.emoji || '📋'} ${t.name} (${t.id})`,
-              value: `**Motivo:** ${t.reason.substring(0, 100)}${t.reason.length > 100 ? '...' : ''}\n**Usos:** ${t.usageCount || 0} vezes`,
-              inline: false
-            });
-          });
-          
-          await interaction.editReply({ embeds: [embed] });
-        } 
-        else if (action === 'create') {
-          const name = interaction.options.getString('name');
-          const reason = interaction.options.getString('reason');
-          
-          if (!name || !reason) {
-            return interaction.editReply({ content: '❌ Para criar um template, forneça nome e motivo.' });
-          }
-          
-          if (warnSystem.addWarnTemplate) {
-            const result = warnSystem.addWarnTemplate(interaction.guild.id, {
-              name,
-              reason,
-              duration: 0,
-              severity: 'medium',
-              emoji: '📋'
-            }, interaction.user.id);
-            
-            if (result && result.success) {
-              const embed = new EmbedBuilder()
-                .setTitle('✅ Template Criado')
-                .setColor(Colors.Green)
-                .setDescription(`Template **${name}** criado com sucesso!`)
-                .addFields(
-                  { name: '🆔 ID', value: `\`${result.templateId}\``, inline: true },
-                  { name: '📋 Motivo', value: reason, inline: false }
-                )
-                .setTimestamp();
-              
-              await interaction.editReply({ embeds: [embed] });
-            } else {
-              await interaction.editReply({ content: `❌ Erro ao criar template: ${result?.error || 'Erro desconhecido'}` });
-            }
-          } else {
-            await interaction.editReply({ content: '❌ Função de templates não disponível.' });
-          }
-        } 
-        else if (action === 'delete') {
-          // Implementar deleção de template
-          await interaction.editReply({ content: '🔜 Funcionalidade em desenvolvimento' });
         }
       }
 
@@ -1348,40 +1207,27 @@ const warnCommand = {
 
     } catch (error) {
       logError(`Erro no comando warn: ${error.message}`);
-      console.error(error);
       await interaction.editReply({ content: '❌ Erro ao executar o comando.' });
     }
   }
 };
 
 // ===============================
-// COMANDOS DE ATALHO (para compatibilidade)
+// COMANDOS DE ATALHO
 // ===============================
 const warningsCommand = {
   data: {
     name: 'warnings',
     description: '[Atalho] Ver warns de um usuário',
     options: [
-      {
-        name: 'user',
-        description: 'Usuário',
-        type: 6,
-        required: true
-      },
-      {
-        name: 'code',
-        description: 'Código de acesso',
-        type: 3,
-        required: true
-      }
+      { name: 'user', description: 'Usuário', type: 6, required: true },
+      { name: 'code', description: 'Código de acesso', type: 3, required: true }
     ]
   },
   async execute(interaction) {
-    // Redirecionar para o comando warn check
     const user = interaction.options.getUser('user');
     const code = interaction.options.getString('code');
     
-    // Simular o subcomando check
     const fakeInteraction = {
       ...interaction,
       options: {
@@ -1400,33 +1246,16 @@ const clearwarnsCommand = {
     name: 'clearwarns',
     description: '[Atalho] Limpar warns de um usuário',
     options: [
-      {
-        name: 'user',
-        description: 'Usuário',
-        type: 6,
-        required: true
-      },
-      {
-        name: 'reason',
-        description: 'Motivo',
-        type: 3,
-        required: false
-      },
-      {
-        name: 'code',
-        description: 'Código de acesso',
-        type: 3,
-        required: true
-      }
+      { name: 'user', description: 'Usuário', type: 6, required: true },
+      { name: 'reason', description: 'Motivo', type: 3, required: false },
+      { name: 'code', description: 'Código de acesso', type: 3, required: true }
     ]
   },
   async execute(interaction) {
-    // Redirecionar para o comando warn clear
     const user = interaction.options.getUser('user');
     const reason = interaction.options.getString('reason') || 'Limpeza via comando de atalho';
     const code = interaction.options.getString('code');
     
-    // Simular o subcomando clear
     const fakeInteraction = {
       ...interaction,
       options: {
@@ -1449,26 +1278,14 @@ const warnstatsCommand = {
     name: 'warnstats',
     description: '[Atalho] Estatísticas de warns',
     options: [
-      {
-        name: 'user',
-        description: 'Usuário (opcional)',
-        type: 6,
-        required: false
-      },
-      {
-        name: 'code',
-        description: 'Código de acesso',
-        type: 3,
-        required: true
-      }
+      { name: 'user', description: 'Usuário (opcional)', type: 6, required: false },
+      { name: 'code', description: 'Código de acesso', type: 3, required: true }
     ]
   },
   async execute(interaction) {
-    // Redirecionar para o comando warn stats
     const user = interaction.options.getUser('user');
     const code = interaction.options.getString('code');
     
-    // Simular o subcomando stats
     const fakeInteraction = {
       ...interaction,
       options: {
@@ -1485,15 +1302,11 @@ const warnstatsCommand = {
 // ===============================
 // FUNÇÕES DO PAINEL DO DONO
 // ===============================
-
 async function handleOwnerPanel(message) {
-  // Verificar se é o dono
   const ownerId = CONFIG.OWNER_ID ? CONFIG.OWNER_ID.replace(/[<@>]/g, '') : null;
   
   if (message.author.id !== ownerId) {
-    // Não é o dono - mensagem de acesso negado
     const deniedMsg = await message.reply('❌ **Acesso negado!** Apenas o dono do bot pode usar este comando.');
-    
     setTimeout(async () => {
       try {
         await message.delete();
@@ -1503,79 +1316,45 @@ async function handleOwnerPanel(message) {
     return;
   }
 
-  // É o dono - criar embed do painel
   const uptimeMs = client.uptime;
   const uptimeSeconds = Math.floor(uptimeMs / 1000);
   const hours = Math.floor(uptimeSeconds / 3600);
   const minutes = Math.floor((uptimeSeconds % 3600) / 60);
   const seconds = uptimeSeconds % 60;
 
-  // Formatar uptime
   let uptimeString = '';
   if (hours > 0) uptimeString += `${hours}h `;
   if (minutes > 0) uptimeString += `${minutes}m `;
   uptimeString += `${seconds}s`;
 
-  // Calcular total de comandos usados hoje
   const totalCommandsToday = Object.values(stats.commandsUsed).reduce((a, b) => a + b, 0);
 
-  // Obter estatísticas globais de warns
-  const globalWarnStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : { totalWarns: 0, totalUsers: 0, totalServers: 0 };
+  let globalWarnStats = { totalWarns: 0, totalUsers: 0, totalServers: 0 };
+  try {
+    globalWarnStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : globalWarnStats;
+  } catch (err) {}
 
-  // Criar embed
   const embed = new EmbedBuilder()
     .setTitle('👋 Welcome, Owner!')
     .setDescription('**Painel de Controle do Bot**')
     .setColor('#89CFF0')
     .addFields(
-      { 
-        name: '🤖 **Informações do Bot**', 
-        value: `• **Tag:** ${client.user.tag}\n• **ID:** ${client.user.id}\n• **Servidores:** ${client.guilds.cache.size}\n• **Usuários:** ${client.users.cache.size}`,
-        inline: false 
-      },
-      { 
-        name: '📊 **Status**', 
-        value: `• **Ping:** ${client.ws.ping}ms\n• **Uptime:** ${uptimeString}\n• **Memória:** ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`,
-        inline: true 
-      },
-      { 
-        name: '📅 **Informações**', 
-        value: `• **Iniciado em:** ${stats.startDate.toLocaleString('pt-BR')}\n• **Comandos hoje:** ${totalCommandsToday}\n• **Warns totais:** ${globalWarnStats.totalWarns || 0}\n• **Servidores com warns:** ${globalWarnStats.totalServers || 0}`,
-        inline: true 
-      },
-      { 
-        name: '📋 **Comandos Disponíveis**', 
-        value: '`/ping` - Verificar latência\n`/help` - Lista de comandos\n`/adm` - Painel admin\n`/private` - Mensagem staff\n`/report` - Gerar relatório\n`/warn` - Sistema completo de warns (com subcomandos)\n`/warnings` - Atalho para ver warns\n`/clearwarns` - Atalho para limpar warns\n`/warnstats` - Atalho para estatísticas\n\n**Comandos DM:**\n`!clear` - Limpar DM\n`!clearAll` - Limpar todas DMs\n`Hello` - Abrir este painel',
-        inline: false 
-      }
+      { name: '🤖 **Informações do Bot**', value: `• **Tag:** ${client.user.tag}\n• **ID:** ${client.user.id}\n• **Servidores:** ${client.guilds.cache.size}\n• **Usuários:** ${client.users.cache.size}`, inline: false },
+      { name: '📊 **Status**', value: `• **Ping:** ${client.ws.ping}ms\n• **Uptime:** ${uptimeString}\n• **Memória:** ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`, inline: true },
+      { name: '📅 **Informações**', value: `• **Iniciado em:** ${stats.startDate.toLocaleString('pt-BR')}\n• **Comandos hoje:** ${totalCommandsToday}\n• **Warns totais:** ${globalWarnStats.totalWarns || 0}`, inline: true },
+      { name: '📋 **Comandos Disponíveis**', value: '`/ping` `/help` `/adm` `/private` `/report` `/warn` `/warnings` `/clearwarns` `/warnstats`\n\n**Comandos DM:** `!clear` `!clearAll` `Hello`', inline: false }
     )
-    .setFooter({ 
-      text: `Hostville-bot@5.0.1 • Warn System v${warnSystem.version || '2.0.0'}`,
-      iconURL: client.user.displayAvatarURL()
-    })
+    .setFooter({ text: `Hostville-bot@5.0.1 • Warn System v${warnSystem.version || '2.0.0'}` })
     .setTimestamp();
 
-  // Criar botões
   const row = new ActionRowBuilder()
     .addComponents(
-      new ButtonBuilder()
-        .setCustomId('owner_turnoff')
-        .setLabel('Turn Off')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('🔴'),
-      new ButtonBuilder()
-        .setCustomId('owner_moderation')
-        .setLabel('Moderation')
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji('🛡️'),
-      new ButtonBuilder()
-        .setCustomId('owner_warnstats')
-        .setLabel('Warn Stats')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('📊')
+      new ButtonBuilder().setCustomId('owner_turnoff').setLabel('Turn Off').setStyle(ButtonStyle.Secondary).setEmoji('🔴'),
+      new ButtonBuilder().setCustomId('owner_moderation').setLabel('Moderation').setStyle(ButtonStyle.Danger).setEmoji('🛡️'),
+      new ButtonBuilder().setCustomId('owner_warnstats').setLabel('Warn Stats').setStyle(ButtonStyle.Primary).setEmoji('📊'),
+      new ButtonBuilder().setCustomId('owner_monitor_roles').setLabel('Monitor Roles').setStyle(ButtonStyle.Success).setEmoji('👥')
     );
 
-  // Enviar mensagem com embed e botões
   const panelMsg = await message.reply({
     content: '✅ **Owner Panel**',
     embeds: [embed],
@@ -1583,181 +1362,71 @@ async function handleOwnerPanel(message) {
   });
 
   logInfo(`🔐 Painel do dono aberto por ${message.author.tag}`);
-  
   return panelMsg;
 }
 
 async function handleOwnerPanelButtons(interaction) {
-  // Verificar se é o dono
   const ownerId = CONFIG.OWNER_ID ? CONFIG.OWNER_ID.replace(/[<@>]/g, '') : null;
   
   if (interaction.user.id !== ownerId) {
-    await interaction.reply({ 
-      content: '❌ Apenas o dono do bot pode usar estes botões!', 
-      flags: 64 
-    });
-    
-    setTimeout(async () => {
-      try {
-        await interaction.deleteReply();
-      } catch (e) {}
-    }, 5000);
+    await interaction.reply({ content: '❌ Apenas o dono do bot pode usar estes botões!', flags: 64 });
+    setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 5000);
     return;
   }
 
   if (interaction.customId === 'owner_turnoff') {
-    // Botão Turn Off
     const confirmRow = new ActionRowBuilder()
       .addComponents(
-        new ButtonBuilder()
-          .setCustomId('confirm_shutdown')
-          .setLabel('✅ Confirmar Desligamento')
-          .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-          .setCustomId('cancel_shutdown')
-          .setLabel('❌ Cancelar')
-          .setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId('confirm_shutdown').setLabel('✅ Confirmar Desligamento').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('cancel_shutdown').setLabel('❌ Cancelar').setStyle(ButtonStyle.Secondary)
       );
 
-    await interaction.reply({
-      content: '⚠️ **Tem certeza que deseja desligar o bot?**',
-      components: [confirmRow],
-      flags: 64
-    });
+    await interaction.reply({ content: '⚠️ **Tem certeza que deseja desligar o bot?**', components: [confirmRow], flags: 64 });
 
-    // Criar coletor para os botões de confirmação
     const filter = (i) => i.user.id === ownerId;
-    const collector = interaction.channel.createMessageComponentCollector({ 
-      filter, 
-      time: 30000,
-      max: 1
-    });
+    const collector = interaction.channel.createMessageComponentCollector({ filter, time: 30000, max: 1 });
 
     collector.on('collect', async (i) => {
       if (i.customId === 'confirm_shutdown') {
-        await i.update({ 
-          content: '🔴 **Desligando o bot...**', 
-          components: [] 
-        });
-        
+        await i.update({ content: '🔴 **Desligando o bot...**', components: [] });
         logInfo(`🔴 Bot desligado por ${interaction.user.tag}`);
-        
-        // Aguardar 2 segundos e desligar
-        setTimeout(() => {
-          process.exit(0);
-        }, 2000);
-        
+        setTimeout(() => process.exit(0), 2000);
       } else if (i.customId === 'cancel_shutdown') {
-        await i.update({ 
-          content: '✅ **Desligamento cancelado.**', 
-          components: [] 
-        });
-        
-        setTimeout(async () => {
-          try {
-            await i.deleteReply();
-          } catch (e) {}
-        }, 3000);
+        await i.update({ content: '✅ **Desligamento cancelado.**', components: [] });
+        setTimeout(async () => { try { await i.deleteReply(); } catch (e) {} }, 3000);
       }
     });
-
-    collector.on('end', async (collected) => {
-      if (collected.size === 0) {
-        try {
-          await interaction.editReply({ 
-            content: '⏰ **Tempo esgotado. Desligamento cancelado.**', 
-            components: [] 
-          });
-          
-          setTimeout(async () => {
-            try {
-              await interaction.deleteReply();
-            } catch (e) {}
-          }, 3000);
-        } catch (e) {}
-      }
-    });
-
-  } else if (interaction.customId === 'owner_moderation') {
-    // Botão Moderation - similar ao !MonitorOn/Off
+  } 
+  else if (interaction.customId === 'owner_moderation') {
     await interaction.deferReply({ flags: 64 });
-
     try {
-      // Criar lista de servidores com status
       const options = [];
       let count = 0;
       
       for (const [guildId, guild] of client.guilds.cache) {
-        if (count >= 25) break; // Limite do Discord
-        
+        if (count >= 25) break;
         const status = serverMonitoring.get(guildId) ? '🟢 ATIVO' : '🔴 INATIVO';
-        options.push(
-          new StringSelectMenuOptionBuilder()
-            .setLabel(guild.name.substring(0, 100))
-            .setDescription(`${guild.memberCount} membros - ${status}`)
-            .setValue(guildId)
-            .setEmoji('🏛️')
-        );
+        options.push(new StringSelectMenuOptionBuilder().setLabel(guild.name.substring(0, 100)).setDescription(`${guild.memberCount} membros - ${status}`).setValue(guildId).setEmoji('🏛️'));
         count++;
       }
 
-      // Menu para selecionar servidor
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId('owner_monitor_select')
-        .setPlaceholder('Selecione um servidor para alterar')
-        .addOptions(options);
-
-      if (client.guilds.cache.size > 25) {
-        selectMenu.addOptions(
-          new StringSelectMenuOptionBuilder()
-            .setLabel('📌 Mais servidores...')
-            .setDescription('Use /adm para ver mais opções')
-            .setValue('more')
-            .setEmoji('📌')
-        );
-      }
-
+      const selectMenu = new StringSelectMenuBuilder().setCustomId('owner_monitor_select').setPlaceholder('Selecione um servidor para alterar').addOptions(options);
       const row = new ActionRowBuilder().addComponents(selectMenu);
+      const actionRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('owner_monitor_all_on').setLabel('Ativar Todos').setStyle(ButtonStyle.Success).setEmoji('✅'),
+        new ButtonBuilder().setCustomId('owner_monitor_all_off').setLabel('Desativar Todos').setStyle(ButtonStyle.Danger).setEmoji('❌')
+      );
 
-      // Botões para ação em massa
-      const actionRow = new ActionRowBuilder()
-        .addComponents(
-          new ButtonBuilder()
-            .setCustomId('owner_monitor_all_on')
-            .setLabel('Ativar Todos')
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('✅'),
-          new ButtonBuilder()
-            .setCustomId('owner_monitor_all_off')
-            .setLabel('Desativar Todos')
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji('❌')
-        );
-
-      await interaction.editReply({
-        content: '🛡️ **Painel de Moderação**\nSelecione um servidor para alterar o status do monitoramento:',
-        components: [row, actionRow]
-      });
-
+      await interaction.editReply({ content: '🛡️ **Painel de Moderação**\nSelecione um servidor para alterar o status do monitoramento:', components: [row, actionRow] });
     } catch (error) {
       logError(`Erro no painel de moderação: ${error.message}`);
-      await interaction.editReply({ 
-        content: '❌ Erro ao carregar servidores.' 
-      });
+      await interaction.editReply({ content: '❌ Erro ao carregar servidores.' });
     }
-  } else if (interaction.customId === 'owner_warnstats') {
-    // Botão Warn Stats
+  } 
+  else if (interaction.customId === 'owner_warnstats') {
     await interaction.deferReply({ flags: 64 });
-
     try {
-      const globalStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : { 
-        totalServers: 0, 
-        totalUsers: 0, 
-        totalWarns: 0,
-        totalActiveWarns: 0,
-        averageWarnsPerUser: 0
-      };
-
+      const globalStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : { totalServers: 0, totalUsers: 0, totalWarns: 0, totalActiveWarns: 0 };
       const embed = new EmbedBuilder()
         .setTitle('📊 Estatísticas Globais de Warns')
         .setColor(Colors.Blue)
@@ -1765,362 +1434,21 @@ async function handleOwnerPanelButtons(interaction) {
           { name: '🌐 Servidores', value: globalStats.totalServers?.toString() || '0', inline: true },
           { name: '👥 Usuários Warnados', value: globalStats.totalUsers?.toString() || '0', inline: true },
           { name: '⚠️ Total de Warns', value: globalStats.totalWarns?.toString() || '0', inline: true },
-          { name: '🟢 Warns Ativos', value: globalStats.totalActiveWarns?.toString() || '0', inline: true },
-          { name: '📊 Média por Usuário', value: globalStats.averageWarnsPerUser?.toString() || '0', inline: true }
+          { name: '🟢 Warns Ativos', value: globalStats.totalActiveWarns?.toString() || '0', inline: true }
         )
         .setFooter({ text: `Sistema de Warns v${warnSystem.version || '2.0.0'}` })
         .setTimestamp();
-
       await interaction.editReply({ embeds: [embed] });
-
     } catch (error) {
       logError(`Erro no painel de warns: ${error.message}`);
-      await interaction.editReply({ 
-        content: '❌ Erro ao carregar estatísticas de warns.' 
-      });
+      await interaction.editReply({ content: '❌ Erro ao carregar estatísticas de warns.' });
     }
   }
-}
-
-async function handleOwnerServerSelection(interaction) {
-  const ownerId = CONFIG.OWNER_ID ? CONFIG.OWNER_ID.replace(/[<@>]/g, '') : null;
-  
-  if (interaction.user.id !== ownerId) {
-    await interaction.reply({ 
-      content: '❌ Acesso negado!', 
-      flags: 64 
-    });
-    return;
-  }
-
-  await interaction.deferUpdate();
-
-  try {
-    const selectedValue = interaction.values[0];
-    
-    if (selectedValue === 'more') {
-      await interaction.editReply({ 
-        content: '📌 **Use o comando `Hello` novamente para ver mais servidores.**',
-        components: [] 
-      });
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 5000);
-      return;
-    }
-
-    const guild = client.guilds.cache.get(selectedValue);
-    if (!guild) {
-      await interaction.editReply({ 
-        content: '❌ Servidor não encontrado.',
-        components: [] 
-      });
-      return;
-    }
-
-    const currentStatus = serverMonitoring.get(guild.id) !== false;
-    
-    // Criar botões para ativar/desativar
-    const row = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(`monitor_guild_${guild.id}_on`)
-          .setLabel('🟢 Ativar')
-          .setStyle(ButtonStyle.Success)
-          .setDisabled(currentStatus),
-        new ButtonBuilder()
-          .setCustomId(`monitor_guild_${guild.id}_off`)
-          .setLabel('🔴 Desativar')
-          .setStyle(ButtonStyle.Danger)
-          .setDisabled(!currentStatus)
-      );
-
-    const embed = new EmbedBuilder()
-      .setTitle(`🛡️ Servidor: ${guild.name}`)
-      .setColor(currentStatus ? Colors.Green : Colors.Red)
-      .addFields(
-        { name: '📊 Status Atual', value: currentStatus ? '🟢 **ATIVO**' : '🔴 **INATIVO**', inline: true },
-        { name: '👥 Membros', value: `${guild.memberCount}`, inline: true },
-        { name: '📅 Criado em', value: guild.createdAt.toLocaleDateString('pt-BR'), inline: true }
-      )
-      .setTimestamp();
-
-    await interaction.editReply({
-      content: `**${guild.name}** - Escolha a ação:`,
-      embeds: [embed],
-      components: [row]
-    });
-
-  } catch (error) {
-    logError(`Erro no handleOwnerServerSelection: ${error.message}`);
-  }
-}
-
-async function handleGuildMonitorButton(interaction) {
-  const ownerId = CONFIG.OWNER_ID ? CONFIG.OWNER_ID.replace(/[<@>]/g, '') : null;
-  
-  if (interaction.user.id !== ownerId) {
-    await interaction.reply({ 
-      content: '❌ Acesso negado!', 
-      flags: 64 
-    });
-    return;
-  }
-
-  await interaction.deferUpdate();
-
-  try {
-    const parts = interaction.customId.split('_');
-    const guildId = parts[2];
-    const action = parts[3];
-    
-    const guild = client.guilds.cache.get(guildId);
-    if (!guild) {
-      await interaction.editReply({ 
-        content: '❌ Servidor não encontrado.',
-        components: [] 
-      });
-      return;
-    }
-
-    const isOn = action === 'on';
-    setServerMonitoring(guildId, isOn, interaction.user);
-
-    const embed = new EmbedBuilder()
-      .setTitle(`✅ Monitoramento ${isOn ? 'Ativado' : 'Desativado'}`)
-      .setColor(isOn ? Colors.Green : Colors.Red)
-      .addFields(
-        { name: '🏛️ Servidor', value: guild.name, inline: true },
-        { name: '🛡️ Status', value: isOn ? '🟢 **ATIVO**' : '🔴 **INATIVO**', inline: true },
-        { name: '👤 Staff', value: interaction.user.tag, inline: true }
-      )
-      .setTimestamp();
-
-    await interaction.editReply({
-      content: `✅ **Monitoramento ${isOn ? 'ativado' : 'desativado'} em ${guild.name}!**`,
-      embeds: [embed],
-      components: []
-    });
-
-    setTimeout(async () => {
-      try {
-        await interaction.deleteReply();
-      } catch (e) {}
-    }, 10000);
-
-  } catch (error) {
-    logError(`Erro no handleGuildMonitorButton: ${error.message}`);
-  }
-}
-
-async function handleOwnerBulkAction(interaction) {
-  const ownerId = CONFIG.OWNER_ID ? CONFIG.OWNER_ID.replace(/[<@>]/g, '') : null;
-  
-  if (interaction.user.id !== ownerId) {
-    await interaction.reply({ 
-      content: '❌ Acesso negado!', 
-      flags: 64 
-    });
-    return;
-  }
-
-  await interaction.deferUpdate();
-
-  try {
-    const isOn = interaction.customId.includes('on');
-    let count = 0;
-    
-    for (const [guildId, guild] of client.guilds.cache) {
-      setServerMonitoring(guildId, isOn, interaction.user);
-      count++;
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(`✅ Ação em Massa Concluída`)
-      .setColor(isOn ? Colors.Green : Colors.Red)
-      .addFields(
-        { name: '🛡️ Ação', value: isOn ? 'Ativar Todos' : 'Desativar Todos', inline: true },
-        { name: '📊 Servidores', value: `${count} servidores`, inline: true },
-        { name: '👤 Staff', value: interaction.user.tag, inline: true }
-      )
-      .setTimestamp();
-
-    await interaction.editReply({
-      content: `✅ **Monitoramento ${isOn ? 'ativado' : 'desativado'} em ${count} servidores!**`,
-      embeds: [embed],
-      components: []
-    });
-
-    setTimeout(async () => {
-      try {
-        await interaction.deleteReply();
-      } catch (e) {}
-    }, 10000);
-
-  } catch (error) {
-    logError(`Erro no handleOwnerBulkAction: ${error.message}`);
-  }
-}
-
-// ===============================
-// HANDLER PARA BOTÕES DE WARNS
-// ===============================
-
-async function handleWarnButtons(interaction) {
-  const customId = interaction.customId;
-
-  // Paginação de warns
-  if (customId.startsWith('warns_prev_') || customId.startsWith('warns_next_')) {
-    const parts = customId.split('_');
-    const action = parts[1]; // prev ou next
-    const userId = parts[2];
-    const currentPage = parseInt(parts[3]);
-
-    const user = await client.users.fetch(userId);
-    const userWarns = warnSystem.getUserWarns(interaction.guild.id, userId);
-    
-    if (!userWarns) {
-      return interaction.reply({ content: '❌ Warns não encontrados.', flags: 64 });
-    }
-
-    const newPage = action === 'next' ? currentPage + 1 : currentPage - 1;
-    
-    // Criar embed simples se a função não existir
-    const embed = new EmbedBuilder()
-      .setTitle(`Warns de ${user.tag} - Página ${newPage}`)
-      .setColor(Colors.Orange)
-      .setDescription(`Total: **${userWarns.activeCount}** ativos (${userWarns.count} total)`)
-      .setTimestamp();
-
-    const row = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(`warns_prev_${userId}_${newPage}`)
-          .setLabel('◀ Anterior')
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(newPage === 1),
-        new ButtonBuilder()
-          .setCustomId(`warns_next_${userId}_${newPage}`)
-          .setLabel('Próximo ▶')
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(newPage * 5 >= userWarns.history.length)
-      );
-
-    await interaction.update({ embeds: [embed], components: [row] });
-  }
-
-  // Ver detalhes do warn
-  if (customId.startsWith('warn_details_')) {
-    const warnId = customId.replace('warn_details_', '');
-    
-    // Buscar o warn
-    const guildWarns = warnSystem.getWarns ? warnSystem.getWarns().get(interaction.guild.id) : null;
-    if (guildWarns) {
-      for (const [uid, userWarns] of guildWarns) {
-        const warn = userWarns.history.find(w => w.id === warnId);
-        if (warn) {
-          const user = await client.users.fetch(uid);
-          const moderator = await client.users.fetch(warn.moderatorId).catch(() => null);
-          
-          const riskLevel = warnSystem.calculateRiskLevel ? 
-            warnSystem.calculateRiskLevel(userWarns.activeCount) : 
-            { color: Colors.Orange };
-          
-          const embed = new EmbedBuilder()
-            .setTitle(`📋 Detalhes do Warn #${warnId}`)
-            .setColor(riskLevel.color || Colors.Orange)
-            .addFields(
-              { name: '👤 Usuário', value: `${user.tag} (${uid})`, inline: true },
-              { name: '🛡️ Moderador', value: moderator ? moderator.tag : warn.moderatorId, inline: true },
-              { name: '📅 Data', value: warnSystem.formatDate ? warnSystem.formatDate(warn.timestamp) : new Date(warn.timestamp).toLocaleString('pt-BR'), inline: true },
-              { name: '📋 Motivo', value: warn.reason, inline: false },
-              { name: '🟢 Status', value: warn.active ? 'Ativo' : 'Inativo', inline: true }
-            )
-            .setTimestamp();
-
-          if (warn.expiresAt) {
-            embed.addFields({
-              name: '⏰ Expira em',
-              value: warnSystem.formatDate ? warnSystem.formatDate(warn.expiresAt) : new Date(warn.expiresAt).toLocaleString('pt-BR'),
-              inline: true
-            });
-          }
-
-          return interaction.reply({ embeds: [embed], flags: 64 });
-        }
-      }
-    }
-
-    await interaction.reply({ content: '❌ Warn não encontrado.', flags: 64 });
-  }
-
-  // Remover warn
-  if (customId.startsWith('warn_remove_')) {
-    const parts = customId.replace('warn_remove_', '').split('_');
-    const warnId = parts[0];
-    const userId = parts[1];
-
-    const modal = new ModalBuilder()
-      .setCustomId(`remove_warn_modal_${warnId}_${userId}`)
-      .setTitle('Remover Warn');
-
-    const reasonInput = new TextInputBuilder()
-      .setCustomId('remove_reason')
-      .setLabel('Motivo da remoção')
-      .setStyle(TextInputStyle.Paragraph)
-      .setPlaceholder('Por que este warn está sendo removido?')
-      .setRequired(true);
-
-    const row = new ActionRowBuilder().addComponents(reasonInput);
-    modal.addComponents(row);
-
-    await interaction.showModal(modal);
-  }
-}
-
-// ===============================
-// HANDLER PARA MODAIS DE WARNS
-// ===============================
-
-async function handleWarnModals(interaction) {
-  if (interaction.customId.startsWith('remove_warn_modal_')) {
-    const parts = interaction.customId.replace('remove_warn_modal_', '').split('_');
-    const warnId = parts[0];
-    const userId = parts[1];
-    const reason = interaction.fields.getTextInputValue('remove_reason');
-
+  else if (interaction.customId === 'owner_monitor_roles') {
     await interaction.deferReply({ flags: 64 });
-
-    if (!warnSystem.removeWarn) {
-      return interaction.editReply({ content: '❌ Função removeWarn não disponível.' });
-    }
-
-    const result = warnSystem.removeWarn(
-      interaction.guild.id,
-      userId,
-      warnId,
-      interaction.user.id,
-      reason
-    );
-
-    if (result && result.success) {
-      const embed = new EmbedBuilder()
-        .setTitle('✅ Warn Removido')
-        .setColor(Colors.Green)
-        .setDescription(`Warn #${warnId} foi removido com sucesso.`)
-        .addFields(
-          { name: '👤 Usuário', value: `<@${userId}>`, inline: true },
-          { name: '📋 Motivo', value: reason, inline: false }
-        )
-        .setTimestamp();
-
-      await interaction.editReply({ embeds: [embed] });
-    } else {
-      await interaction.editReply({ content: `❌ ${result?.error || 'Erro ao remover warn'}` });
-    }
+    await monitorWarnRoles();
+    await interaction.editReply({ content: '✅ **Monitoramento de cargos concluído!** Verifique o console para ver os resultados.' });
+    setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 10000);
   }
 }
 
@@ -2130,463 +1458,103 @@ async function handleWarnModals(interaction) {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
-  // ===== MENSAGENS NA DM =====
   if (message.channel.type === ChannelType.DM) {
-    
-    // === COMANDO Hello - Painel do Dono ===
     if (message.content.toLowerCase() === 'hello') {
       await handleOwnerPanel(message);
       return;
     }
     
-    // === COMANDO !MonitorOn ===
-    if (message.content.startsWith('!MonitorOn')) {
-      const args = message.content.split(' ');
-      const password = args[1];
-      
-      if (!password) {
-        await message.reply('❌ Use: `!MonitorOn ACCESS_CODE`');
-        setTimeout(async () => {
-          try {
-            const msgs = await message.channel.messages.fetch({ limit: 2 });
-            for (const msg of msgs.values()) {
-              if (msg.author.id === client.user.id) {
-                await msg.delete();
-              }
-            }
-          } catch (e) {}
-        }, 5000);
-        return;
-      }
-      
-      if (password !== CONFIG.ACCESS_CODE) {
-        await message.reply('❌ Código de acesso incorreto!');
-        setTimeout(async () => {
-          try {
-            const msgs = await message.channel.messages.fetch({ limit: 2 });
-            for (const msg of msgs.values()) {
-              if (msg.author.id === client.user.id) {
-                await msg.delete();
-              }
-            }
-          } catch (e) {}
-        }, 5000);
-        return;
-      }
-      
-      const row = new ActionRowBuilder()
-        .addComponents(
-          new ButtonBuilder()
-            .setCustomId('monitor_all_on')
-            .setLabel('Todos os Servidores ⚠️')
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('🌐'),
-          new ButtonBuilder()
-            .setCustomId('monitor_select_on')
-            .setLabel('Selecionar um Servidor')
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('🔍')
-        );
-      
-      const reply = await message.reply({
-        content: '🛡️ **Escolha uma opção para ATIVAR o monitoramento:**',
-        components: [row]
-      });
-      
-      setTimeout(async () => {
-        try {
-          await message.delete();
-          await reply.delete();
-        } catch (e) {}
-      }, 120000);
-      
-      return;
-    }
-    
-    // === COMANDO !MonitorOff ===
-    if (message.content.startsWith('!MonitorOff')) {
-      const args = message.content.split(' ');
-      const password = args[1];
-      
-      if (!password) {
-        await message.reply('❌ Use: `!MonitorOff ACCESS_CODE`');
-        setTimeout(async () => {
-          try {
-            const msgs = await message.channel.messages.fetch({ limit: 2 });
-            for (const msg of msgs.values()) {
-              if (msg.author.id === client.user.id) {
-                await msg.delete();
-              }
-            }
-          } catch (e) {}
-        }, 5000);
-        return;
-      }
-      
-      if (password !== CONFIG.ACCESS_CODE) {
-        await message.reply('❌ Código de acesso incorreto!');
-        setTimeout(async () => {
-          try {
-            const msgs = await message.channel.messages.fetch({ limit: 2 });
-            for (const msg of msgs.values()) {
-              if (msg.author.id === client.user.id) {
-                await msg.delete();
-              }
-            }
-          } catch (e) {}
-        }, 5000);
-        return;
-      }
-      
-      const row = new ActionRowBuilder()
-        .addComponents(
-          new ButtonBuilder()
-            .setCustomId('monitor_all_off')
-            .setLabel('Todos os Servidores ⚠️')
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji('🌐'),
-          new ButtonBuilder()
-            .setCustomId('monitor_select_off')
-            .setLabel('Selecionar um Servidor')
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('🔍')
-        );
-      
-      const reply = await message.reply({
-        content: '🛡️ **Escolha uma opção para DESATIVAR o monitoramento:**',
-        components: [row]
-      });
-      
-      setTimeout(async () => {
-        try {
-          await message.delete();
-          await reply.delete();
-        } catch (e) {}
-      }, 120000);
-      
-      return;
-    }
-    
-    // === COMANDO !clearAll ===
     if (message.content.startsWith('!clearAll')) {
-      
       const args = message.content.split(' ');
       const password = args[1];
       
-      if (!password) {
-        const errorMsg = await message.reply('❌ Use: `!clearAll SUA_SENHA`');
-        setTimeout(async () => {
-          try {
-            await message.delete();
-            await errorMsg.delete();
-          } catch (e) {}
-        }, 5000);
-        return;
-      }
-      
-      if (password !== CONFIG.ACCESS_CODE) {
-        const errorMsg = await message.reply('❌ Código de acesso incorreto!');
-        setTimeout(async () => {
-          try {
-            await message.delete();
-            await errorMsg.delete();
-          } catch (e) {}
-        }, 5000);
+      if (!password || password !== CONFIG.ACCESS_CODE) {
+        const errorMsg = await message.reply('❌ Use: `!clearAll ACCESS_CODE`');
+        setTimeout(async () => { try { await message.delete(); await errorMsg.delete(); } catch (e) {} }, 5000);
         return;
       }
       
       try {
         await message.delete();
-      } catch (e) {}
-      
-      try {
-        const processingMsg = await message.channel.send('🔄 Limpando mensagens de TODAS as DMs... Isso pode levar alguns minutos...');
-        
+        const processingMsg = await message.channel.send('🔄 Limpando mensagens de TODAS as DMs...');
         let totalDeleted = 0;
         let totalChannels = 0;
         
-        // Coletar DMs
         const dmChannels = new Map();
-        
-        // Método 1: Buscar do cache de channels
-        client.channels.cache.forEach(channel => {
-          if (channel.type === ChannelType.DM) {
-            dmChannels.set(channel.id, channel);
-          }
-        });
-        
-        // Método 2: Buscar de usuários que interagiram recentemente
-        client.users.cache.forEach(user => {
-          if (user.dmChannel && !dmChannels.has(user.dmChannel.id)) {
-            dmChannels.set(user.dmChannel.id, user.dmChannel);
-          }
-        });
+        client.channels.cache.forEach(channel => { if (channel.type === ChannelType.DM) dmChannels.set(channel.id, channel); });
+        client.users.cache.forEach(user => { if (user.dmChannel && !dmChannels.has(user.dmChannel.id)) dmChannels.set(user.dmChannel.id, user.dmChannel); });
         
         totalChannels = dmChannels.size;
         
-        if (totalChannels === 0) {
-          await processingMsg.edit('❌ Nenhum canal de DM encontrado para limpar.');
-          setTimeout(async () => {
-            try {
-              await processingMsg.delete();
-            } catch (e) {}
-          }, 5000);
-          return;
-        }
-        
-        // Processar canais
         for (const [channelId, channel] of dmChannels) {
           let channelCount = 0;
-          
           try {
             let fetchedMessages;
             let hasMore = true;
-            let retryCount = 0;
             
-            while (hasMore && retryCount < 3) {
-              try {
-                fetchedMessages = await channel.messages.fetch({ limit: 100 });
-                
-                if (fetchedMessages.size === 0) {
-                  hasMore = false;
-                  break;
-                }
-                
-                const deletableMessages = fetchedMessages.filter(msg => 
-                  msg.author.id === client.user.id
-                );
-                
-                if (deletableMessages.size === 0) {
-                  hasMore = false;
-                  break;
-                }
-                
-                for (const [id, msg] of deletableMessages) {
-                  try {
-                    await msg.delete();
-                    channelCount++;
-                    totalDeleted++;
-                    
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    
-                  } catch (err) {
-                    if (err.code === 10008) {
-                      continue;
-                    }
-                    logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
-                  }
-                }
-                
-                if (fetchedMessages.size < 100) {
-                  hasMore = false;
-                }
-                
-              } catch (err) {
-                retryCount++;
-                logError(`Erro no lote do canal ${channelId}, tentativa ${retryCount}: ${err.message}`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
+            while (hasMore) {
+              fetchedMessages = await channel.messages.fetch({ limit: 100 });
+              if (fetchedMessages.size === 0) break;
+              
+              const deletableMessages = fetchedMessages.filter(msg => msg.author.id === client.user.id);
+              if (deletableMessages.size === 0) break;
+              
+              for (const [id, msg] of deletableMessages) {
+                try { await msg.delete(); channelCount++; totalDeleted++; await new Promise(resolve => setTimeout(resolve, 200)); } catch (err) {}
               }
+              
+              if (fetchedMessages.size < 100) hasMore = false;
             }
-            
-            if (channelCount > 0) {
-              const recipient = channel.recipient ? channel.recipient.tag : 'desconhecido';
-              logInfo(`Limpou ${channelCount} mensagens do bot na DM com ${recipient}`);
-            }
-            
             await new Promise(resolve => setTimeout(resolve, 800));
-            
-          } catch (err) {
-            logError(`Erro ao processar DM ${channelId}: ${err.message}`);
-          }
+          } catch (err) {}
         }
         
         await processingMsg.edit(`✅ **${totalDeleted} mensagens** do bot foram limpas de **${totalChannels} DMs**!`);
-        
-        setTimeout(async () => {
-          try {
-            await processingMsg.delete();
-          } catch (e) {}
-        }, 10000);
-        
-        logInfo(`${message.author.tag} limpou ${totalDeleted} mensagens de todas as DMs usando !clearAll`);
-        
+        setTimeout(async () => { try { await processingMsg.delete(); } catch (e) {} }, 10000);
+        logInfo(`${message.author.tag} limpou ${totalDeleted} mensagens de todas as DMs`);
       } catch (error) {
-        logError(`Erro ao limpar todas as DMs: ${error.message}`);
-        const errorMsg = await message.channel.send('❌ Erro ao limpar mensagens. Tente novamente.');
-        setTimeout(async () => {
-          try {
-            await errorMsg.delete();
-          } catch (e) {}
-        }, 5000);
+        logError(`Erro ao limpar DMs: ${error.message}`);
       }
-      
       return;
     }
     
-    // === COMANDO !clear ===
     if (message.content.startsWith('!clear')) {
-      
       try {
         await message.delete();
-      } catch (e) {}
-      
-      try {
-        const row = new ActionRowBuilder()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId('confirm_clear')
-              .setLabel('✅ Sim, limpar mensagens')
-              .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-              .setCustomId('cancel_clear')
-              .setLabel('❌ Não, ignorar')
-              .setStyle(ButtonStyle.Secondary)
-          );
+        let deletedCount = 0;
+        let fetchedMessages;
         
-        const confirmMsg = await message.channel.send({
-          content: '⚠️ **Tem certeza que deseja limpar todas as mensagens desta DM?**',
-          components: [row]
-        });
-        
-        const filter = (interaction) => {
-          return interaction.user.id === message.author.id;
-        };
-        
-        const collector = confirmMsg.createMessageComponentCollector({ 
-          filter, 
-          time: 60000,
-          max: 1
-        });
-        
-        collector.on('collect', async (interaction) => {
-          try {
-            if (interaction.customId === 'confirm_clear') {
-              await interaction.update({ content: '🔄 Limpando mensagens...', components: [] });
-              
-              let deletedCount = 0;
-              let fetchedMessages;
-              
-              try {
-                do {
-                  fetchedMessages = await message.channel.messages.fetch({ limit: 100 });
-                  
-                  if (fetchedMessages.size === 0) break;
-                  
-                  const deletableMessages = fetchedMessages.filter(msg => 
-                    msg.id !== confirmMsg.id
-                  );
-                  
-                  if (deletableMessages.size === 0) break;
-                  
-                  for (const [id, msg] of deletableMessages) {
-                    try {
-                      await msg.delete();
-                      deletedCount++;
-                      await new Promise(resolve => setTimeout(resolve, 200));
-                    } catch (err) {
-                      logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
-                    }
-                  }
-                  
-                } while (fetchedMessages.size >= 100);
-                
-                console.log(chalk.green.bgBlack.bold(`\n🧹 ${deletedCount} mensagens foram limpas do histórico da DM de ${message.author.tag}!`));
-                
-                await interaction.editReply({ 
-                  content: '✅ **Mensagens limpas com sucesso!**',
-                  components: [] 
-                });
-                
-                setTimeout(async () => {
-                  try {
-                    await confirmMsg.delete();
-                  } catch (e) {}
-                }, 5000);
-                
-                logInfo(`${message.author.tag} limpou ${deletedCount} mensagens na DM`);
-                
-              } catch (error) {
-                logError(`Erro ao limpar DM: ${error.message}`);
-                await interaction.editReply({ 
-                  content: '❌ Erro ao limpar mensagens. Tente novamente.',
-                  components: [] 
-                });
-                
-                setTimeout(async () => {
-                  try {
-                    await confirmMsg.delete();
-                  } catch (e) {}
-                }, 5000);
-              }
-              
-            } else if (interaction.customId === 'cancel_clear') {
-              await interaction.update({ content: '❌ Operação cancelada.', components: [] });
-              
-              setTimeout(async () => {
-                try {
-                  await confirmMsg.delete();
-                } catch (e) {}
-              }, 3000);
-            }
-          } catch (error) {
-            logError(`Erro no coletor do !clear: ${error.message}`);
+        do {
+          fetchedMessages = await message.channel.messages.fetch({ limit: 100 });
+          if (fetchedMessages.size === 0) break;
+          
+          const deletableMessages = fetchedMessages.filter(msg => msg.author.id === client.user.id);
+          if (deletableMessages.size === 0) break;
+          
+          for (const [id, msg] of deletableMessages) {
+            try { await msg.delete(); deletedCount++; await new Promise(resolve => setTimeout(resolve, 200)); } catch (err) {}
           }
-        });
+        } while (fetchedMessages.size >= 100);
         
-        collector.on('end', async (collected) => {
-          if (collected.size === 0) {
-            try {
-              await confirmMsg.edit({ 
-                content: '⏰ Tempo esgotado. Operação cancelada.',
-                components: [] 
-              });
-              
-              setTimeout(async () => {
-                try {
-                  await confirmMsg.delete();
-                } catch (e) {}
-              }, 3000);
-            } catch (error) {}
-          }
-        });
-        
+        const confirmMsg = await message.channel.send(`✅ **${deletedCount} mensagens** limpas!`);
+        setTimeout(async () => { try { await confirmMsg.delete(); } catch (e) {} }, 3000);
+        logInfo(`${message.author.tag} limpou ${deletedCount} mensagens na DM`);
       } catch (error) {
-        logError(`Erro ao processar !clear: ${error.message}`);
+        logError(`Erro ao limpar DM: ${error.message}`);
       }
-      
       return;
     }
     
-    // RESPOSTA AUTOMÁTICA
     try {
-      const reply = await message.reply({
-        content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.OWNER_ID}> `
-      });
-      
-      setTimeout(async () => {
-        try {
-          await reply.delete();
-        } catch (e) {}
-      }, 10000);
-      
-      logInfo(`Mensagem automática enviada para ${message.author.tag} na DM`);
-    } catch (error) {
-      logError(`Erro ao responder DM: ${error.message}`);
-    }
+      const reply = await message.reply({ content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.OWNER_ID}>` });
+      setTimeout(async () => { try { await reply.delete(); } catch (e) {} }, 10000);
+    } catch (error) {}
     return;
   }
 
-  // ===== MODERAÇÃO EM CANAIS DE SERVIDOR =====
   const isMonitoringActive = serverMonitoring.get(message.guild.id) !== false;
-  
-  if (!isMonitoringActive) {
-    return;
-  }
-   
-  if (isStaff(message.author.id)) {
-    return;
-  }
-  
+  if (!isMonitoringActive) return;
+  if (isStaff(message.author.id)) return;
   if (isAdmin(message.member)) return;
 
   if (containsOffensiveWord(message.content)) {
@@ -2594,18 +1562,10 @@ client.on("messageCreate", async (message) => {
     
     try {
       const permissions = message.channel.permissionsFor(client.user);
-      if (!permissions.has(PermissionFlagsBits.ManageMessages)) {
-        logWarn(`Bot não tem permissão para deletar mensagens em #${message.channel.name}`);
-        return;
-      }
-
-      if (!message.deletable) {
-        logWarn(`Mensagem muito antiga para ser deletada em #${message.channel.name}`);
-        return;
-      }
+      if (!permissions.has(PermissionFlagsBits.ManageMessages)) return;
+      if (!message.deletable) return;
 
       await message.delete();
-      
       stats.messagesDeleted++;
 
       const warningMsg = await message.channel.send({
@@ -2615,22 +1575,14 @@ client.on("messageCreate", async (message) => {
           .setColor(Colors.Red)
           .addFields(
             { name: '👤 Usuário', value: message.author.toString(), inline: false },
-            { name: '🗓 Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: false },
             { name: '🚫 Palavra', value: `**${foundWord || "desconhecida"}**`, inline: false }
           )
-          .setFooter({ text: 'Caso isso tenha sido um erro, contate a staff.' })
           .setTimestamp()
         ]
       });
 
-      setTimeout(async () => {
-        try {
-          await warningMsg.delete();
-        } catch (e) {}
-      }, 10000);
-
+      setTimeout(async () => { try { await warningMsg.delete(); } catch (e) {} }, 10000);
       logModeration("Palavras ofensivas detectadas", message.author, message.content, message.channel, foundWord || "desconhecida");
-
     } catch (err) {
       logError(`Erro ao moderar mensagem: ${err.message}`);
     }
@@ -2657,19 +1609,24 @@ client.once('clientReady', async () => {
   
   if (client.guilds.cache.size > 0) {
     try {
+      const allCommands = [
+        ...commands.map(c => c.data),
+        pingCommand.data,
+        helpCommand.data,
+        privateCommand.data,
+        reportCommand.data,
+        warnCommand.data,
+        warningsCommand.data,
+        clearwarnsCommand.data,
+        warnstatsCommand.data
+      ];
+      
+      console.log(chalk.yellow(`\n📝 Registrando ${allCommands.length} comandos em ${client.guilds.cache.size} servidores...`));
+      
       for (const guild of client.guilds.cache.values()) {
-        await guild.commands.set([
-          ...commands.map(c => c.data),
-          pingCommand.data,
-          helpCommand.data,
-          privateCommand.data,
-          reportCommand.data,
-          warnCommand.data,
-          warningsCommand.data,
-          clearwarnsCommand.data,
-          warnstatsCommand.data
-        ]);
-        logSuccess(`Comandos registrados em: ${guild.name}`);
+        await guild.commands.set(allCommands);
+        console.log(chalk.green(`✅ Comandos registrados em: ${guild.name}`));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
       logInfo('Comandos registrados nos servidores com sucesso!');
     } catch (error) {
@@ -2681,218 +1638,29 @@ client.once('clientReady', async () => {
 
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
   console.log(chalk.yellow('  📝 COMANDOS NA DM:'));
-  console.log(chalk.yellow('  • !clear - Limpa mensagens da DM (mensagens temporárias)'));
+  console.log(chalk.yellow('  • !clear - Limpa mensagens da DM'));
   console.log(chalk.yellow('  • !clearAll - Limpa TODAS as DMs (requer senha)'));
-  console.log(chalk.yellow('  • !MonitorOn - Ativar monitoramento (requer senha)'));
-  console.log(chalk.yellow('  • !MonitorOff - Desativar monitoramento (requer senha)'));
   console.log(chalk.yellow('  • Hello - Painel do Dono (apenas para o dono)\n'));
   
   console.log(chalk.magenta('  📋 COMANDOS DE WARNS:'));
   console.log(chalk.magenta('  • /warn add @user motivo [dias] - Adicionar warn'));
-  console.log(chalk.magenta('  • /warn remove @user warnid motivo - Remover warn específico'));
-  console.log(chalk.magenta('  • /warn clear @user motivo - Limpar todos os warns'));
-  console.log(chalk.magenta('  • /warn check @user - Ver warns de um usuário'));
-  console.log(chalk.magenta('  • /warn stats [@user] - Estatísticas de warns'));
-  console.log(chalk.magenta('  • /warn template list - Listar templates\n'));
+  console.log(chalk.magenta('  • /warn remove @user warnid motivo - Remover warn'));
+  console.log(chalk.magenta('  • /warn clear @user motivo - Limpar warns'));
+  console.log(chalk.magenta('  • /warn check @user - Ver warns'));
+  console.log(chalk.magenta('  • /warn stats [@user] - Estatísticas\n'));
+  
+  // Executar monitoramento inicial de cargos
+  setTimeout(() => {
+    monitorWarnRoles();
+  }, 5000);
   
   scheduleDailyReport();
-  
   initReadline();
   showMenu();
 });
 
 // ===============================
-// HANDLER PARA BOTÕES DE MONITORAMENTO
-// ===============================
-async function handleMonitorButtons(interaction) {
-  await interaction.deferReply({ flags: 64 });
-  
-  try {
-    const parts = interaction.customId.split('_');
-    const action = parts[1];
-    const state = parts[2];
-    const isOn = state === 'on';
-    const actionText = isOn ? 'ATIVAR' : 'DESATIVAR';
-    
-    if (action === 'all') {
-      let count = 0;
-      for (const [guildId, guild] of client.guilds.cache) {
-        setServerMonitoring(guildId, isOn, interaction.user);
-        count++;
-      }
-      
-      const embed = createStatusEmbed(null, state, interaction.user);
-      embed.setDescription(`✅ Monitoramento ${isOn ? 'ativado' : 'desativado'} em **${count} servidores**!`);
-      
-      await interaction.editReply({
-        content: `✅ Operação concluída!`,
-        embeds: [embed]
-      });
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 10000);
-      
-    } else if (action === 'select') {
-      const options = [];
-      
-      let count = 0;
-      for (const [guildId, guild] of client.guilds.cache) {
-        if (count >= 25) break;
-        
-        const status = serverMonitoring.get(guildId) ? '🟢 ATIVO' : '🔴 INATIVO';
-        options.push(
-          new StringSelectMenuOptionBuilder()
-            .setLabel(guild.name.substring(0, 100))
-            .setDescription(`${guild.memberCount} membros - ${status}`)
-            .setValue(guildId)
-            .setEmoji('🏛️')
-        );
-        count++;
-      }
-      
-      if (client.guilds.cache.size > 25) {
-        options.push(
-          new StringSelectMenuOptionBuilder()
-            .setLabel('📌 Mais servidores...')
-            .setDescription('Use o comando novamente para ver outros servidores')
-            .setValue('more')
-            .setEmoji('📌')
-        );
-      }
-      
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId(`select_server_${state}`)
-        .setPlaceholder('Selecione um servidor')
-        .addOptions(options);
-      
-      const row = new ActionRowBuilder().addComponents(selectMenu);
-      
-      pendingActions.set(interaction.user.id, { 
-        action: state,
-        messageId: interaction.id 
-      });
-      
-      await interaction.editReply({
-        content: `🔍 **Selecione o servidor para ${actionText} o monitoramento:**`,
-        components: [row]
-      });
-    }
-  } catch (error) {
-    logError(`Erro no handleMonitorButtons: ${error.message}`);
-    await interaction.editReply({ 
-      content: '❌ Erro ao processar comando. Tente novamente.'
-    });
-    
-    setTimeout(async () => {
-      try {
-        await interaction.deleteReply();
-      } catch (e) {}
-    }, 5000);
-  }
-}
-
-// ===============================
-// HANDLER PARA SELEÇÃO DE SERVIDOR (MONITORAMENTO PADRÃO)
-// ===============================
-async function handleServerSelection(interaction) {
-  await interaction.deferUpdate();
-  
-  try {
-    const selectedValue = interaction.values[0];
-    const customId = interaction.customId;
-    const state = customId.split('_')[2];
-    
-    const pending = pendingActions.get(interaction.user.id);
-    
-    if (!pending) {
-      await interaction.editReply({ 
-        content: '❌ Esta seleção expirou. Use o comando novamente.',
-        components: [] 
-      });
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 5000);
-      
-      return;
-    }
-    
-    const isOn = state === 'on';
-    const actionText = isOn ? 'ATIVADO' : 'DESATIVADO';
-    
-    if (selectedValue === 'more') {
-      await interaction.editReply({ 
-        content: '📌 **Use o comando novamente para ver mais servidores.**\nDigite `!MonitorOn` ou `!MonitorOff` novamente.',
-        components: [] 
-      });
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 5000);
-      
-      pendingActions.delete(interaction.user.id);
-      return;
-    }
-    
-    const guild = client.guilds.cache.get(selectedValue);
-    if (!guild) {
-      await interaction.editReply({ 
-        content: '❌ Servidor não encontrado.',
-        components: [] 
-      });
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 5000);
-      
-      pendingActions.delete(interaction.user.id);
-      return;
-    }
-    
-    setServerMonitoring(selectedValue, isOn, interaction.user);
-    
-    const embed = createStatusEmbed(guild, state, interaction.user);
-    
-    await interaction.editReply({ 
-      content: `✅ **Monitoramento ${actionText} em ${guild.name}!**`,
-      embeds: [embed],
-      components: [] 
-    });
-    
-    setTimeout(async () => {
-      try {
-        await interaction.deleteReply();
-      } catch (e) {}
-    }, 10000);
-    
-    pendingActions.delete(interaction.user.id);
-    
-  } catch (error) {
-    logError(`Erro no handleServerSelection: ${error.message}`);
-    await interaction.editReply({ 
-      content: '❌ Erro ao processar seleção.',
-      components: [] 
-    });
-    
-    setTimeout(async () => {
-      try {
-        await interaction.deleteReply();
-      } catch (e) {}
-    }, 5000);
-  }
-}
-
-// ===============================
-// EVENTO: INTERAÇÃO
+// HANDLER PARA INTERAÇÕES
 // ===============================
 client.on('interactionCreate', async (interaction) => {
   try {
@@ -2900,151 +1668,38 @@ client.on('interactionCreate', async (interaction) => {
       const cmdName = interaction.commandName;
       stats.commandsUsed[cmdName] = (stats.commandsUsed[cmdName] || 0) + 1;
       
-      // Verificar comandos principais
-      if (interaction.commandName === 'ping') {
-        await pingCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'help') {
-        await helpCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'private') {
-        await privateCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'report') {
-        await reportCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'warn') {
-        await warnCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'warnings') {
-        await warningsCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'clearwarns') {
-        await clearwarnsCommand.execute(interaction);
-        return;
-      }
-      if (interaction.commandName === 'warnstats') {
-        await warnstatsCommand.execute(interaction);
-        return;
-      }
-      
-      // Comandos do array commands
-      const command = commands.find(c => c.data.name === interaction.commandName);
-      if (command) {
-        try {
-          await command.execute(interaction);
-        } catch (error) {
-          logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
-          if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
-          } else {
-            await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
-          }
-        }
+      if (interaction.commandName === 'ping') await pingCommand.execute(interaction);
+      else if (interaction.commandName === 'help') await helpCommand.execute(interaction);
+      else if (interaction.commandName === 'private') await privateCommand.execute(interaction);
+      else if (interaction.commandName === 'report') await reportCommand.execute(interaction);
+      else if (interaction.commandName === 'warn') await warnCommand.execute(interaction);
+      else if (interaction.commandName === 'warnings') await warningsCommand.execute(interaction);
+      else if (interaction.commandName === 'clearwarns') await clearwarnsCommand.execute(interaction);
+      else if (interaction.commandName === 'warnstats') await warnstatsCommand.execute(interaction);
+      else {
+        const command = commands.find(c => c.data.name === interaction.commandName);
+        if (command) await command.execute(interaction);
       }
       return;
     }
 
     if (interaction.isButton()) {
-      // Botões de confirmação de desligamento
-      if (interaction.customId === 'confirm_shutdown' || interaction.customId === 'cancel_shutdown') {
-        // Esses botões são tratados pelo coletor no handleOwnerPanelButtons
-        return;
-      }
-      
-      // Botões do painel do dono
-      if (interaction.customId === 'owner_turnoff' || interaction.customId === 'owner_moderation' || interaction.customId === 'owner_warnstats') {
+      if (interaction.customId === 'owner_turnoff' || interaction.customId === 'owner_moderation' || 
+          interaction.customId === 'owner_warnstats' || interaction.customId === 'owner_monitor_roles') {
         await handleOwnerPanelButtons(interaction);
         return;
       }
       
-      // Botões de monitoramento de servidor (painel do dono)
-      if (interaction.customId.startsWith('monitor_guild_')) {
-        await handleGuildMonitorButton(interaction);
-        return;
-      }
-      
-      // Botões de ação em massa (painel do dono)
-      if (interaction.customId === 'owner_monitor_all_on' || interaction.customId === 'owner_monitor_all_off') {
-        await handleOwnerBulkAction(interaction);
-        return;
-      }
-      
-      // Botões do painel administrativo
       if (interaction.customId === 'stats' || interaction.customId === 'console' || interaction.customId === 'help') {
         await handleButtonInteraction(interaction);
         return;
       }
-      
-      // Botões de confirmação do !clear
-      if (interaction.customId === 'confirm_clear' || interaction.customId === 'cancel_clear') {
-        return;
-      }
-      
-      // Botões de monitoramento padrão
-      if (interaction.customId.startsWith('monitor_')) {
-        await handleMonitorButtons(interaction);
-        return;
-      }
-      
-      // Botões de warns
-      if (interaction.customId.startsWith('warns_') || interaction.customId.startsWith('warn_')) {
-        await handleWarnButtons(interaction);
-        return;
-      }
-      
-      await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 5000);
-    }
-    
-    if (interaction.isModalSubmit()) {
-      if (interaction.customId.startsWith('remove_warn_modal_')) {
-        await handleWarnModals(interaction);
-        return;
-      }
-    }
-    
-    if (interaction.isStringSelectMenu()) {
-      // Menu de seleção do painel do dono
-      if (interaction.customId === 'owner_monitor_select') {
-        await handleOwnerServerSelection(interaction);
-        return;
-      }
-      
-      // Menu de seleção padrão
-      if (interaction.customId.startsWith('select_server_')) {
-        await handleServerSelection(interaction);
-        return;
-      }
     }
   } catch (error) {
-    logError(`Erro geral no interactionCreate: ${error.message}`);
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: '❌ Erro ao processar interação.', flags: 64 }).catch(() => {});
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 5000);
-    }
+    logError(`Erro no interactionCreate: ${error.message}`);
   }
 });
 
-// ===============================
-// HANDLER PARA BOTÕES DO PAINEL ADMIN
-// ===============================
 async function handleButtonInteraction(interaction) {
   switch (interaction.customId) {
     case 'stats': {
@@ -3062,39 +1717,22 @@ async function handleButtonInteraction(interaction) {
           { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
           { name: '👥 Usuários', value: `${client.users.cache.size}`, inline: true }
         )
-        .setFooter({ text: 'Estatísticas atualizadas' })
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed], flags: 64 });
-      logInfo(`${interaction.user.tag} abriu estatísticas`);
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 15000);
-      
+      setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 15000);
       break;
     }
-
     case 'console': {
       console.log(chalk.yellow('\n═══ ESTATÍSTICAS DO BOT ═══'));
       console.log(chalk.white(`Ping:    ${client.ws.ping}ms`));
       console.log(chalk.white(`Uptime:  ${Math.floor(client.uptime / 3600000)}h`));
       console.log(chalk.white(`Servers: ${client.guilds.cache.size}`));
-      console.log(chalk.white(`Users:   ${client.users.cache.size}`));
       console.log(chalk.yellow('═════════════════════════════\n'));
       await interaction.reply({ content: '✅ Verifique o console!', flags: 64 });
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 5000);
-      
+      setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 5000);
       break;
     }
-
     case 'help': {
       const embed = new EmbedBuilder()
         .setTitle('❓ Ajuda - Painel Administrativo')
@@ -3102,32 +1740,14 @@ async function handleButtonInteraction(interaction) {
         .setColor(Colors.Blue)
         .addFields(
           { name: '📊 Estatísticas', value: 'Clique em "Estatísticas" para ver dados do bot', inline: false },
-          { name: '🖥️ Console', value: 'Clique em "Ver no Console" para ver dados no terminal', inline: false },
-          { name: '🔐 Segurança', value: 'Use o comando /adm com a senha correta', inline: false }
+          { name: '🖥️ Console', value: 'Clique em "Ver no Console" para ver dados no terminal', inline: false }
         )
-        .setFooter({ text: 'Painel Administrativo' })
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed], flags: 64 });
-      logInfo(`${interaction.user.tag} pediu ajuda no painel`);
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 15000);
-      
+      setTimeout(async () => { try { await interaction.deleteReply(); } catch (e) {} }, 15000);
       break;
     }
-
-    default:
-      await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
-      
-      setTimeout(async () => {
-        try {
-          await interaction.deleteReply();
-        } catch (e) {}
-      }, 5000);
   }
 }
 
@@ -3143,15 +1763,10 @@ function showMenu() {
   console.log(chalk.cyan('╠═══════════════════════════════════════════════════════╣'));
   console.log(chalk.cyan('║  1.  Ver estatísticas detalhadas                                ║'));
   console.log(chalk.cyan('║  2.  Listar todos os servidores                                 ║'));
-  console.log(chalk.cyan('║  3.  Ver membros de um servidor                                 ║'));
-  console.log(chalk.cyan('║  4.  Enviar mensagem para canal                                 ║'));
-  console.log(chalk.cyan('║  5.  Ver status do monitoramento                                ║'));
-  console.log(chalk.cyan('║  6.  Ver logs recentes                                          ║'));
-  console.log(chalk.cyan('║  7.  Ver status do bot                                          ║'));
-  console.log(chalk.cyan('║  8.  Gerar relatório manual                                     ║'));
-  console.log(chalk.cyan('║  9.  Ver estatísticas de warns                                  ║'));
-  console.log(chalk.cyan('║  10. Ver templates de warns                                     ║'));
-  console.log(chalk.cyan('║  11. Criar backup manual                                        ║'));
+  console.log(chalk.cyan('║  3.  Ver status do monitoramento                                ║'));
+  console.log(chalk.cyan('║  4.  Gerar relatório manual                                     ║'));
+  console.log(chalk.cyan('║  5.  Ver estatísticas de warns                                  ║'));
+  console.log(chalk.cyan('║  6.  Monitorar cargos de warn (console)                         ║'));
   console.log(chalk.cyan('║  0.  Sair                                                       ║'));
   console.log(chalk.cyan('╚═══════════════════════════════════════════════════════╝'));
   
@@ -3162,9 +1777,7 @@ function showMenu() {
 }
 
 function handleMenuOption(option) {
-  if (!rl || rl.closed) {
-    initReadline();
-  }
+  if (!rl || rl.closed) initReadline();
   
   switch (option) {
     case '1':
@@ -3174,37 +1787,20 @@ function handleMenuOption(option) {
       listServers();
       break;
     case '3':
-      listMembersInServer();
-      break;
-    case '4':
-      sendMessageToChannel();
-      break;
-    case '5':
       showMonitoringStatus();
       break;
-    case '6':
-      showRecentLogs();
-      break;
-    case '7':
-      showBotStatus();
-      break;
-    case '8':
+    case '4':
       generateManualReport();
       break;
-    case '9':
+    case '5':
       showWarnStats();
       break;
-    case '10':
-      showWarnTemplates();
-      break;
-    case '11':
-      createManualBackup();
+    case '6':
+      monitorWarnRoles().then(() => showMenu());
       break;
     case '0':
       console.log(chalk.red('❌ Encerrando o bot...'));
-      if (rl && !rl.closed) {
-        rl.close();
-      }
+      if (rl && !rl.closed) rl.close();
       process.exit(0);
     default:
       console.log(chalk.red('❌ Opção inválida!'));
@@ -3224,42 +1820,28 @@ function showStats() {
   console.log(chalk.white(`⏱️  Uptime:     ${hours}h ${minutes}m ${seconds}s`));
   console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
   console.log(chalk.white(`👥 Usuários:   ${client.users.cache.size}`));
-  console.log(chalk.white(`📁 Canais:     ${client.channels.cache.size}`));
   console.log(chalk.white(`📊 Stats Hoje:  Del:${stats.messagesDeleted} Ent:${stats.membersJoined} Sai:${stats.membersLeft}`));
   console.log(chalk.white(`⚠️ Warns dados: ${stats.warnsGiven}`));
   console.log(chalk.yellow('═══════════════════════════════\n'));
-  
   showMenu();
 }
 
 function listServers() {
   console.log(chalk.yellow('\n═══ 🏛️ SERVIDORES DO BOT ═══'));
-  
-  if (client.guilds.cache.size === 0) {
-    console.log(chalk.gray('Nenhum servidor encontrado.'));
-  } else {
-    client.guilds.cache.forEach((guild, index) => {
-      const monitorStatus = serverMonitoring.get(guild.id) ? '🟢 ATIVO' : '🔴 INATIVO';
-      console.log(chalk.white(`${index + 1}. ${guild.name} (${guild.memberCount} membros) - ${monitorStatus}`));
-    });
-  }
-  
+  client.guilds.cache.forEach((guild, index) => {
+    const monitorStatus = serverMonitoring.get(guild.id) ? '🟢 ATIVO' : '🔴 INATIVO';
+    console.log(chalk.white(`${index + 1}. ${guild.name} (${guild.memberCount} membros) - ${monitorStatus}`));
+  });
   console.log(chalk.yellow('══════════════════════════════\n'));
   showMenu();
 }
 
 function showMonitoringStatus() {
   console.log(chalk.yellow('\n═══ 🛡️ STATUS DO MONITORAMENTO ═══'));
-  
-  if (client.guilds.cache.size === 0) {
-    console.log(chalk.gray('Nenhum servidor encontrado.'));
-  } else {
-    client.guilds.cache.forEach((guild) => {
-      const status = serverMonitoring.get(guild.id) !== false ? '🟢 ATIVO' : '🔴 INATIVO';
-      console.log(chalk.white(`• ${guild.name}: ${status}`));
-    });
-  }
-  
+  client.guilds.cache.forEach((guild) => {
+    const status = serverMonitoring.get(guild.id) !== false ? '🟢 ATIVO' : '🔴 INATIVO';
+    console.log(chalk.white(`• ${guild.name}: ${status}`));
+  });
   console.log(chalk.yellow('═══════════════════════════════════\n'));
   showMenu();
 }
@@ -3273,17 +1855,6 @@ async function generateManualReport() {
     console.log(chalk.white(`👥 Membros novos: ${stats.membersJoined}`));
     console.log(chalk.white(`👋 Membros que saíram: ${stats.membersLeft}`));
     console.log(chalk.white(`⚠️ Warns dados: ${stats.warnsGiven}`));
-    
-    console.log(chalk.cyan('\n📋 Comandos mais usados:'));
-    const sortedCommands = Object.entries(stats.commandsUsed).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    if (sortedCommands.length > 0) {
-      sortedCommands.forEach(([cmd, count]) => {
-        console.log(chalk.white(`   • /${cmd}: ${count} vezes`));
-      });
-    } else {
-      console.log(chalk.white('   • Nenhum comando usado hoje'));
-    }
-    
   } catch (error) {
     console.log(chalk.red(`❌ Erro: ${error.message}`));
   }
@@ -3293,278 +1864,48 @@ async function generateManualReport() {
 
 function showWarnStats() {
   console.log(chalk.yellow('\n═══ 📊 ESTATÍSTICAS DE WARNS ═══'));
-  
   try {
-    const globalStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : {
-      totalServers: 0,
-      totalUsers: 0,
-      totalWarns: 0,
-      totalActiveWarns: 0
-    };
-    
+    const globalStats = warnSystem.getGlobalStats ? warnSystem.getGlobalStats() : { totalServers: 0, totalUsers: 0, totalWarns: 0, totalActiveWarns: 0 };
     console.log(chalk.white(`🌐 Servidores com warns: ${globalStats.totalServers}`));
     console.log(chalk.white(`👥 Usuários warnados: ${globalStats.totalUsers}`));
     console.log(chalk.white(`⚠️ Total de warns: ${globalStats.totalWarns}`));
     console.log(chalk.white(`🟢 Warns ativos: ${globalStats.totalActiveWarns}`));
     console.log(chalk.white(`📊 Versão do sistema: v${warnSystem.version || '2.0.0'}`));
-    
   } catch (error) {
     console.log(chalk.red(`❌ Erro ao carregar estatísticas: ${error.message}`));
   }
-  
   console.log(chalk.yellow('═══════════════════════════════\n'));
-  showMenu();
-}
-
-function showWarnTemplates() {
-  console.log(chalk.yellow('\n═══ 📋 TEMPLATES DE WARNS ═══'));
-  
-  try {
-    // Não podemos listar templates de todos os servidores aqui facilmente
-    console.log(chalk.white('Use `/warn template list` no Discord para ver os templates do seu servidor.'));
-  } catch (error) {
-    console.log(chalk.red(`❌ Erro: ${error.message}`));
-  }
-  
-  console.log(chalk.yellow('═══════════════════════════════\n'));
-  showMenu();
-}
-
-async function createManualBackup() {
-  console.log(chalk.yellow('\n═══ 💾 CRIANDO BACKUP MANUAL ═══'));
-  
-  if (warnSystem.createBackup) {
-    try {
-      const result = await warnSystem.createBackup({ description: 'Backup manual via console' });
-      if (result.success) {
-        console.log(chalk.green(`✅ Backup criado com sucesso! ID: ${result.backupId}`));
-        console.log(chalk.white(`📦 Tamanho: ${warnSystem.formatSize ? warnSystem.formatSize(result.size) : result.size + ' bytes'}`));
-      } else {
-        console.log(chalk.red(`❌ Erro ao criar backup: ${result.error}`));
-      }
-    } catch (error) {
-      console.log(chalk.red(`❌ Erro: ${error.message}`));
-    }
-  } else {
-    console.log(chalk.yellow('⚠️ Função de backup não disponível no sistema de warns.'));
-  }
-  
-  console.log(chalk.yellow('═══════════════════════════════\n'));
-  showMenu();
-}
-
-function listMembersInServer() {
-  const guilds = Array.from(client.guilds.cache.values());
-  
-  if (guilds.length === 0) {
-    console.log(chalk.red('Nenhum servidor encontrado.'));
-    showMenu();
-    return;
-  }
-
-  console.log(chalk.yellow('\n═══ 👥 ESCOLHA UM SERVIDOR ═══'));
-  guilds.forEach((guild, index) => {
-    console.log(chalk.white(`${index + 1}. ${guild.name}`));
-  });
-  
-  rl.question(chalk.yellow('\n👉 Digite o número do servidor: '), async (answer) => {
-    const index = parseInt(answer) - 1;
-    
-    if (index >= 0 && index < guilds.length) {
-      const guild = guilds[index];
-      console.log(chalk.cyan(`\nCarregando membros de ${guild.name}...`));
-      
-      try {
-        await guild.members.fetch();
-        const members = guild.members.cache;
-        
-        console.log(chalk.yellow(`\n═══ MEMBROS DE ${guild.name.toUpperCase()} ═══`));
-        console.log(chalk.white(`Total: ${members.size} membros\n`));
-        
-        let count = 0;
-        members.forEach((member) => {
-          if (count < 10) {
-            const status = member.user.bot ? chalk.blue('[BOT]') : chalk.green('[USER]');
-            console.log(`  ${status} ${member.user.tag} - ${member.user.id}`);
-            count++;
-          }
-        });
-        
-        if (members.size > 10) {
-          console.log(chalk.gray(`  ... e mais ${members.size - 10} membros`));
-        }
-        
-        console.log(chalk.yellow('══════════════════════════════════════\n'));
-      } catch (error) {
-        logError(`Erro ao buscar membros: ${error.message}`);
-      }
-    } else {
-      console.log(chalk.red('Servidor inválido!'));
-    }
-    
-    showMenu();
-  });
-}
-
-function sendMessageToChannel() {
-  const guilds = Array.from(client.guilds.cache.values());
-  
-  if (guilds.length === 0) {
-    console.log(chalk.red('Nenhum servidor encontrado.'));
-    showMenu();
-    return;
-  }
-
-  console.log(chalk.yellow('\n═══ 📢 ENVIAR MENSAGEM ═══'));
-  guilds.forEach((guild, index) => {
-    console.log(chalk.white(`${index + 1}. ${guild.name}`));
-  });
-  
-  rl.question(chalk.yellow('\n👉 Escolha o servidor: '), (guildAnswer) => {
-    const guildIndex = parseInt(guildAnswer) - 1;
-    
-    if (guildIndex >= 0 && guildIndex < guilds.length) {
-      const guild = guilds[guildIndex];
-      const channels = guild.channels.cache.filter(
-        c => c.type === ChannelType.GuildText
-      );
-      
-      if (channels.size === 0) {
-        console.log(chalk.red('Nenhum canal de texto encontrado.'));
-        showMenu();
-        return;
-      }
-      
-      console.log(chalk.cyan('\n📁 Canais de texto:'));
-      channels.forEach((channel, index) => {
-        console.log(chalk.white(`${index + 1}. #${channel.name}`));
-      });
-      
-      rl.question(chalk.yellow('\n👉 Escolha o canal: '), async (channelAnswer) => {
-        const channelIndex = parseInt(channelAnswer) - 1;
-        
-        if (channelIndex >= 0 && channelIndex < channels.size) {
-          const channel = Array.from(channels.values())[channelIndex];
-          
-          rl.question(chalk.yellow('\n📝 Digite a mensagem: '), async (message) => {
-            try {
-              await channel.send(message);
-              console.log(chalk.green(`\n✅ Mensagem enviada para #${channel.name}!`));
-            } catch (error) {
-              logError(`Erro ao enviar mensagem: ${error.message}`);
-            }
-            showMenu();
-          });
-        } else {
-          console.log(chalk.red('Canal inválido!'));
-          showMenu();
-        }
-      });
-    } else {
-      console.log(chalk.red('Servidor inválido!'));
-      showMenu();
-    }
-  });
-}
-
-function showRecentLogs() {
-  console.log(chalk.yellow('\n═══ 📋 LOGS RECENTES ═══'));
-  console.log(chalk.white('Os logs recentes foram exibidos no console.'));
-  console.log(chalk.yellow('══════════════════════════════\n'));
-  showMenu();
-}
-
-function showBotStatus() {
-  const uptimeSeconds = Math.floor(client.uptime / 1000);
-  const hours = Math.floor(uptimeSeconds / 3600);
-  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-  const seconds = uptimeSeconds % 60;
-
-  console.log(chalk.yellow('\n═══ 🛡️ STATUS DO BOT ═══'));
-  console.log(chalk.white(`🟢 Status: Online`));
-  console.log(chalk.white(`🏓 Ping: ${client.ws.ping}ms`));
-  console.log(chalk.white(`⏱️  Uptime: ${hours}h ${minutes}m ${seconds}s`));
-  console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
-  console.log(chalk.white(`👥 Usuários: ${client.users.cache.size}`));
-  console.log(chalk.white(`⚠️ Warn System: v${warnSystem.version || '2.0.0'}`));
-  console.log(chalk.yellow('══════════════════════════════\n'));
   showMenu();
 }
 
 // ===============================
 // EVENTOS DE LOG
 // ===============================
-client.on('messageDelete', async (message) => {
-  if (!message.guild || !message.author) return;
-
-  let deleter = 'Desconhecido';
-  try {
-    const auditLogs = await message.guild.fetchAuditLogs({ type: 72, limit: 1 });
-    const entry = auditLogs.entries.first();
-    if (entry && entry.target.id === message.author.id && entry.createdTimestamp > Date.now() - 5000) {
-      deleter = entry.executor.tag;
-    }
-  } catch (e) {}
-
-  console.log(chalk.red.bgBlack.bold('\n 🗑️ MENSAGEM DELETADA '));
-  console.log(chalk.red('────────────────────────────────'));
-  console.log(chalk.red(`   Autor:     ${message.author.tag}`));
-  console.log(chalk.red(`   Conteúdo: ${message.content || '[sem texto]'}`));
-  console.log(chalk.red(`   Deletado:  ${deleter}`));
-  console.log(chalk.red(`   Canal:     #${message.channel.name}`));
-  console.log(chalk.red(`   Servidor:  ${message.guild.name}`));
-  console.log(chalk.red('────────────────────────────────\n'));
-});
-
-client.on('messageUpdate', async (oldMessage, newMessage) => {
-  if (!oldMessage.guild || !oldMessage.author) return;
-  if (oldMessage.content === newMessage.content) return;
-
-  console.log(chalk.yellow.bgBlack.bold('\n 📝 MENSAGEM ATUALIZADA '));
-  console.log(chalk.yellow('────────────────────────────────'));
-  console.log(chalk.yellow(`   Autor:     ${oldMessage.author.tag}`));
-  console.log(chalk.yellow(`   Antigo:    ${oldMessage.content}`));
-  console.log(chalk.yellow(`   Novo:      ${newMessage.content}`));
-  console.log(chalk.yellow(`   Canal:     #${oldMessage.channel.name}`));
-  console.log(chalk.yellow('────────────────────────────────\n'));
-});
-
 client.on('guildMemberAdd', async (member) => {
   stats.membersJoined++;
   
-  // Verificar blacklist
   if (warnSystem.checkBlacklist) {
     const blacklisted = warnSystem.checkBlacklist(member.guild.id, member.id);
     if (blacklisted && blacklisted.active) {
       try {
         await member.kick('Usuário na blacklist');
         logInfo(`⛔ Usuário ${member.user.tag} kickado automaticamente (blacklist)`);
-      } catch (err) {
-        logError(`Erro ao kickar usuário da blacklist: ${err.message}`);
-      }
+      } catch (err) {}
     }
   }
   
   console.log(chalk.green.bgBlack.bold('\n 👤 NOVO MEMBRO '));
-  console.log(chalk.green('────────────────────────────────'));
   console.log(chalk.green(`   Usuário: ${member.user.tag}`));
-  console.log(chalk.green(`   ID:      ${member.user.id}`));
   console.log(chalk.green(`   Servidor: ${member.guild.name}`));
-  console.log(chalk.green(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
   console.log(chalk.green('────────────────────────────────\n'));
-  logInfo(`Novo membro: ${member.user.tag} (${member.guild.name})`);
 });
 
 client.on('guildMemberRemove', async (member) => {
   stats.membersLeft++;
-  
   console.log(chalk.red.bgBlack.bold('\n ❌ MEMBRO SAIU '));
-  console.log(chalk.red('────────────────────────────────'));
   console.log(chalk.red(`   Usuário: ${member.user.tag}`));
   console.log(chalk.red(`   Servidor: ${member.guild.name}`));
-  console.log(chalk.red(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
   console.log(chalk.red('────────────────────────────────\n'));
-  logInfo(`Membro saiu: ${member.user.tag} (${member.guild.name})`);
 });
 
 // ===============================
@@ -3572,12 +1913,10 @@ client.on('guildMemberRemove', async (member) => {
 // ===============================
 process.on('unhandledRejection', (error) => {
   logError(`Erro não tratado: ${error.message}`);
-  console.error(error);
 });
 
 process.on('uncaughtException', (error) => {
   logError(`Exceção não tratada: ${error.message}`);
-  console.error(error);
   process.exit(1);
 });
 
