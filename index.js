@@ -1314,14 +1314,18 @@ client.once('clientReady', async () => {
   console.log(chalk.yellow('  • !MonitorOff - Desativar monitoramento\n'));
   
   scheduleDailyReport();
+
+  // 🔁 INICIA STATUS DO BOT
+  updateStatus();
   
   // Inicia o menu interativo
   initReadline();
   showMenu();
 });
+
 function updateStatus() {
     const activities = [
-         { name: '𝙼𝚊𝚍𝚎 𝚋𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝', type: 2 },
+        { name: '𝙼𝚊𝚍𝚎 𝚋𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝', type: 2 },
         { name: 'Moderando o Servidor', type: 2 }
     ];
     
