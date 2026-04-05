@@ -1,27 +1,21 @@
 {
   "name": "hostville-bot",
-  "version": "4.1.2",
-  "description": "Bot Discord avançado com sistema completo de moderação, warns, backups, analytics e painel administrativo",
+  "version": "4.1.2-hf",
+  "description": "Bot Discord avançado com painel, monitoramento e automoderação com IA",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "install:all": "npm install",
-    "backup": "node scripts/backup.js",
-    "clean": "node scripts/clean.js"
+    "install:all": "npm install"
   },
   "keywords": [
     "discord",
     "bot",
     "discord.js",
-    "moderation",
-    "warn-system",
     "automod",
     "ai-moderation",
-    "admin-panel",
-    "backup",
-    "analytics"
+    "admin-panel"
   ],
   "author": "Isac",
   "license": "MIT",
@@ -32,28 +26,10 @@
     "chalk": "^4.1.2",
     "discord.js": "^14.14.1",
     "dotenv": "^16.4.5",
-    "openai": "^4.56.0",
-    "node-cron": "^3.0.3",
-    "axios": "^1.6.7",
-    "crypto": "^1.0.1",
-    "fs": "^0.0.1-security",
-    "path": "^0.12.7",
-    "readline": "^1.3.0",
-    "moment": "^2.30.1",
-    "moment-timezone": "^0.5.44",
-    "colors": "^1.4.0",
-    "table": "^6.8.1",
-    "cli-table3": "^0.6.3",
-    "ora": "^5.4.1",
-    "figlet": "^1.7.0",
-    "gradient-string": "^2.0.2"
+    "openai": "^4.56.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
-  },
-  "optionalDependencies": {
-    "bufferutil": "^4.0.8",
-    "zlib-sync": "^0.1.7",
-    "erlpack": "^0.1.4"
   }
 }
+
