@@ -1318,8 +1318,20 @@ client.once('clientReady', async () => {
   // Inicia o menu interativo
   initReadline();
   showMenu();
-});
 
+  // ============================================
+  // PRESENÇA FIXA DO BOT (PERMANENTE)
+  // ============================================
+
+  client.user.setPresence({
+    activities: [{
+      name: "𝙼𝚊𝚍𝚎 𝙱𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝",
+      type:  1
+    }],
+    status: "online"
+  });
+
+});
 // ===============================
 // HANDLER PARA BOTÕES DE MONITORAMENTO
 // ===============================
