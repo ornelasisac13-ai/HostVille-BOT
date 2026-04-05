@@ -1,6 +1,6 @@
 {
   "name": "hostville-bot",
-  "version": "5.0.1",
+  "version": "4.1.2",
   "description": "Bot Discord avançado com sistema completo de moderação, warns, backups, analytics e painel administrativo",
   "main": "index.js",
   "type": "commonjs",
