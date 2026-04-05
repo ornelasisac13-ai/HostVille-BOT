@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-4.1.2-4f46e5?style=for-the-badge">
+  <img src="https://img.shields.io/badge/version-5.0.1-4f46e5?style=for-the-badge">
   <img src="https://img.shields.io/badge/node-16.9%2B-22c55e?style=for-the-badge">
   <img src="https://img.shields.io/badge/discord.js-v14-5865F2?style=for-the-badge">
   <img src="https://img.shields.io/badge/license-MIT-10b981?style=for-the-badge">
