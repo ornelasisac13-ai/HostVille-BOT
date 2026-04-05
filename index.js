@@ -1809,6 +1809,19 @@ client.once('clientReady', async () => {
   console.log(chalk.white(`   • ID: ${client.user.id}`));
   console.log(chalk.white(`   • Servidores: ${client.guilds.cache.size}`));
     
+  // ===============================
+  // STATUS DO BOT
+  // ===============================
+  client.user.setPresence({
+    status: 'online', // online | idle | dnd | invisible
+    activities: [
+      {
+        name: `𝙼𝚊𝚍𝚎 𝙱𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝`,
+        type: 1
+      }
+    ]
+  });
+
   for (const guild of client.guilds.cache.values()) {
     serverMonitoring.set(guild.id, true);
   }
