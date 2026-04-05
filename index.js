@@ -1,6 +1,3 @@
-// ===============================
-// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - CORRIGIDO (COM PAINEL DO DONO)
-// ===============================
 const { 
   Client, 
   GatewayIntentBits, 
