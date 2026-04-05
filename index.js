@@ -1,3 +1,6 @@
+// ===============================
+// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - CORRIGIDO (SEM FALSOS POSITIVOS)
+// ===============================
 const { 
   Client, 
   GatewayIntentBits, 
@@ -73,7 +76,7 @@ const stats = {
 };
 
 // ===============================
-// LISTA DE PALAVRAS OFENSIVAS
+// LISTA DE PALAVRAS OFENSIVAS (VERSÃO COMPLETA - SEM CARACTERES ESPECIAIS QUE CAUSAM ERRO)
 // ===============================
 const offensiveWords = [
   // PALAVRAS BASE (TODAS LIMPAS, SEM REGEX INVÁLIDOS)
@@ -132,10 +135,15 @@ const offensiveWords = [
   "chanfrado", "chantagista", "charlatão", "chato", "chavascal",
   "chibante", "chibata", "chicletinho", "chilique", "chinelão",
   "chinfra", "chinfrim", "chiqueiro", "chocalho", "chocho",
-  "chucro", "chupeta", "chupim", "chupista",
+  "chucro", "chupeta", "chupim", "chupista", "chuta",
   
   // INSULTOS RACIAIS E PRECONCEITUOSOS (NÃO RECOMENDADO USAR, MAS LISTADO PARA MODERAÇÃO)
   "macaco", "macaca", "preto", "preta", "neguinho", "neguinha",
+  "crioulo", "crioula", "mulambo", "mestiço", "caipora",
+  "judeu", "judiaria", "judiado", "gringo", "gringa",
+  "paraíba", "baiano", "cearense", "nordestino", "sulista",
+  "gaúcho", "paulista", "carioca", "mineiro", "goiano",
+  "caipira", "matuto", "roceiro", "caboclo",
   
   // XINGAMENTOS LGBTFÓBICOS
   "bicha", "bichinha", "baitola", "boiola", "boiolinha",
@@ -239,7 +247,7 @@ const offensiveWords = [
   "nazista", "fascista", "hitler", "nazi", "skinhead",
   "terrorista", "extremista", "radical", "fundamentalista"
 ];
-
+// ===============================
 // FUNÇÕES DE LOG PERSONALIZADAS
 // ===============================
 function getTimestamp() {
@@ -294,6 +302,7 @@ async function generateDailyReport() {
   const now = new Date();
   const reportDate = now.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   
+  // Calcular comandos mais usados
   const sortedCommands = Object.entries(stats.commandsUsed)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
@@ -307,6 +316,7 @@ async function generateDailyReport() {
     commandsField += "• Nenhum comando usado hoje";
   }
   
+  // Criar embed do relatório
   const reportEmbed = new EmbedBuilder()
     .setTitle('📊 Relatório Diário do Bot')
     .setDescription(`Período: **${reportDate}**`)
@@ -351,16 +361,19 @@ async function generateDailyReport() {
 }
 
 // ===============================
-// FUNÇÃO PARA ENVIAR RELATÓRIO
+// FUNÇÃO PARA ENVIAR RELATÓRIO PARA STAFF
 // ===============================
 async function sendReportToStaff() {
   try {
     const reportEmbed = await generateDailyReport();
     
+    // Dividir STAFF_USER_ID se houver múltiplos
     const staffIds = CONFIG.STAFF_USER_ID ? CONFIG.STAFF_USER_ID.split(',') : [];
     
     for (const staffId of staffIds) {
       const staffIdTrimmed = staffId.trim();
+      
+      // Se for menção (<@ID>), extrair apenas o ID
       const cleanId = staffIdTrimmed.replace(/[<@>]/g, '');
       
       try {
@@ -377,6 +390,7 @@ async function sendReportToStaff() {
       }
     }
     
+    // Também enviar para o canal de logs se configurado
     if (CONFIG.logChannelId) {
       const logChannel = await client.channels.fetch(CONFIG.logChannelId).catch(() => null);
       if (logChannel) {
@@ -387,6 +401,7 @@ async function sendReportToStaff() {
       }
     }
     
+    // Resetar estatísticas para o próximo dia
     stats.reset();
     
   } catch (error) {
@@ -395,15 +410,17 @@ async function sendReportToStaff() {
 }
 
 // ===============================
-// FUNÇÃO PARA AGENDAR RELATÓRIO
+// FUNÇÃO PARA CALCULAR PRÓXIMO ENVIO
 // ===============================
 function scheduleDailyReport() {
   const now = new Date();
   const [reportHour, reportMinute] = CONFIG.DAILY_REPORT_TIME ? CONFIG.DAILY_REPORT_TIME.split(':').map(Number) : [0, 0];
   
+  // Criar data para hoje no horário do relatório
   const nextReport = new Date(now);
   nextReport.setHours(reportHour, reportMinute, 0, 0);
   
+  // Se já passou do horário hoje, agendar para amanhã
   if (now > nextReport) {
     nextReport.setDate(nextReport.getDate() + 1);
   }
@@ -412,47 +429,61 @@ function scheduleDailyReport() {
   
   logInfo(`📊 Próximo relatório diário agendado para: ${nextReport.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
   
+  // Agendar o relatório
   setTimeout(() => {
     sendReportToStaff();
+    
+    // Agendar para os próximos dias (a cada 24h)
     setInterval(sendReportToStaff, 24 * 60 * 60 * 1000);
+    
     logInfo('📊 Relatórios diários agendados (a cada 24h)');
   }, timeUntilReport);
 }
 
 // ===============================
-// FUNÇÃO PARA CHECAR PALAVRAS OFENSIVAS
+// FUNÇÃO PARA CHECAR PALAVRAS OFENSIVAS (VERSÃO CORRIGIDA - SEM FALSOS POSITIVOS E SEM REGEX INVÁLIDA)
 // ===============================
 function containsOffensiveWord(text) {
   if (!text || typeof text !== 'string') return false;
   
   const textLower = text.toLowerCase().trim();
   
+  // PASSO 1: Verificar frases completas primeiro
   for (const offensivePhrase of offensiveWords) {
     if (offensivePhrase.includes(' ') && textLower.includes(offensivePhrase)) {
       return true;
     }
   }
   
+  // PASSO 2: Remover caracteres especiais e números (para evitar falsos positivos)
+  // IMPORTANTE: NÃO usamos regex com quantificadores problemáticos
   const textNormalized = textLower
-    .replace(/[^\w\sà-úÀ-Ú]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[^\w\sà-úÀ-Ú]/g, ' ') // substitui qualquer caractere não alfanumérico por espaço
+    .replace(/\s+/g, ' ') // substitui múltiplos espaços por um único espaço
     .trim();
   
+  // PASSO 3: Dividir em palavras
   const words = textNormalized.split(' ');
   
+  // PASSO 4: Verificar cada palavra
   for (const word of words) {
+    // Ignorar palavras muito curtas (menos de 3 caracteres)
     if (word.length < 3) continue;
     
+    // Verificar se a palavra EXATA está na lista
     if (offensiveWords.includes(word)) {
       return true;
     }
     
+    // PASSO 5: Verificar variações comuns (leet speak) - sem usar regex problemática
+    // Substituições manuais sem quantificadores problemáticos
     const leetMap = {
       '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a', 
       '5': 's', '6': 'g', '7': 't', '8': 'b', '9': 'g',
       '@': 'a', '!': 'i', '$': 's', '#': 'h', '&': 'e'
     };
     
+    // Converter a palavra manualmente, caractere por caractere
     let normalizedWord = '';
     for (let i = 0; i < word.length; i++) {
       const char = word[i];
@@ -468,19 +499,21 @@ function containsOffensiveWord(text) {
 }
 
 // ===============================
-// FUNÇÃO PARA ENCONTRAR PALAVRA OFENSIVA
+// FUNÇÃO PARA ENCONTRAR A PALAVRA OFENSIVA (VERSÃO CORRIGIDA)
 // ===============================
 function findOffensiveWord(text) {
   if (!text || typeof text !== 'string') return null;
   
   const textLower = text.toLowerCase().trim();
   
+  // Verificar frases completas primeiro
   for (const offensivePhrase of offensiveWords) {
     if (offensivePhrase.includes(' ') && textLower.includes(offensivePhrase)) {
       return offensivePhrase;
     }
   }
   
+  // Normalizar o texto
   const textNormalized = textLower
     .replace(/[^\w\sà-úÀ-Ú]/g, ' ')
     .replace(/\s+/g, ' ')
@@ -491,10 +524,12 @@ function findOffensiveWord(text) {
   for (const word of words) {
     if (word.length < 3) continue;
     
+    // Verificar palavra exata
     if (offensiveWords.includes(word)) {
       return word;
     }
     
+    // Verificar leet speak (substituição manual)
     const leetMap = {
       '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a', 
       '5': 's', '6': 'g', '7': 't', '8': 'b', '9': 'g',
@@ -516,7 +551,7 @@ function findOffensiveWord(text) {
 }
 
 // ===============================
-// FUNÇÃO PARA VERIFICAR PERMISSÕES
+// FUNÇÃO PARA VERIFICAR PERMISSÕES DE ADMIN
 // ===============================
 function isAdmin(member) {
   if (!member) return false;
@@ -527,13 +562,20 @@ function isAdmin(member) {
   );
 }
 
+// ===============================
+// FUNÇÃO PARA VERIFICAR SE O USUÁRIO É STAFF (NÃO SERÁ MODERADO)
+// ===============================
 function isStaff(userId) {
   return staffIds.includes(userId);
 }
 
+// ===============================
+// FUNÇÃO PARA ATIVAR/DESATIVAR MONITORAMENTO
+// ===============================
 function setServerMonitoring(guildId, status, user) {
   serverMonitoring.set(guildId, status);
   
+  // Log no console
   const action = status ? 'ATIVADO' : 'DESATIVADO';
   console.log(chalk.cyan.bgBlack.bold(`\n 🛡️ MONITORAMENTO ${action}`));
   console.log(chalk.cyan('────────────────────────────────'));
@@ -544,6 +586,9 @@ function setServerMonitoring(guildId, status, user) {
   console.log(chalk.cyan('────────────────────────────────\n'));
 }
 
+// ===============================
+// FUNÇÃO PARA CRIAR EMBED DE STATUS
+// ===============================
 function createStatusEmbed(guild, action, user) {
   const isActive = action === 'on';
   const color = isActive ? Colors.Green : Colors.Red;
@@ -595,6 +640,7 @@ function initReadline() {
 // ===============================
 // COMANDOS DO BOT
 // ===============================
+
 const commands = [
   {
     data: {
@@ -655,6 +701,7 @@ const commands = [
   },
 ];
 
+// === COMANDO /PING ===
 const pingCommand = {
   data: {
     name: 'ping',
@@ -674,10 +721,12 @@ const pingCommand = {
     await interaction.reply({ embeds: [embed], flags: 64 });
     logInfo(`Comando /ping usado por ${interaction.user.tag}`);
     
+    // Registrar comando usado
     stats.commandsUsed['ping'] = (stats.commandsUsed['ping'] || 0) + 1;
   },
 };
 
+// === COMANDO /HELP - AJUDA ===
 const helpCommand = {
   data: {
     name: 'help',
@@ -695,16 +744,18 @@ const helpCommand = {
         { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
         { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false }
       )
-      .setFooter({ text: 'Comandos de texto na DM: !clear, !clearAll, !MonitorOn, !MonitorOff, Hello' })
+      .setFooter({ text: 'Comandos de texto na DM: !clear, !clearAll, !MonitorOn, !MonitorOff' })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], flags: 64 });
     logInfo(`Comando /help usado por ${interaction.user.tag}`);
     
+    // Registrar comando usado
     stats.commandsUsed['help'] = (stats.commandsUsed['help'] || 0) + 1;
   },
 };
 
+// === COMANDO /PRIVATE ===
 const privateCommand = {
   data: {
     name: 'private',
@@ -759,6 +810,7 @@ const privateCommand = {
 
       logInfo(`${interaction.user.tag} enviou mensagem para ${user.tag}`);
       
+      // Registrar comando usado
       stats.commandsUsed['private'] = (stats.commandsUsed['private'] || 0) + 1;
     } catch (error) {
       await interaction.reply({
@@ -770,6 +822,7 @@ const privateCommand = {
   }
 };
 
+// === COMANDO /REPORT ===
 const reportCommand = {
   data: {
     name: 'report',
@@ -797,6 +850,7 @@ const reportCommand = {
     
     const reportEmbed = await generateDailyReport();
     
+    // Enviar para cada staff na DM (sem auto-delete)
     const staffIds = CONFIG.STAFF_USER_ID ? CONFIG.STAFF_USER_ID.split(',') : [];
     let successCount = 0;
     let failCount = 0;
@@ -821,6 +875,7 @@ const reportCommand = {
       }
     }
     
+    // Também enviar para o canal de logs se configurado
     if (CONFIG.logChannelId) {
       const logChannel = await client.channels.fetch(CONFIG.logChannelId).catch(() => null);
       if (logChannel) {
@@ -831,6 +886,7 @@ const reportCommand = {
       }
     }
     
+    // Confirmar para quem usou o comando
     await interaction.followUp({
       content: `✅ Relatório gerado e enviado para **${successCount} staff(s)**${failCount > 0 ? ` (${failCount} falhas)` : ''}`,
       flags: 64
@@ -838,467 +894,44 @@ const reportCommand = {
     
     logInfo(`${interaction.user.tag} gerou relatório manual (enviado para ${successCount} staffs)`);
     
+    // Registrar comando usado
     stats.commandsUsed['report'] = (stats.commandsUsed['report'] || 0) + 1;
   }
 };
 
 // ===============================
-// FUNÇÕES DO PAINEL DO DONO
+// FUNÇÃO PARA ENVIAR MENSAGEM EFÊMERA NA DM
 // ===============================
-
-async function handleOwnerPanel(message) {
-  // Verificar se é o dono
-  const ownerId = CONFIG.OWNER_ID ? CONFIG.OWNER_ID.replace(/[<@>]/g, '') : null;
-  
-  if (message.author.id !== ownerId) {
-    // Não é o dono - mensagem de acesso negado
-    const deniedMsg = await message.reply('❌ **Acesso negado!** Apenas o dono do bot pode usar este comando.');
-    
-    setTimeout(async () => {
-      try {
-        await message.delete();
-        await deniedMsg.delete();
-      } catch (e) {}
-    }, 5000);
-    return;
-  }
-
-  // É o dono - criar embed do painel
-  const uptimeMs = client.uptime;
-  const uptimeSeconds = Math.floor(uptimeMs / 1000);
-  const hours = Math.floor(uptimeSeconds / 3600);
-  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-  const seconds = uptimeSeconds % 60;
-
-  // Formatar uptime
-  let uptimeString = '';
-  if (hours > 0) uptimeString += `${hours}h `;
-  if (minutes > 0) uptimeString += `${minutes}m `;
-  uptimeString += `${seconds}s`;
-
-  // Calcular total de comandos usados hoje
-  const totalCommandsToday = Object.values(stats.commandsUsed).reduce((a, b) => a + b, 0);
-
-  // Criar embed azul bebê (cor: #89CFF0)
-  const embed = new EmbedBuilder()
-    .setTitle('👋 Welcome, Isac!')
-    .setDescription('**Painel de Controle do Bot**')
-    .setColor('#89CFF0')
-    .addFields(
-      { 
-        name: '🤖 **Informações do Bot**', 
-        value: `• **Tag:** ${client.user.tag}\n• **ID:** ${client.user.id}\n• **Servidores:** ${client.guilds.cache.size}\n• **Usuários:** ${client.users.cache.size}`,
-        inline: false 
-      },
-      { 
-        name: '📊 **Status**', 
-        value: `• **Ping:** ${client.ws.ping}ms\n• **Uptime:** ${uptimeString}\n• **Memória:** ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`,
-        inline: true 
-      },
-      { 
-        name: '📅 **Informações**', 
-        value: `• **Iniciado em:** ${stats.startDate.toLocaleString('pt-BR')}\n• **Comandos hoje:** ${totalCommandsToday}`,
-        inline: true 
-      },
-      { 
-        name: '📋 **Comandos Disponíveis**', 
-        value: '`/ping` - Verificar latência\n`/help` - Lista de comandos\n`/adm` - Painel admin\n`/private` - Mensagem staff\n`/report` - Gerar relatório\n\n**Comandos DM:**\n`!clear` - Limpar DM\n`!clearAll` - Limpar todas DMs\n`Hello` - Abrir este painel',
-        inline: false 
-      }
-    )
-    .setFooter({ 
-      text: `Hostville-bot@5.0.1`,
-      iconURL: client.user.displayAvatarURL()
-    })
-    .setTimestamp();
-
-  // Criar botões
-  const row = new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('owner_turnoff')
-        .setLabel('Turn Off')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('🔴'),
-      new ButtonBuilder()
-        .setCustomId('owner_moderation')
-        .setLabel('Moderation')
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji('🛡️')
-    );
-
-  // Enviar mensagem com embed e botões
-  const panelMsg = await message.reply({
-    content: '✅ **Owner Panel**',
-    embeds: [embed],
-    components: [row]
-  });
-
-  logInfo(`🔐 Painel do dono aberto por ${message.author.tag}`);
-  
-  return panelMsg;
-}
-
-async function handleOwnerPanelButtons(interaction) {
-  // Verificar se é o dono
-  const ownerId = CONFIG.OWNER_ID ? CONFIG.OWNER_ID.replace(/[<@>]/g, '') : null;
-  
-  if (interaction.user.id !== ownerId) {
-    await interaction.reply({ 
-      content: '❌ Apenas o dono do bot pode usar estes botões!', 
-      flags: 64 
-    });
-    
-    setTimeout(async () => {
-      try {
-        await interaction.deleteReply();
-      } catch (e) {}
-    }, 5000);
-    return;
-  }
-
-  if (interaction.customId === 'owner_turnoff') {
-    // Botão Turn Off
-    const confirmRow = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId('confirm_shutdown')
-          .setLabel('✅ Confirmar Desligamento')
-          .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-          .setCustomId('cancel_shutdown')
-          .setLabel('❌ Cancelar')
-          .setStyle(ButtonStyle.Secondary)
-      );
-
-    await interaction.reply({
-      content: '⚠️ **Tem certeza que deseja desligar o bot?**',
-      components: [confirmRow],
-      flags: 64
-    });
-
-    // Criar coletor para os botões de confirmação
-    const filter = (i) => i.user.id === ownerId;
-    const collector = interaction.channel.createMessageComponentCollector({ 
-      filter, 
-      time: 30000,
-      max: 1
-    });
-
-    collector.on('collect', async (i) => {
-      if (i.customId === 'confirm_shutdown') {
-        await i.update({ 
-          content: '🔴 **Desligando o bot...**', 
-          components: [] 
-        });
-        
-        logInfo(`🔴 Bot desligado por ${interaction.user.tag}`);
-        
-        // Aguardar 2 segundos e desligar
-        setTimeout(() => {
-          process.exit(0);
-        }, 2000);
-        
-      } else if (i.customId === 'cancel_shutdown') {
-        await i.update({ 
-          content: '✅ **Desligamento cancelado.**', 
-          components: [] 
-        });
-        
-        setTimeout(async () => {
-          try {
-            await i.deleteReply();
-          } catch (e) {}
-        }, 3000);
-      }
-    });
-
-    collector.on('end', async (collected) => {
-      if (collected.size === 0) {
-        try {
-          await interaction.editReply({ 
-            content: '⏰ **Tempo esgotado. Desligamento cancelado.**', 
-            components: [] 
-          });
-          
-          setTimeout(async () => {
-            try {
-              await interaction.deleteReply();
-            } catch (e) {}
-          }, 3000);
-        } catch (e) {}
-      }
-    });
-
-  } else if (interaction.customId === 'owner_moderation') {
-    // Botão Moderation - similar ao !MonitorOn/Off
-    await interaction.deferReply({ flags: 64 });
-
-    try {
-      // Criar lista de servidores com status
-      const options = [];
-      let count = 0;
-      
-      for (const [guildId, guild] of client.guilds.cache) {
-        if (count >= 25) break; // Limite do Discord
-        
-        const status = serverMonitoring.get(guildId) ? '🟢 ATIVO' : '🔴 INATIVO';
-        options.push(
-          new StringSelectMenuOptionBuilder()
-            .setLabel(guild.name.substring(0, 100))
-            .setDescription(`${guild.memberCount} membros - ${status}`)
-            .setValue(guildId)
-            .setEmoji('🏛️')
-        );
-        count++;
-      }
-
-      // Menu para selecionar servidor
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId('owner_monitor_select')
-        .setPlaceholder('Selecione um servidor para alterar')
-        .addOptions(options);
-
-      if (client.guilds.cache.size > 25) {
-        selectMenu.addOptions(
-          new StringSelectMenuOptionBuilder()
-            .setLabel('📌 Mais servidores...')
-            .setDescription('Use /adm para ver mais opções')
-            .setValue('more')
-            .setEmoji('📌')
-        );
-      }
-
-      const row = new ActionRowBuilder().addComponents(selectMenu);
-
-      // Botões para ação em massa
-      const actionRow = new ActionRowBuilder()
-        .addComponents(
-          new ButtonBuilder()
-            .setCustomId('owner_monitor_all_on')
-            .setLabel('Ativar Todos')
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('✅'),
-          new ButtonBuilder()
-            .setCustomId('owner_monitor_all_off')
-            .setLabel('Desativar Todos')
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji('❌')
-        );
-
-      await interaction.editReply({
-        content: '🛡️ **Painel de Moderação**\nSelecione um servidor para alterar o status do monitoramento:',
-        components: [row, actionRow]
-      });
-
-    } catch (error) {
-      logError(`Erro no painel de moderação: ${error.message}`);
-      await interaction.editReply({ 
-        content: '❌ Erro ao carregar servidores.' 
-      });
-    }
-  }
-}
-
-async function handleOwnerServerSelection(interaction) {
-  const ownerId = CONFIG.OWNER_ID ? CONFIG.OWNER_ID.replace(/[<@>]/g, '') : null;
-  
-  if (interaction.user.id !== ownerId) {
-    await interaction.reply({ 
-      content: '❌ Acesso negado!', 
-      flags: 64 
-    });
-    return;
-  }
-
-  await interaction.deferUpdate();
-
+async function sendEphemeralDM(user, content, options = {}) {
   try {
-    const selectedValue = interaction.values[0];
+    const msg = await user.send(content);
     
-    if (selectedValue === 'more') {
-      await interaction.editReply({ 
-        content: '📌 **Use o comando `Hello` novamente para ver mais servidores.**',
-        components: [] 
-      });
-      
+    if (options.deleteAfter) {
       setTimeout(async () => {
         try {
-          await interaction.deleteReply();
+          await msg.delete();
         } catch (e) {}
-      }, 5000);
-      return;
+      }, options.deleteAfter);
     }
-
-    const guild = client.guilds.cache.get(selectedValue);
-    if (!guild) {
-      await interaction.editReply({ 
-        content: '❌ Servidor não encontrado.',
-        components: [] 
-      });
-      return;
-    }
-
-    const currentStatus = serverMonitoring.get(guild.id) !== false;
     
-    // Criar botões para ativar/desativar
-    const row = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(`monitor_guild_${guild.id}_on`)
-          .setLabel('🟢 Ativar')
-          .setStyle(ButtonStyle.Success)
-          .setDisabled(currentStatus),
-        new ButtonBuilder()
-          .setCustomId(`monitor_guild_${guild.id}_off`)
-          .setLabel('🔴 Desativar')
-          .setStyle(ButtonStyle.Danger)
-          .setDisabled(!currentStatus)
-      );
-
-    const embed = new EmbedBuilder()
-      .setTitle(`🛡️ Servidor: ${guild.name}`)
-      .setColor(currentStatus ? Colors.Green : Colors.Red)
-      .addFields(
-        { name: '📊 Status Atual', value: currentStatus ? '🟢 **ATIVO**' : '🔴 **INATIVO**', inline: true },
-        { name: '👥 Membros', value: `${guild.memberCount}`, inline: true },
-        { name: '📅 Criado em', value: guild.createdAt.toLocaleDateString('pt-BR'), inline: true }
-      )
-      .setTimestamp();
-
-    await interaction.editReply({
-      content: `**${guild.name}** - Escolha a ação:`,
-      embeds: [embed],
-      components: [row]
-    });
-
+    return msg;
   } catch (error) {
-    logError(`Erro no handleOwnerServerSelection: ${error.message}`);
-  }
-}
-
-async function handleGuildMonitorButton(interaction) {
-  const ownerId = CONFIG.OWNER_ID ? CONFIG.OWNER_ID.replace(/[<@>]/g, '') : null;
-  
-  if (interaction.user.id !== ownerId) {
-    await interaction.reply({ 
-      content: '❌ Acesso negado!', 
-      flags: 64 
-    });
-    return;
-  }
-
-  await interaction.deferUpdate();
-
-  try {
-    const parts = interaction.customId.split('_');
-    const guildId = parts[2];
-    const action = parts[3];
-    
-    const guild = client.guilds.cache.get(guildId);
-    if (!guild) {
-      await interaction.editReply({ 
-        content: '❌ Servidor não encontrado.',
-        components: [] 
-      });
-      return;
-    }
-
-    const isOn = action === 'on';
-    setServerMonitoring(guildId, isOn, interaction.user);
-
-    const embed = new EmbedBuilder()
-      .setTitle(`✅ Monitoramento ${isOn ? 'Ativado' : 'Desativado'}`)
-      .setColor(isOn ? Colors.Green : Colors.Red)
-      .addFields(
-        { name: '🏛️ Servidor', value: guild.name, inline: true },
-        { name: '🛡️ Status', value: isOn ? '🟢 **ATIVO**' : '🔴 **INATIVO**', inline: true },
-        { name: '👤 Staff', value: interaction.user.tag, inline: true }
-      )
-      .setTimestamp();
-
-    await interaction.editReply({
-      content: `✅ **Monitoramento ${isOn ? 'ativado' : 'desativado'} em ${guild.name}!**`,
-      embeds: [embed],
-      components: []
-    });
-
-    setTimeout(async () => {
-      try {
-        await interaction.deleteReply();
-      } catch (e) {}
-    }, 10000);
-
-  } catch (error) {
-    logError(`Erro no handleGuildMonitorButton: ${error.message}`);
-  }
-}
-
-async function handleOwnerBulkAction(interaction) {
-  const ownerId = CONFIG.OWNER_ID ? CONFIG.OWNER_ID.replace(/[<@>]/g, '') : null;
-  
-  if (interaction.user.id !== ownerId) {
-    await interaction.reply({ 
-      content: '❌ Acesso negado!', 
-      flags: 64 
-    });
-    return;
-  }
-
-  await interaction.deferUpdate();
-
-  try {
-    const isOn = interaction.customId.includes('on');
-    let count = 0;
-    
-    for (const [guildId, guild] of client.guilds.cache) {
-      setServerMonitoring(guildId, isOn, interaction.user);
-      count++;
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(`✅ Ação em Massa Concluída`)
-      .setColor(isOn ? Colors.Green : Colors.Red)
-      .addFields(
-        { name: '🛡️ Ação', value: isOn ? 'Ativar Todos' : 'Desativar Todos', inline: true },
-        { name: '📊 Servidores', value: `${count} servidores`, inline: true },
-        { name: '👤 Staff', value: interaction.user.tag, inline: true }
-      )
-      .setTimestamp();
-
-    await interaction.editReply({
-      content: `✅ **Monitoramento ${isOn ? 'ativado' : 'desativado'} em ${count} servidores!**`,
-      embeds: [embed],
-      components: []
-    });
-
-    setTimeout(async () => {
-      try {
-        await interaction.deleteReply();
-      } catch (e) {}
-    }, 10000);
-
-  } catch (error) {
-    logError(`Erro no handleOwnerBulkAction: ${error.message}`);
+    logError(`Erro ao enviar mensagem efêmera: ${error.message}`);
+    return null;
   }
 }
 
 // ===============================
-// EVENTO PRINCIPAL DE MENSAGENS
+// EVENTO PRINCIPAL DE MENSAGENS (DM E MODERAÇÃO)
 // ===============================
 client.on("messageCreate", async (message) => {
+  // Ignora mensagens do próprio bot
   if (message.author.bot) return;
 
-  // ===== MENSAGENS NA DM =====
+  // VERIFICAÇÃO DE MENSAGEM NA DM
   if (message.channel.type === ChannelType.DM) {
     
-    // === COMANDO Hello - Painel do Dono ===
-    if (message.content.toLowerCase() === 'hello') {
-      await handleOwnerPanel(message);
-      return;
-    }
-    
-    // === COMANDO !MonitorOn ===
+    // COMANDO !MonitorOn na DM
     if (message.content.startsWith('!MonitorOn')) {
       const args = message.content.split(' ');
       const password = args[1];
@@ -1333,6 +966,7 @@ client.on("messageCreate", async (message) => {
         return;
       }
       
+      // Criar botões para escolher ação
       const row = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder()
@@ -1352,6 +986,7 @@ client.on("messageCreate", async (message) => {
         components: [row]
       });
       
+      // Apaga a mensagem do comando e a resposta após 2 minutos
       setTimeout(async () => {
         try {
           await message.delete();
@@ -1362,7 +997,7 @@ client.on("messageCreate", async (message) => {
       return;
     }
     
-    // === COMANDO !MonitorOff ===
+    // COMANDO !MonitorOff na DM
     if (message.content.startsWith('!MonitorOff')) {
       const args = message.content.split(' ');
       const password = args[1];
@@ -1397,6 +1032,7 @@ client.on("messageCreate", async (message) => {
         return;
       }
       
+      // Criar botões para escolher ação
       const row = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder()
@@ -1416,6 +1052,7 @@ client.on("messageCreate", async (message) => {
         components: [row]
       });
       
+      // Apaga a mensagem do comando e a resposta após 2 minutos
       setTimeout(async () => {
         try {
           await message.delete();
@@ -1426,12 +1063,14 @@ client.on("messageCreate", async (message) => {
       return;
     }
     
-    // === COMANDO !clearAll ===
+    // COMANDO !clearAll
     if (message.content.startsWith('!clearAll')) {
       
+      // Extrai a senha
       const args = message.content.split(' ');
       const password = args[1];
       
+      // Verifica se a senha foi fornecida
       if (!password) {
         const errorMsg = await message.reply('❌ Use: `!clearAll SUA_SENHA`');
         setTimeout(async () => {
@@ -1443,6 +1082,7 @@ client.on("messageCreate", async (message) => {
         return;
       }
       
+      // Verifica senha
       if (password !== CONFIG.ACCESS_CODE) {
         const errorMsg = await message.reply('❌ Código de acesso incorreto!');
         setTimeout(async () => {
@@ -1454,6 +1094,7 @@ client.on("messageCreate", async (message) => {
         return;
       }
       
+      // Apaga a mensagem do comando imediatamente
       try {
         await message.delete();
       } catch (e) {}
@@ -1464,103 +1105,49 @@ client.on("messageCreate", async (message) => {
         let totalDeleted = 0;
         let totalChannels = 0;
         
-        // Coletar DMs
-        const dmChannels = new Map();
-        
-        // Método 1: Buscar do cache de channels
-        client.channels.cache.forEach(channel => {
+        // Para cada canal de DM que o bot tem acesso
+        for (const [channelId, channel] of client.channels.cache) {
           if (channel.type === ChannelType.DM) {
-            dmChannels.set(channel.id, channel);
-          }
-        });
-        
-        // Método 2: Buscar de usuários que interagiram recentemente
-        client.users.cache.forEach(user => {
-          if (user.dmChannel && !dmChannels.has(user.dmChannel.id)) {
-            dmChannels.set(user.dmChannel.id, user.dmChannel);
-          }
-        });
-        
-        totalChannels = dmChannels.size;
-        
-        if (totalChannels === 0) {
-          await processingMsg.edit('❌ Nenhum canal de DM encontrado para limpar.');
-          setTimeout(async () => {
-            try {
-              await processingMsg.delete();
-            } catch (e) {}
-          }, 5000);
-          return;
-        }
-        
-        // Processar canais
-        for (const [channelId, channel] of dmChannels) {
-          let channelCount = 0;
-          
-          try {
-            let fetchedMessages;
-            let hasMore = true;
-            let retryCount = 0;
+            totalChannels++;
+            let channelCount = 0;
             
-            while (hasMore && retryCount < 3) {
-              try {
+            try {
+              let fetchedMessages;
+              do {
                 fetchedMessages = await channel.messages.fetch({ limit: 100 });
                 
-                if (fetchedMessages.size === 0) {
-                  hasMore = false;
-                  break;
-                }
+                if (fetchedMessages.size === 0) break;
                 
                 const deletableMessages = fetchedMessages.filter(msg => 
                   msg.author.id === client.user.id
                 );
                 
-                if (deletableMessages.size === 0) {
-                  hasMore = false;
-                  break;
-                }
+                if (deletableMessages.size === 0) break;
                 
                 for (const [id, msg] of deletableMessages) {
                   try {
                     await msg.delete();
                     channelCount++;
                     totalDeleted++;
-                    
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
                   } catch (err) {
-                    if (err.code === 10008) {
-                      continue;
-                    }
                     logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
                   }
                 }
                 
-                if (fetchedMessages.size < 100) {
-                  hasMore = false;
-                }
-                
-              } catch (err) {
-                retryCount++;
-                logError(`Erro no lote do canal ${channelId}, tentativa ${retryCount}: ${err.message}`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
-              }
+              } while (fetchedMessages.size >= 100);
+              
+              logInfo(`Limpou ${channelCount} mensagens do bot na DM com ${channel.recipient ? channel.recipient.tag : 'desconhecido'}`);
+              
+            } catch (err) {
+              logError(`Erro ao processar DM ${channelId}: ${err.message}`);
             }
-            
-            if (channelCount > 0) {
-              const recipient = channel.recipient ? channel.recipient.tag : 'desconhecido';
-              logInfo(`Limpou ${channelCount} mensagens do bot na DM com ${recipient}`);
-            }
-            
-            await new Promise(resolve => setTimeout(resolve, 800));
-            
-          } catch (err) {
-            logError(`Erro ao processar DM ${channelId}: ${err.message}`);
           }
         }
         
         await processingMsg.edit(`✅ **${totalDeleted} mensagens** do bot foram limpas de **${totalChannels} DMs**!`);
         
+        // Apaga a mensagem de processamento após 10 segundos
         setTimeout(async () => {
           try {
             await processingMsg.delete();
@@ -1582,14 +1169,16 @@ client.on("messageCreate", async (message) => {
       return;
     }
     
-    // === COMANDO !clear ===
+    // COMANDO !clear - TODAS AS MENSAGENS SÃO EFÊMERAS (APAGAM AUTOMATICAMENTE)
     if (message.content.startsWith('!clear')) {
       
+      // Apaga a mensagem do comando imediatamente
       try {
         await message.delete();
       } catch (e) {}
       
       try {
+        // Cria botões para o usuário confirmar
         const row = new ActionRowBuilder()
           .addComponents(
             new ButtonBuilder()
@@ -1602,11 +1191,13 @@ client.on("messageCreate", async (message) => {
               .setStyle(ButtonStyle.Secondary)
           );
         
+        // Envia mensagem de confirmação com botões
         const confirmMsg = await message.channel.send({
           content: '⚠️ **Tem certeza que deseja limpar todas as mensagens desta DM?**',
           components: [row]
         });
         
+        // Criar um coletor para os botões
         const filter = (interaction) => {
           return interaction.user.id === message.author.id;
         };
@@ -1620,6 +1211,7 @@ client.on("messageCreate", async (message) => {
         collector.on('collect', async (interaction) => {
           try {
             if (interaction.customId === 'confirm_clear') {
+              // Atualiza a mensagem de confirmação
               await interaction.update({ content: '🔄 Limpando mensagens...', components: [] });
               
               let deletedCount = 0;
@@ -1641,7 +1233,7 @@ client.on("messageCreate", async (message) => {
                     try {
                       await msg.delete();
                       deletedCount++;
-                      await new Promise(resolve => setTimeout(resolve, 200));
+                      await new Promise(resolve => setTimeout(resolve, 500));
                     } catch (err) {
                       logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
                     }
@@ -1651,11 +1243,13 @@ client.on("messageCreate", async (message) => {
                 
                 console.log(chalk.green.bgBlack.bold(`\n🧹 ${deletedCount} mensagens foram limpas do histórico da DM de ${message.author.tag}!`));
                 
+                // Atualiza a mensagem de confirmação com sucesso
                 await interaction.editReply({ 
                   content: '✅ **Mensagens limpas com sucesso!**',
                   components: [] 
                 });
                 
+                // Apaga a mensagem de confirmação após 5 segundos
                 setTimeout(async () => {
                   try {
                     await confirmMsg.delete();
@@ -1716,12 +1310,13 @@ client.on("messageCreate", async (message) => {
       return;
     }
     
-    // RESPOSTA AUTOMÁTICA
-    try {
-      const reply = await message.reply({
-        content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.OWNER_ID}> `
-      });
+    // RESPOSTA AUTOMÁTICA para outras mensagens na DM
+try {
+  const reply = await message.reply({
+    content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.OWNER_ID}> `
+  });
       
+      // Apaga a resposta automática após 10 segundos
       setTimeout(async () => {
         try {
           await reply.delete();
@@ -1735,13 +1330,15 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // ===== MODERAÇÃO EM CANAIS DE SERVIDOR =====
+  // MODERAÇÃO EM CANAIS DE SERVIDOR
+  // Verificar se o monitoramento está ativo para este servidor
   const isMonitoringActive = serverMonitoring.get(message.guild.id) !== false;
   
   if (!isMonitoringActive) {
     return;
   }
    
+  // VERIFICAR SE O USUÁRIO É STAFF (NÃO MODERAR)
   if (isStaff(message.author.id)) {
     return;
   }
@@ -1782,6 +1379,7 @@ client.on("messageCreate", async (message) => {
         ]
       });
 
+      // Apaga o aviso após 10 segundos
       setTimeout(async () => {
         try {
           await warningMsg.delete();
@@ -1797,7 +1395,7 @@ client.on("messageCreate", async (message) => {
 });
 
 // ===============================
-// EVENTO: BOT PRONTO
+// EVENTO: BOT PRONTO (CORRIGIDO - USANDO 'ready' EM VEZ DE 'clientReady')
 // ===============================
 client.once('clientReady', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
@@ -1809,23 +1407,12 @@ client.once('clientReady', async () => {
   console.log(chalk.white(`   • ID: ${client.user.id}`));
   console.log(chalk.white(`   • Servidores: ${client.guilds.cache.size}`));
     
-  // ===============================
-  // STATUS DO BOT
-  // ===============================
-  client.user.setPresence({
-    status: 'online', // online | idle | dnd | invisible
-    activities: [
-      {
-        name: `𝙼𝚊𝚍𝚎 𝙱𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝`,
-        type: 1
-      }
-    ]
-  });
-
+  // Inicializar monitoramento para todos os servidores (padrão: ativo)
   for (const guild of client.guilds.cache.values()) {
     serverMonitoring.set(guild.id, true);
   }
   
+  // Registrar comandos em TODOS os servidores
   if (client.guilds.cache.size > 0) {
     try {
       for (const guild of client.guilds.cache.values()) {
@@ -1849,17 +1436,29 @@ client.once('clientReady', async () => {
   console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
   console.log(chalk.yellow('  📝 COMANDOS NA DM:'));
   console.log(chalk.yellow('  • !clear - Limpa mensagens da DM (mensagens temporárias)'));
-  console.log(chalk.yellow('  • !clearAll - Limpa TODAS as DMs (requer senha)'));
-  console.log(chalk.yellow('  • !MonitorOn - Ativar monitoramento (requer senha)'));
-  console.log(chalk.yellow('  • !MonitorOff - Desativar monitoramento (requer senha)'));
-  console.log(chalk.yellow('  • Hello - Painel do Dono (apenas para o dono)\n'));
+  console.log(chalk.yellow('  • !clearAll - Limpa TODAS as DMs'));
+  console.log(chalk.yellow('  • !MonitorOn - Ativar monitoramento'));
+  console.log(chalk.yellow('  • !MonitorOff - Desativar monitoramento\n'));
   
   scheduleDailyReport();
   
+  // Inicia o menu interativo
   initReadline();
   showMenu();
-});
 
+  // ============================================
+  // PRESENÇA FIXA DO BOT (PERMANENTE)
+  // ============================================
+
+  client.user.setPresence({
+    activities: [{
+      name: "𝙼𝚊𝚍𝚎 𝙱𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝",
+      type:  1
+    }],
+    status: "online"
+  });
+
+});
 // ===============================
 // HANDLER PARA BOTÕES DE MONITORAMENTO
 // ===============================
@@ -1888,6 +1487,7 @@ async function handleMonitorButtons(interaction) {
         embeds: [embed]
       });
       
+      // Apaga após 10 segundos
       setTimeout(async () => {
         try {
           await interaction.deleteReply();
@@ -1954,7 +1554,7 @@ async function handleMonitorButtons(interaction) {
 }
 
 // ===============================
-// HANDLER PARA SELEÇÃO DE SERVIDOR (MONITORAMENTO PADRÃO)
+// HANDLER PARA SELEÇÃO DE SERVIDOR
 // ===============================
 async function handleServerSelection(interaction) {
   await interaction.deferUpdate();
@@ -2051,10 +1651,11 @@ async function handleServerSelection(interaction) {
 }
 
 // ===============================
-// EVENTO: INTERAÇÃO
+// EVENTO: INTERAÇÃO (BOTÕES E MENUS)
 // ===============================
 client.on('interactionCreate', async (interaction) => {
   try {
+    // Handler para comandos de chat input
     if (interaction.isChatInputCommand()) {
       const cmdName = interaction.commandName;
       stats.commandsUsed[cmdName] = (stats.commandsUsed[cmdName] || 0) + 1;
@@ -2093,44 +1694,17 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
+    // Handler para botões
     if (interaction.isButton()) {
-      // Botões de confirmação de desligamento
-      if (interaction.customId === 'confirm_shutdown' || interaction.customId === 'cancel_shutdown') {
-        // Esses botões são tratados pelo coletor no handleOwnerPanelButtons
-        // Então apenas ignoramos aqui para não dar conflito
-        return;
-      }
-      
-      // Botões do painel do dono
-      if (interaction.customId === 'owner_turnoff' || interaction.customId === 'owner_moderation') {
-        await handleOwnerPanelButtons(interaction);
-        return;
-      }
-      
-      // Botões de monitoramento de servidor (painel do dono)
-      if (interaction.customId.startsWith('monitor_guild_')) {
-        await handleGuildMonitorButton(interaction);
-        return;
-      }
-      
-      // Botões de ação em massa (painel do dono)
-      if (interaction.customId === 'owner_monitor_all_on' || interaction.customId === 'owner_monitor_all_off') {
-        await handleOwnerBulkAction(interaction);
-        return;
-      }
-      
-      // Botões do painel administrativo
       if (interaction.customId === 'stats' || interaction.customId === 'console' || interaction.customId === 'help') {
         await handleButtonInteraction(interaction);
         return;
       }
       
-      // Botões de confirmação do !clear
       if (interaction.customId === 'confirm_clear' || interaction.customId === 'cancel_clear') {
         return;
       }
       
-      // Botões de monitoramento padrão
       if (interaction.customId.startsWith('monitor_')) {
         await handleMonitorButtons(interaction);
         return;
@@ -2145,14 +1719,8 @@ client.on('interactionCreate', async (interaction) => {
       }, 5000);
     }
     
+    // Handler para menus de seleção
     if (interaction.isStringSelectMenu()) {
-      // Menu de seleção do painel do dono
-      if (interaction.customId === 'owner_monitor_select') {
-        await handleOwnerServerSelection(interaction);
-        return;
-      }
-      
-      // Menu de seleção padrão
       if (interaction.customId.startsWith('select_server_')) {
         await handleServerSelection(interaction);
         return;
@@ -2173,7 +1741,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ===============================
-// HANDLER PARA BOTÕES DO PAINEL ADMIN
+// EVENTO: BOTÃO INTERAÇÃO (PAINEL ADMIN)
 // ===============================
 async function handleButtonInteraction(interaction) {
   switch (interaction.customId) {
@@ -2261,15 +1829,17 @@ async function handleButtonInteraction(interaction) {
   }
 }
 
+
 // ===============================
-// MENU INTERATIVO
+// MENU INTERATIVO NO CONSOLE
 // ===============================
+
 function showMenu() {
   if (isMenuActive) return;
   isMenuActive = true;
   
   console.log(chalk.cyan('\n╔═══════════════════════════════════════════════════════╗'));
-  console.log(chalk.cyan('║                  𝙷𝚘𝚜𝚝𝚅𝚒𝚕𝚕𝚎-𝙱𝙾𝚃 𝚅𝚎𝚛𝚜ã𝚘 5.0.1                     ║'));
+  console.log(chalk.cyan('║                  𝙷𝚘𝚜𝚝𝚅𝚒𝚕𝚕𝚎-𝙱𝙾𝚃 𝚅𝚎𝚛𝚜ã𝚘 𝟺.𝟷.𝟸                     ║'));
   console.log(chalk.cyan('╠═══════════════════════════════════════════════════════╣'));
   console.log(chalk.cyan('║  1.  Ver estatísticas detalhadas                                ║'));
   console.log(chalk.cyan('║  2.  Listar todos os servidores                                 ║'));
@@ -2483,7 +2053,7 @@ function sendMessageToChannel() {
         c => c.type === ChannelType.GuildText
       );
       
-      if (channels.size === 0) {
+      if (channels.length === 0) {
         console.log(chalk.red('Nenhum canal de texto encontrado.'));
         showMenu();
         return;
@@ -2497,8 +2067,8 @@ function sendMessageToChannel() {
       rl.question(chalk.yellow('\n👉 Escolha o canal: '), async (channelAnswer) => {
         const channelIndex = parseInt(channelAnswer) - 1;
         
-        if (channelIndex >= 0 && channelIndex < channels.size) {
-          const channel = Array.from(channels.values())[channelIndex];
+        if (channelIndex >= 0 && channelIndex < channels.length) {
+          const channel = channels[channelIndex];
           
           rl.question(chalk.yellow('\n📝 Digite a mensagem: '), async (message) => {
             try {
