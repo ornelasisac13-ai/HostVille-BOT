@@ -8,7 +8,6 @@
   <img src="https://img.shields.io/badge/discord.js-v14.14.0-blue.svg" alt="Discord.js">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/badge/status-online-brightgreen.svg" alt="Status">
-  <img src="https://img.shields.io/badge/warns%20system-v2.0.0-orange.svg" alt="Warns System">
 </p>
 
 # 🛡️ HostVille-Bot - Sistema Completo de Moderação
