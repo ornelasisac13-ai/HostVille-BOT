@@ -1268,7 +1268,7 @@ try {
 });
 
 // ===============================
-// EVENTO: BOT PRONTO (CORRIGIDO - USANDO 'ready' EM VEZ DE 'clientReady')
+// EVENTO: BOT PRONTO
 // ===============================
 client.once('clientReady', async () => {
   console.log('\n' + chalk.green.underline('═'.repeat(50)));
@@ -1319,6 +1319,22 @@ client.once('clientReady', async () => {
   initReadline();
   showMenu();
 });
+function updateStatus() {
+    const activities = [
+         { name: '𝙼𝚊𝚍𝚎 𝚋𝚢 𝚈𝟸𝚔_𝙽𝚊𝚝', type: 2 },
+        { name: 'Avalie sua equipe!', type: 2 }
+    ];
+    
+    let index = 0;
+    setInterval(() => {
+        const activity = activities[index % activities.length];
+        client.user.setPresence({
+            activities: [{ name: activity.name, type: activity.type }],
+            status: 'online'
+        });
+        index++;
+    }, 10000);
+}
 
 // ===============================
 // HANDLER PARA BOTÕES DE MONITORAMENTO
