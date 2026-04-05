@@ -1,2213 +1,2058 @@
-
-require('dotenv').config();
+// ===============================
+// BOT MODERAÇÃO COMPLETA VERSÃO INTEGRADA - CORRIGIDO (SEM FALSOS POSITIVOS)
+// ===============================
 const { 
-    Client, 
-    GatewayIntentBits, 
-    REST, 
-    Routes, 
-    SlashCommandBuilder, 
-    EmbedBuilder, 
-    ActionRowBuilder, 
-    StringSelectMenuBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    ModalBuilder, 
-    TextInputBuilder, 
-    TextInputStyle, 
-    Collection, 
-    PermissionsBitField,
-    ChannelType,
-    MessageFlags,
-    Events,
-    ActivityType,
-    WebhookClient,
-    codeBlock,
-    inlineCode,
-    time,
-    TimestampStyles,
-    version as discordVersion
+  Client, 
+  GatewayIntentBits, 
+  Partials, 
+  Colors, 
+  ActionRowBuilder, 
+  ButtonBuilder, 
+  ButtonStyle, 
+  EmbedBuilder, 
+  ChannelType,
+  PermissionFlagsBits,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder
 } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-const cron = require('node-cron');
-const os = require('os');
+const dotenv = require('dotenv');
+const chalk = require('chalk');
+const readline = require('readline');
 
-// ============================================
-// CONFIGURAÇÃO DO CLIENT
-// ============================================
+dotenv.config();
+
+// ===============================
+// CONFIGURAÇÃO DO CLIENTE DISCORD
+// ===============================
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildModeration,
-        GatewayIntentBits.GuildPresences,
-        GatewayIntentBits.MessageContent
-    ],
-    allowedMentions: { 
-        parse: ['users', 'roles'], 
-        repliedUser: true,
-        users: [],
-        roles: []
-    },
-    retryLimit: 3,
-    presence: {
-        status: 'online',
-        activities: [{ name: 'Inicializando...', type: ActivityType.Playing }]
-    }
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildPresences,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.DirectMessageTyping
+  ],
+  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User],
 });
 
-// Collections para armazenamento em memória
-client.commands = new Collection();
-client.slashCommands = new Collection();
-client.cooldowns = new Collection();
-client.tempReviewData = new Map();
-client.userCache = new Map();
-client.roleCache = new Map();
-client.channelCache = new Map();
-client.commandUsage = new Map();
-client.rateLimits = new Map();
-
-// ============================================
-// VARIÁVEIS DE AMBIENTE COM VALIDAÇÃO
-// ============================================
-const TOKEN = process.env.TOKEN;
-const STAFF_ROLE_IDS = process.env.STAFF_ROLE_IDS ? process.env.STAFF_ROLE_IDS.split(',').map(id => id.trim()).filter(id => id.length > 0) : [];
-const REVIEWS_CHANNEL_ID = process.env.REVIEWS_CHANNEL_ID;
-const REVIEWS_LOG_CHANNEL_ID = process.env.REVIEWS_LOG_CHANNEL_ID;
-const LOG_CHANNEL_ID = process.env.LOG_CHANNEL_ID;
-
-// Validação das variáveis de ambiente
-if (!TOKEN) {
-    console.error('❌ TOKEN não configurado no arquivo .env');
-    process.exit(1);
-}
-if (!STAFF_ROLE_IDS.length) {
-    console.warn('⚠️ Nenhum cargo staff configurado. Os comandos de moderação não funcionarão corretamente.');
-}
-if (!REVIEWS_CHANNEL_ID) {
-    console.warn('⚠️ REVIEWS_CHANNEL_ID não configurado. O sistema de avaliação não funcionará.');
-}
-if (!REVIEWS_LOG_CHANNEL_ID) {
-    console.warn('⚠️ REVIEWS_LOG_CHANNEL_ID não configurado. Os logs de avaliação não serão enviados.');
-}
-if (!LOG_CHANNEL_ID) {
-    console.warn('⚠️ LOG_CHANNEL_ID não configurado. Os logs gerais não serão enviados.');
-}
-
-// ============================================
-// CONSTANTES DE CONFIGURAÇÃO
-// ============================================
-const PREFIX = '!';
-const EMBED_COLOR = '#341539';
-const MAX_FEEDBACK_LENGTH = 700;
-const MAX_CLEAR_MESSAGES = 1000;
-const MAX_CLEAR_USER_MESSAGES = 500;
-const COOLDOWN_DURATION = 3000;
-const BACKUP_INTERVAL_HOURS = 24;
-const AUTO_DELETE_LOGS_DAYS = 30;
-const MAX_REVIEWS_PER_USER_PER_DAY = 10;
-const MIN_REVIEWS_FOR_RANKING = 3;
-const RANKING_TOP_SIZE = 10;
-const WEEKLY_RANKING_TOP = 3;
-const CACHE_TTL = 3600000; // 1 hora
-
-// ============================================
-// SISTEMA DE ARMAZENAMENTO EM ARQUIVO JSON
-// ============================================
-const DATA_DIR = path.join(__dirname, 'data');
-const BACKUP_DIR = path.join(DATA_DIR, 'backups');
-const LOGS_DIR = path.join(DATA_DIR, 'logs');
-const REVIEWS_FILE = path.join(DATA_DIR, 'reviews.json');
-const RANKINGS_FILE = path.join(DATA_DIR, 'rankings.json');
-const STATS_FILE = path.join(DATA_DIR, 'stats.json');
-const LOGS_FILE = path.join(LOGS_DIR, 'system-logs.json');
-const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
-const USER_STATS_FILE = path.join(DATA_DIR, 'user-stats.json');
-const WEEKLY_STATS_FILE = path.join(DATA_DIR, 'weekly-stats.json');
-
-// Criar diretórios necessários
-const directories = [DATA_DIR, BACKUP_DIR, LOGS_DIR];
-directories.forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        console.log(`📁 Diretório criado: ${dir}`);
-    }
-});
-
-// ============================================
-// FUNÇÕES DE LEITURA/ESCRITA DE DADOS
-// ============================================
-
-function readJSONFile(filePath, defaultValue = []) {
-    try {
-        if (!fs.existsSync(filePath)) {
-            fs.writeFileSync(filePath, JSON.stringify(defaultValue, null, 2));
-            return defaultValue;
-        }
-        const data = fs.readFileSync(filePath, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error(`❌ Erro ao ler arquivo ${filePath}:`, error);
-        return defaultValue;
-    }
-}
-
-function writeJSONFile(filePath, data) {
-    try {
-        fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-        return true;
-    } catch (error) {
-        console.error(`❌ Erro ao escrever arquivo ${filePath}:`, error);
-        return false;
-    }
-}
-
-// Funções específicas para cada tipo de dado
-function loadReviews() { return readJSONFile(REVIEWS_FILE, []); }
-function saveReviews(reviews) { return writeJSONFile(REVIEWS_FILE, reviews); }
-
-function loadRankings() { return readJSONFile(RANKINGS_FILE, []); }
-function saveRankings(rankings) { return writeJSONFile(RANKINGS_FILE, rankings); }
-
-function loadStats() { return readJSONFile(STATS_FILE, { reviews: 0, users: {}, lastWeeklyReset: null, botStartTime: Date.now() }); }
-function saveStats(stats) { return writeJSONFile(STATS_FILE, stats); }
-
-function loadUserStats() { return readJSONFile(USER_STATS_FILE, {}); }
-function saveUserStats(userStats) { return writeJSONFile(USER_STATS_FILE, userStats); }
-
-function loadWeeklyStats() { return readJSONFile(WEEKLY_STATS_FILE, []); }
-function saveWeeklyStats(weeklyStats) { return writeJSONFile(WEEKLY_STATS_FILE, weeklyStats); }
-
-function loadConfig() { return readJSONFile(CONFIG_FILE, { autoBackup: true, weeklyRankingEnabled: true, mentionOnRanking: false }); }
-function saveConfig(config) { return writeJSONFile(CONFIG_FILE, config); }
-
-// ============================================
-// SISTEMA DE LOGS AVANÇADO
-// ============================================
-
-class AdvancedLogger {
-    constructor() {
-        this.logLevels = {
-            DEBUG: 0,
-            INFO: 1,
-            WARN: 2,
-            ERROR: 3,
-            FATAL: 4
-        };
-        this.currentLevel = this.logLevels.INFO;
-    }
-
-    formatMessage(level, message, details = {}) {
-        const timestamp = new Date().toISOString();
-        const pid = process.pid;
-        return `[${timestamp}] [${level}] [PID:${pid}] ${message} ${Object.keys(details).length ? JSON.stringify(details) : ''}`;
-    }
-
-    log(level, message, details = {}) {
-        const levelValue = this.logLevels[level] || this.logLevels.INFO;
-        if (levelValue >= this.currentLevel) {
-            const formattedMessage = this.formatMessage(level, message, details);
-            if (level === 'ERROR' || level === 'FATAL') {
-                console.error(formattedMessage);
-            } else if (level === 'WARN') {
-                console.warn(formattedMessage);
-            } else {
-                console.log(formattedMessage);
-            }
-            
-            // Salvar no arquivo de logs
-            const logs = this.getLogs();
-            logs.push({ level, message, details, timestamp: new Date().toISOString() });
-            this.saveLogs(logs.slice(-5000)); // Manter últimos 5000 logs
-        }
-    }
-
-    getLogs() {
-        return readJSONFile(LOGS_FILE, []);
-    }
-
-    saveLogs(logs) {
-        writeJSONFile(LOGS_FILE, logs);
-    }
-
-    debug(message, details = {}) { this.log('DEBUG', message, details); }
-    info(message, details = {}) { this.log('INFO', message, details); }
-    warn(message, details = {}) { this.log('WARN', message, details); }
-    error(message, details = {}) { this.log('ERROR', message, details); }
-    fatal(message, details = {}) { this.log('FATAL', message, details); }
-}
-
-const logger = new AdvancedLogger();
-
-// ============================================
-// FUNÇÕES DE UTILIDADE AVANÇADAS
-// ============================================
-
-// Verificar se usuário é staff (qualquer um dos cargos configurados)
-function isStaff(member) {
-    if (!member || !member.roles) return false;
-    return STAFF_ROLE_IDS.some(roleId => member.roles.cache.has(roleId));
-}
-
-// Verificar se usuário tem um cargo específico
-function hasRole(member, roleId) {
-    return member && member.roles && member.roles.cache.has(roleId);
-}
-
-// Obter todos os cargos staff
-function getStaffRoles(guild) {
-    const roles = [];
-    for (const roleId of STAFF_ROLE_IDS) {
-        const role = guild.roles.cache.get(roleId);
-        if (role) roles.push(role);
-    }
-    return roles;
-}
-
-// Obter todos os membros staff
-function getAllStaffMembers(guild) {
-    const members = new Set();
-    for (const roleId of STAFF_ROLE_IDS) {
-        const role = guild.roles.cache.get(roleId);
-        if (role) {
-            role.members.forEach(member => members.add(member));
-        }
-    }
-    return Array.from(members);
-}
-
-// Obter cor baseada na nota (0-10)
-function getColorByScore(score) {
-    if (score >= 0 && score <= 3) return 0xFF0000; // Vermelho
-    if (score >= 4 && score <= 6) return 0xFFFF00; // Amarelo
-    if (score >= 7 && score <= 8) return 0x00AA00; // Verde claro
-    return 0x00FF00; // Verde brilhante
-}
-
-// Obter emoji baseado na nota
-function getScoreEmoji(score) {
-    if (score === 0) return '💀';
-    if (score === 1) return '😭';
-    if (score === 2) return '😞';
-    if (score === 3) return '😐';
-    if (score === 4) return '🤔';
-    if (score === 5) return '😐';
-    if (score === 6) return '🙂';
-    if (score === 7) return '😊';
-    if (score === 8) return '😃';
-    if (score === 9) return '🌟';
-    if (score === 10) return '⭐';
-    return '📊';
-}
-
-// Obter descrição da nota
-function getScoreDescription(score) {
-    if (score === 0) return 'Precisa melhorar drasticamente';
-    if (score === 1) return 'Muito insatisfatório';
-    if (score === 2) return 'Insatisfatório';
-    if (score === 3) return 'Abaixo da média';
-    if (score === 4) return 'Regular baixo';
-    if (score === 5) return 'Regular';
-    if (score === 6) return 'Regular alto';
-    if (score === 7) return 'Bom';
-    if (score === 8) return 'Muito bom';
-    if (score === 9) return 'Excelente';
-    if (score === 10) return 'Perfeito!';
-    return 'Nota inválida';
-}
-
-// Formatar data em vários formatos
-function formatDate(date, format = 'full') {
-    const d = new Date(date);
-    const formats = {
-        short: d.toLocaleDateString('pt-BR'),
-        long: d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }),
-        full: d.toLocaleString('pt-BR'),
-        time: d.toLocaleTimeString('pt-BR'),
-        iso: d.toISOString(),
-        relative: time(d, TimestampStyles.RelativeTime)
-    };
-    return formats[format] || formats.full;
-}
-
-// Obter número da semana (ISO)
-function getWeekNumber(date) {
-    const d = new Date(date);
-    d.setUTCHours(0, 0, 0, 0);
-    d.setUTCDate(d.getUTCDate() + 3 - (d.getUTCDay() + 6) % 7);
-    const week1 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
-    return 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getUTCDay() + 6) % 7) / 7);
-}
-
-// Obter ano da data
-function getYear(date) {
-    return new Date(date).getFullYear();
-}
-
-// Calcular média de um array
-function calculateAverage(numbers) {
-    if (!numbers || numbers.length === 0) return 0;
-    return numbers.reduce((a, b) => a + b, 0) / numbers.length;
-}
-
-// Calcular mediana
-function calculateMedian(numbers) {
-    if (!numbers || numbers.length === 0) return 0;
-    const sorted = [...numbers].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-// Calcular desvio padrão
-function calculateStandardDeviation(numbers) {
-    if (!numbers || numbers.length === 0) return 0;
-    const avg = calculateAverage(numbers);
-    const squareDiffs = numbers.map(value => Math.pow(value - avg, 2));
-    return Math.sqrt(calculateAverage(squareDiffs));
-}
-
-// Validar feedback
-function validateFeedback(feedback) {
-    if (!feedback || feedback.trim().length === 0) return { valid: true, cleaned: '' };
-    const cleaned = feedback.trim().substring(0, MAX_FEEDBACK_LENGTH);
-    return { valid: true, cleaned };
-}
-
-// Verificar cooldown de usuário
-function checkCooldown(userId, command) {
-    const key = `${userId}-${command}`;
-    const cooldown = client.cooldowns.get(key);
-    if (cooldown && Date.now() < cooldown) {
-        return { onCooldown: true, remaining: Math.ceil((cooldown - Date.now()) / 1000) };
-    }
-    client.cooldowns.set(key, Date.now() + COOLDOWN_DURATION);
-    setTimeout(() => client.cooldowns.delete(key), COOLDOWN_DURATION);
-    return { onCooldown: false };
-}
-
-// Limpar dados antigos do cache
-function cleanCache() {
-    const now = Date.now();
-    for (const [key, value] of client.userCache) {
-        if (value.timestamp && now - value.timestamp > CACHE_TTL) {
-            client.userCache.delete(key);
-        }
-    }
-    for (const [key, value] of client.roleCache) {
-        if (value.timestamp && now - value.timestamp > CACHE_TTL) {
-            client.roleCache.delete(key);
-        }
-    }
-}
-
-// ============================================
-// FUNÇÕES DE ESTATÍSTICAS DE USUÁRIO
-// ============================================
-
-function calculateUserStats(userId) {
-    const reviews = loadReviews();
-    const userReviews = reviews.filter(r => r.reviewedId === userId);
-    
-    if (userReviews.length === 0) {
-        return {
-            count: 0,
-            average: 0,
-            median: 0,
-            highest: 0,
-            lowest: 0,
-            standardDeviation: 0,
-            recentReviews: [],
-            weeklyTrend: 0
-        };
-    }
-    
-    const scores = userReviews.map(r => r.score);
-    const sortedByDate = [...userReviews].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    
-    // Calcular tendência semanal
-    const now = new Date();
-    const thisWeek = userReviews.filter(r => {
-        const reviewDate = new Date(r.createdAt);
-        return getWeekNumber(reviewDate) === getWeekNumber(now) && getYear(reviewDate) === getYear(now);
-    });
-    const lastWeek = userReviews.filter(r => {
-        const reviewDate = new Date(r.createdAt);
-        const lastWeekNum = getWeekNumber(new Date(now.setDate(now.getDate() - 7)));
-        return getWeekNumber(reviewDate) === lastWeekNum && getYear(reviewDate) === getYear(now);
-    });
-    
-    const thisWeekAvg = calculateAverage(thisWeek.map(r => r.score));
-    const lastWeekAvg = calculateAverage(lastWeek.map(r => r.score));
-    const weeklyTrend = thisWeekAvg - lastWeekAvg;
-    
-    return {
-        count: userReviews.length,
-        average: parseFloat(calculateAverage(scores).toFixed(2)),
-        median: parseFloat(calculateMedian(scores).toFixed(2)),
-        highest: Math.max(...scores),
-        lowest: Math.min(...scores),
-        standardDeviation: parseFloat(calculateStandardDeviation(scores).toFixed(2)),
-        recentReviews: sortedByDate.slice(0, 5),
-        weeklyTrend: parseFloat(weeklyTrend.toFixed(2)),
-        thisWeekCount: thisWeek.length,
-        lastWeekCount: lastWeek.length
-    };
-}
-
-function calculateReviewerStats(userId) {
-    const reviews = loadReviews();
-    const userReviews = reviews.filter(r => r.reviewerId === userId);
-    
-    if (userReviews.length === 0) {
-        return { count: 0, averageGiven: 0, mostCommonScore: 0 };
-    }
-    
-    const scores = userReviews.map(r => r.score);
-    const scoreFrequency = {};
-    scores.forEach(score => {
-        scoreFrequency[score] = (scoreFrequency[score] || 0) + 1;
-    });
-    const mostCommonScore = parseInt(Object.keys(scoreFrequency).reduce((a, b) => scoreFrequency[a] > scoreFrequency[b] ? a : b, 0));
-    
-    return {
-        count: userReviews.length,
-        averageGiven: parseFloat(calculateAverage(scores).toFixed(2)),
-        mostCommonScore: mostCommonScore
-    };
-}
-
-// ============================================
-// SISTEMA DE RANKING SEMANAL AVANÇADO
-// ============================================
-
-async function generateWeeklyRanking() {
-    const reviews = loadReviews();
-    const now = new Date();
-    const weekNumber = getWeekNumber(now);
-    const year = getYear(now);
-    
-    // Filtrar avaliações da semana atual
-    const weekReviews = reviews.filter(review => {
-        const reviewDate = new Date(review.createdAt);
-        return getWeekNumber(reviewDate) === weekNumber && getYear(reviewDate) === year;
-    });
-    
-    if (weekReviews.length === 0) {
-        logger.info('Nenhuma avaliação encontrada para o ranking semanal', { weekNumber, year });
-        return null;
-    }
-    
-    // Agrupar por usuário avaliado
-    const userScores = new Map();
-    
-    weekReviews.forEach(review => {
-        if (!userScores.has(review.reviewedId)) {
-            userScores.set(review.reviewedId, {
-                userId: review.reviewedId,
-                userName: review.reviewedName,
-                userTag: review.reviewedTag,
-                scores: [],
-                totalScore: 0,
-                count: 0,
-                reviewers: new Set()
-            });
-        }
-        const userData = userScores.get(review.reviewedId);
-        userData.scores.push(review.score);
-        userData.totalScore += review.score;
-        userData.count++;
-        userData.reviewers.add(review.reviewerId);
-    });
-    
-    // Calcular métricas e ordenar
-    const rankings = [];
-    for (const [userId, data] of userScores) {
-        const averageScore = data.totalScore / data.count;
-        const medianScore = calculateMedian(data.scores);
-        const stdDev = calculateStandardDeviation(data.scores);
-        
-        rankings.push({
-            userId: data.userId,
-            userName: data.userName,
-            userTag: data.userTag,
-            averageScore: parseFloat(averageScore.toFixed(2)),
-            medianScore: parseFloat(medianScore.toFixed(2)),
-            totalReviews: data.count,
-            highestScore: Math.max(...data.scores),
-            lowestScore: Math.min(...data.scores),
-            standardDeviation: parseFloat(stdDev.toFixed(2)),
-            uniqueReviewers: data.reviewers.size
-        });
-    }
-    
-    // Ordenar por média (decrescente) e depois por quantidade de reviews
-    rankings.sort((a, b) => {
-        if (b.averageScore !== a.averageScore) return b.averageScore - a.averageScore;
-        return b.totalReviews - a.totalReviews;
-    });
-    
-    const topRankings = rankings.slice(0, WEEKLY_RANKING_TOP);
-    
-    // Salvar ranking histórico
-    const rankingsData = loadRankings();
-    rankingsData.push({
-        weekNumber,
-        year,
-        weekStart: new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()),
-        weekEnd: new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 6),
-        totalReviews: weekReviews.length,
-        totalUsers: rankings.length,
-        rankings: topRankings,
-        allRankings: rankings,
-        createdAt: new Date().toISOString()
-    });
-    saveRankings(rankingsData);
-    
-    // Salvar estatísticas semanais
-    const weeklyStats = loadWeeklyStats();
-    weeklyStats.push({
-        weekNumber,
-        year,
-        totalReviews: weekReviews.length,
-        totalUsers: rankings.length,
-        averageScoreOverall: parseFloat(calculateAverage(weekReviews.map(r => r.score)).toFixed(2)),
-        topScore: topRankings[0]?.averageScore || 0,
-        generatedAt: new Date().toISOString()
-    });
-    saveWeeklyStats(weeklyStats.slice(-52)); // Manter último ano
-    
-    return { topRankings, rankings, weekReviews: weekReviews.length };
-}
-
-async function sendWeeklyRanking() {
-    const rankingData = await generateWeeklyRanking();
-    
-    if (!rankingData || rankingData.topRankings.length === 0) {
-        logger.info('Nenhum dado de ranking para enviar');
-        return false;
-    }
-    
-    const { topRankings, rankings, weekReviews } = rankingData;
-    const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
-    
-    if (!logChannel) {
-        logger.error('Canal de logs não encontrado para enviar ranking', { channelId: LOG_CHANNEL_ID });
-        return false;
-    }
-    
-    const now = new Date();
-    const weekNumber = getWeekNumber(now);
-    const year = getYear(now);
-    const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
-    const weekEnd = new Date(now.setDate(now.getDate() - now.getDay() + 6));
-    
-    const embed = new EmbedBuilder()
-        .setTitle('🏆 Ranking Semanal da Equipe')
-        .setDescription(`Semana ${weekNumber} de ${year}\n${formatDate(weekStart, 'short')} - ${formatDate(weekEnd, 'short')}`)
-        .setColor(0xFFD700)
-        .setThumbnail('https://cdn.discordapp.com/emojis/890915467471437854.png')
-        .setTimestamp()
-        .setFooter({ text: `Total de avaliações: ${weekReviews} | Sistema de Avaliação Automático` });
-    
-    const medals = ['🥇', '🥈', '🥉'];
-    const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
-    const medalNames = ['OURO', 'PRATA', 'BRONZE'];
-    
-    for (let i = 0; i < topRankings.length; i++) {
-        const member = topRankings[i];
-        const scoreEmoji = getScoreEmoji(member.averageScore);
-        
-        embed.addFields({
-            name: `${medals[i]} ${medalNames[i]} - ${member.userName}`,
-            value: `${scoreEmoji} **Média:** ${member.averageScore}/10\n` +
-                   `📊 **Mediana:** ${member.medianScore}/10\n` +
-                   `📝 **Total de avaliações:** ${member.totalReviews}\n` +
-                   `📈 **Maior nota:** ${member.highestScore} | **Menor nota:** ${member.lowestScore}\n` +
-                   `👥 **Avaliadores únicos:** ${member.uniqueReviewers}\n` +
-                   `📉 **Desvio padrão:** ${member.standardDeviation}`,
-            inline: false
-        });
-    }
-    
-    // Adicionar estatísticas adicionais
-    const totalAverage = calculateAverage(rankings.map(r => r.averageScore));
-    embed.addFields({
-        name: '📊 Estatísticas da Semana',
-        value: `🏅 **Total de avaliados:** ${rankings.length}\n` +
-               `⭐ **Média geral:** ${totalAverage.toFixed(2)}/10\n` +
-               `🎯 **Participação:** ${(rankings.length / getAllStaffMembers(logChannel.guild).length * 100).toFixed(1)}% da staff`,
-        inline: false
-    });
-    
-    await logChannel.send({ embeds: [embed] });
-    
-    // Adicionar menções para os top 3 se configurado
-    const config = loadConfig();
-    if (config.mentionOnRanking) {
-        const mentions = topRankings.map(r => `<@${r.userId}>`).join(' ');
-        await logChannel.send(`🎉 Parabéns ${mentions}! Continuem com o bom trabalho!`);
-    }
-    
-    logger.info('Ranking semanal enviado com sucesso', { weekNumber, year, topMembers: topRankings.length });
-    return true;
-}
-
-function checkAndSendRanking() {
-    const now = new Date();
-    const lastSunday = new Date(now);
-    lastSunday.setDate(now.getDate() - now.getDay());
-    lastSunday.setHours(23, 59, 0, 0);
-    
-    const stats = loadStats();
-    const lastReset = stats.lastWeeklyReset ? new Date(stats.lastWeeklyReset) : null;
-    
-    if (!lastReset || lastReset < lastSunday) {
-        sendWeeklyRanking();
-        stats.lastWeeklyReset = new Date().toISOString();
-        saveStats(stats);
-        logger.info('Ranking semanal gerado e enviado', { resetDate: lastSunday });
-    }
-}
-
-// ============================================
-// FUNÇÕES DE BACKUP E MANUTENÇÃO
-// ============================================
-
-function createBackup() {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupData = {
-        version: '3.0.0',
-        timestamp: new Date().toISOString(),
-        botInfo: {
-            uptime: process.uptime(),
-            memory: process.memoryUsage(),
-            nodeVersion: process.version,
-            discordVersion: discordVersion
-        },
-        data: {
-            reviews: loadReviews(),
-            rankings: loadRankings(),
-            stats: loadStats(),
-            userStats: loadUserStats(),
-            weeklyStats: loadWeeklyStats(),
-            config: loadConfig()
-        },
-        systemInfo: {
-            platform: os.platform(),
-            cpus: os.cpus().length,
-            totalMemory: os.totalmem(),
-            freeMemory: os.freemem()
-        }
-    };
-    
-    const backupFile = path.join(BACKUP_DIR, `backup_${timestamp}.json`);
-    writeJSONFile(backupFile, backupData);
-    
-    // Limpar backups antigos (manter últimos 20)
-    const backups = fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json')).sort();
-    while (backups.length > 20) {
-        const oldBackup = backups.shift();
-        fs.unlinkSync(path.join(BACKUP_DIR, oldBackup));
-        logger.info(`Backup antigo removido: ${oldBackup}`);
-    }
-    
-    logger.info(`Backup criado: ${path.basename(backupFile)}`, { size: JSON.stringify(backupData).length });
-    return backupFile;
-}
-
-function restoreBackup(backupFile) {
-    try {
-        const backupData = readJSONFile(backupFile, null);
-        if (!backupData || !backupData.data) {
-            throw new Error('Arquivo de backup inválido');
-        }
-        
-        saveReviews(backupData.data.reviews);
-        saveRankings(backupData.data.rankings);
-        saveStats(backupData.data.stats);
-        saveUserStats(backupData.data.userStats);
-        saveWeeklyStats(backupData.data.weeklyStats);
-        saveConfig(backupData.data.config);
-        
-        logger.info(`Backup restaurado: ${path.basename(backupFile)}`);
-        return true;
-    } catch (error) {
-        logger.error('Erro ao restaurar backup', { error: error.message, file: backupFile });
-        return false;
-    }
-}
-
-function cleanupOldData() {
-    const reviews = loadReviews();
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    
-    const newReviews = reviews.filter(review => new Date(review.createdAt) > sixMonthsAgo);
-    if (newReviews.length !== reviews.length) {
-        saveReviews(newReviews);
-        logger.info(`Limpeza de dados antigos: ${reviews.length - newReviews.length} avaliações removidas`);
-    }
-    
-    // Limpar logs antigos
-    const logs = logger.getLogs();
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - AUTO_DELETE_LOGS_DAYS);
-    const newLogs = logs.filter(log => new Date(log.timestamp) > thirtyDaysAgo);
-    if (newLogs.length !== logs.length) {
-        logger.saveLogs(newLogs);
-        logger.info(`Limpeza de logs antigos: ${logs.length - newLogs.length} logs removidos`);
-    }
-}
-
-// ============================================
-// SISTEMA DE MENSAGENS E EMBEDS
-// ============================================
-
-class MessageBuilder {
-    static createSuccessEmbed(title, description, fields = []) {
-        const embed = new EmbedBuilder()
-            .setTitle(`✅ ${title}`)
-            .setDescription(description)
-            .setColor(0x00FF00)
-            .setTimestamp();
-        
-        fields.forEach(field => {
-            embed.addFields({ name: field.name, value: field.value, inline: field.inline || false });
-        });
-        
-        return embed;
-    }
-    
-    static createErrorEmbed(title, description, fields = []) {
-        const embed = new EmbedBuilder()
-            .setTitle(`❌ ${title}`)
-            .setDescription(description)
-            .setColor(0xFF0000)
-            .setTimestamp();
-        
-        fields.forEach(field => {
-            embed.addFields({ name: field.name, value: field.value, inline: field.inline || false });
-        });
-        
-        return embed;
-    }
-    
-    static createWarningEmbed(title, description, fields = []) {
-        const embed = new EmbedBuilder()
-            .setTitle(`⚠️ ${title}`)
-            .setDescription(description)
-            .setColor(0xFFFF00)
-            .setTimestamp();
-        
-        fields.forEach(field => {
-            embed.addFields({ name: field.name, value: field.value, inline: field.inline || false });
-        });
-        
-        return embed;
-    }
-    
-    static createInfoEmbed(title, description, fields = []) {
-        const embed = new EmbedBuilder()
-            .setTitle(`ℹ️ ${title}`)
-            .setDescription(description)
-            .setColor(0x00AAFF)
-            .setTimestamp();
-        
-        fields.forEach(field => {
-            embed.addFields({ name: field.name, value: field.value, inline: field.inline || false });
-        });
-        
-        return embed;
-    }
-}
-
-// ============================================
-// SISTEMA DE PERMISSÕES
-// ============================================
-
-class PermissionManager {
-    static hasPermission(member, permission) {
-        if (!member) return false;
-        if (member.id === member.guild.ownerId) return true;
-        return member.permissions.has(permission);
-    }
-    
-    static canManageMessages(member) { return this.hasPermission(member, PermissionsBitField.Flags.ManageMessages); }
-    static canKickMembers(member) { return this.hasPermission(member, PermissionsBitField.Flags.KickMembers); }
-    static canBanMembers(member) { return this.hasPermission(member, PermissionsBitField.Flags.BanMembers); }
-    static canAdministrator(member) { return this.hasPermission(member, PermissionsBitField.Flags.Administrator); }
-    
-    static getStaffRolesList(guild) {
-        return STAFF_ROLE_IDS.map(id => guild.roles.cache.get(id)).filter(r => r);
-    }
-}
-
-// ============================================
-// COMANDOS SLASH - DEFINIÇÃO
-// ============================================
-
-// Comando /clearall
-const clearAllCommand = new SlashCommandBuilder()
-    .setName('clearall')
-    .setDescription('Apaga todas as mensagens de um canal específico')
-    .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageMessages)
-    .addChannelOption(option =>
-        option.setName('channel')
-            .setDescription('Canal que terá as mensagens apagadas')
-            .setRequired(true)
-            .addChannelTypes(ChannelType.GuildText))
-    .addIntegerOption(option =>
-        option.setName('limit')
-            .setDescription('Quantidade de mensagens para apagar (padrão: 100, máximo: 1000)')
-            .setMinValue(1)
-            .setMaxValue(MAX_CLEAR_MESSAGES)
-            .setRequired(false))
-    .addBooleanOption(option =>
-        option.setName('silent')
-            .setDescription('Não enviar log da ação?')
-            .setRequired(false));
-
-// Comando /clear
-const clearCommand = new SlashCommandBuilder()
-    .setName('clear')
-    .setDescription('Apaga todas as mensagens de um usuário específico')
-    .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageMessages)
-    .addUserOption(option =>
-        option.setName('user')
-            .setDescription('Usuário que terá as mensagens apagadas')
-            .setRequired(true))
-    .addIntegerOption(option =>
-        option.setName('limit')
-            .setDescription('Quantidade de mensagens para apagar (padrão: 100, máximo: 500)')
-            .setMinValue(1)
-            .setMaxValue(MAX_CLEAR_USER_MESSAGES)
-            .setRequired(false))
-    .addBooleanOption(option =>
-        option.setName('silent')
-            .setDescription('Não enviar log da ação?')
-            .setRequired(false));
-
-// Comando /stats
-const statsCommand = new SlashCommandBuilder()
-    .setName('stats')
-    .setDescription('Mostra estatísticas do sistema de avaliação')
-    .addUserOption(option =>
-        option.setName('user')
-            .setDescription('Usuário para ver estatísticas (opcional)')
-            .setRequired(false))
-    .addStringOption(option =>
-        option.setName('period')
-            .setDescription('Período das estatísticas')
-            .setRequired(false)
-            .addChoices(
-                { name: 'Geral', value: 'all' },
-                { name: 'Esta semana', value: 'week' },
-                { name: 'Este mês', value: 'month' }
-            ));
-
-// Comando /ranking
-const rankingCommand = new SlashCommandBuilder()
-    .setName('ranking')
-    .setDescription('Mostra o ranking atual da semana')
-    .addIntegerOption(option =>
-        option.setName('week')
-            .setDescription('Número da semana (opcional)')
-            .setRequired(false)
-            .setMinValue(1)
-            .setMaxValue(52))
-    .addIntegerOption(option =>
-        option.setName('year')
-            .setDescription('Ano (opcional)')
-            .setRequired(false)
-            .setMinValue(2020)
-            .setMaxValue(2030));
-
-// Comando /review
-const reviewCommand = new SlashCommandBuilder()
-    .setName('review')
-    .setDescription('Ver avaliações de um usuário')
-    .addUserOption(option =>
-        option.setName('user')
-            .setDescription('Usuário para ver avaliações')
-            .setRequired(true));
-
-// Comando /botinfo
-const botInfoCommand = new SlashCommandBuilder()
-    .setName('botinfo')
-    .setDescription('Mostra informações detalhadas do bot');
-
-// Comando /backup (staff apenas)
-const backupCommand = new SlashCommandBuilder()
-    .setName('backup')
-    .setDescription('Gerencia backups do sistema (Staff)')
-    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
-    .addSubcommand(sub => sub.setName('create').setDescription('Cria um novo backup'))
-    .addSubcommand(sub => sub.setName('list').setDescription('Lista backups disponíveis'))
-    .addSubcommand(sub => sub.setName('restore').setDescription('Restaura um backup')
-        .addStringOption(opt => opt.setName('file').setDescription('Nome do arquivo de backup').setRequired(true)));
-
-// Comando /config (staff apenas)
-const configCommand = new SlashCommandBuilder()
-    .setName('config')
-    .setDescription('Configura o bot (Staff)')
-    .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
-    .addSubcommand(sub => sub.setName('show').setDescription('Mostra configurações atuais'))
-    .addSubcommand(sub => sub.setName('set').setDescription('Define uma configuração')
-        .addStringOption(opt => opt.setName('key').setDescription('Chave da configuração').setRequired(true))
-        .addStringOption(opt => opt.setName('value').setDescription('Valor da configuração').setRequired(true)));
-
-// Registrar todos os comandos
-const commands = [
-    clearAllCommand, 
-    clearCommand, 
-    statsCommand, 
-    rankingCommand, 
-    reviewCommand, 
-    botInfoCommand,
-    backupCommand,
-    configCommand
+// ===============================
+// CONFIGURAÇÕES GERAIS
+// ===============================
+const CONFIG = {
+  logChannelId: process.env.LOG_CHANNEL_ID,
+  adminRoles: process.env.ADMIN_ROLES ? process.env.ADMIN_ROLES.split(',') : [],
+  ACCESS_CODE: process.env.ACCESS_CODE,
+  STAFF_USER_ID: process.env.STAFF_USER_ID,
+  OWNER_ID: process.env.OWNER_ID,
+  DAILY_REPORT_TIME: process.env.DAILY_REPORT_TIME,
+};
+
+// ===============================
+// VARIÁVEIS GLOBAIS
+// ===============================
+const serverMonitoring = new Map(); // Key: guildId, Value: boolean (true = monitoramento ativo)
+const pendingActions = new Map(); // Armazena ações pendentes para seleção de servidor
+
+// Lista de IDs de staff que NÃO serão moderados
+const staffIds = CONFIG.STAFF_USER_ID ? CONFIG.STAFF_USER_ID.split(',').map(id => id.trim().replace(/[<@>]/g, '')) : [];
+
+const stats = {
+  messagesDeleted: 0,
+  warnsGiven: 0,
+  membersJoined: 0,
+  membersLeft: 0,
+  commandsUsed: {},
+  startDate: new Date(),
+  
+  reset() {
+    this.messagesDeleted = 0;
+    this.warnsGiven = 0;
+    this.membersJoined = 0;
+    this.membersLeft = 0;
+    this.commandsUsed = {};
+  }
+};
+
+// ===============================
+// LISTA DE PALAVRAS OFENSIVAS (VERSÃO COMPLETA - SEM CARACTERES ESPECIAIS QUE CAUSAM ERRO)
+// ===============================
+const offensiveWords = [
+  // PALAVRAS BASE (TODAS LIMPAS, SEM REGEX INVÁLIDOS)
+  "idiota", "burro", "estupido", "retardado", "lixo",
+  "merda", "fdp", "otario", "desgracado",
+  "vtnc", "imbecil", "inutil", "arrombado", "viado", "bicha", 
+  "piranha", "prostituta", "corno", "babaca", "palhaco", "nojento", 
+  "escroto", "cretino", "canalha", "maldito", "peste", "verme", 
+  "trouxa", "otaria", "burra", "cacete", "caralho", "merdinha",
+  "vagabundo", "vagabunda", "cuzao", "idiotinha", "fodido", "bosta",
+  "porra", "prr", "poha", "krl", "krlh", "caramba",
+  "fds", "foda", "fudeu", "fodase", "fodassi",
+  "pqp", "puta", "vsf", "tnc", "tmnc", "cuzão", "cú", "cu",
+  "buceta", "bct", "xota", "xoxota", "ppk", "perereca",
+  "rapariga", "putinha", "putona", "puto", "bosta", "bostinha", 
+  "inutel", "idiota", "burrinho", "estupida", "retardada", "nojenta", 
+  "escrota", "trouxinha", "verminoso", "pestinha", "cretina", "maldita",
+  "corninho", "chifrudo", "vagaba", "piriguete", "viadinho", "boiola", 
+  "bichinha", "baitola", "sapatão", "sapata", "galinha", "cachorra", 
+  "cachorro", "vaca", "égua", "cabra", "mula", "jumento", "asno", 
+  "anta", "besta", "bocó", "boçal", "bronco", "ignorante", 
+  "analfabeto", "pilantra", "malandro", "safado", "tarado", 
+  "pervertido", "depravado", "asqueroso", "repugnante", "horrivel", 
+  "feio", "crápula", "infeliz", "miseravel", "coitado", "nulo", 
+  "aborto", "lixinho", "traste", "praga", "desgraça", "fudido", 
+  "lascado", "ferrado", "danado", "capeta", "demonio", "diabo", 
+  "satanás", "lucifer", "animal", "bicho", "monstro", "abominavel", 
+  "marginal", "delinquente", "criminoso", "bandido", "ladrão", 
+  "assaltante", "golpista", "enganador", "trapaceiro", "manipulador", 
+  "abusador", "abusado", "folgado", "atrevido", "arrogante", 
+  "pretensioso", "metido", "convencido", "soberbo", "orgulhoso", 
+  "vaidoso", "futil", "oco", "teimoso", "birrento", "pentelho", 
+  "maçante", "enfadonho", "mrd", "fodendo", "fudendo", "crl", 
+  "crlh", "putaria", "puteiro", "caraio", "karaio",
+  
+  // EXPRESSÕES COMUNS (FRASES)
+  "vai tomar no cu", "vai tnc", "vai tmnc",
+  "vai se foder", "vai se fuder", "vsf",
+  "foda se", "fodase", "foda-se",
+  "puta que pariu", "puta q pariu",
+  "filho da puta", "filha da puta"
 ];
 
-// ============================================
-// EVENTO: READY
-// ============================================
-
-client.once('ready', async () => {
-    const startTime = Date.now();
-    
-    console.log('='.repeat(60));
-    console.log(`🤖 Bot logado como ${client.user.tag}`);
-    console.log(`📡 ID: ${client.user.id}`);
-    console.log(`🕐 Inicializado em: ${formatDate(new Date(), 'full')}`);
-    console.log('='.repeat(60));
-    
-    // Registrar comandos slash
-    try {
-        const rest = new REST({ version: '10' }).setToken(TOKEN);
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: commands.map(cmd => cmd.toJSON()) }
-        );
-        console.log('✅ Comandos slash registrados globalmente');
-        logger.info('Comandos slash registrados', { count: commands.length });
-    } catch (error) {
-        console.error('❌ Erro ao registrar comandos:', error);
-        logger.error('Erro ao registrar comandos slash', { error: error.message });
-    }
-    
-    // Configurar canal de avaliações
-    await setupReviewsChannel();
-    
-    // Iniciar sistema de ranking semanal
-    setupWeeklyRankingSystem();
-    
-    // Iniciar sistema de backup automático
-    setupAutoBackup();
-    
-    // Iniciar limpeza periódica
-    setupPeriodicCleanup();
-    
-    // Atualizar status
-    setupStatusRotation();
-    
-    // Criar backup inicial
-    setTimeout(() => {
-        createBackup();
-        cleanupOldData();
-    }, 10000);
-    
-    const loadTime = Date.now() - startTime;
-    console.log(`🚀 Bot totalmente carregado em ${loadTime}ms`);
-    logger.info('Bot inicializado completamente', { loadTime, guilds: client.guilds.cache.size });
-});
-
-// ============================================
-// CONFIGURAÇÃO DO CANAL DE AVALIAÇÕES
-// ============================================
-
-async function setupReviewsChannel() {
-    const channel = client.channels.cache.get(REVIEWS_CHANNEL_ID);
-    if (!channel) {
-        logger.error('Canal de avaliações não encontrado', { channelId: REVIEWS_CHANNEL_ID });
-        return;
-    }
-    
-    const guild = channel.guild;
-    const staffRoles = getStaffRoles(guild);
-    
-    // Criar embed principal
-    const embed = new EmbedBuilder()
-        .setTitle('📊 Sistema de Avaliação da Equipe')
-        .setDescription('Clique no botão abaixo para avaliar um membro da nossa equipe!')
-        .setColor(EMBED_COLOR)
-        .setThumbnail(guild.iconURL({ dynamic: true }) || client.user.displayAvatarURL())
-        .addFields(
-            { 
-                name: '📋 Como funciona', 
-                value: '```\n1️⃣ Selecione o cargo do membro\n2️⃣ Escolha o membro que deseja avaliar\n3️⃣ Selecione uma nota de 0 a 10\n4️⃣ Escreva seu feedback (opcional)\n5️⃣ Envie sua avaliação\n```', 
-                inline: false 
-            },
-            { 
-                name: '🎯 Quem pode avaliar', 
-                value: `Apenas membros com um dos seguintes cargos podem avaliar:\n${staffRoles.map(r => `• ${r.name} (${r.members.size} membros)`).join('\n') || '• Nenhum cargo configurado'}`, 
-                inline: false 
-            },
-            { 
-                name: '⭐ Sistema de Notas', 
-                value: '🔴 **0-3:** Insatisfatório - Precisa melhorar\n🟡 **4-6:** Regular - Bom, mas pode melhorar\n🟢 **7-10:** Excelente - Ótimo trabalho!', 
-                inline: false 
-            },
-            { 
-                name: '📈 Estatísticas', 
-                value: `📝 Total de avaliações: ${loadReviews().length}\n👥 Membros avaliados: ${Object.keys(loadUserStats()).length}\n🏆 Ranking semanal: Ativo`, 
-                inline: false 
-            }
-        )
-        .setFooter({ text: `Sistema de Avaliação • ${guild.name}`, iconURL: guild.iconURL() })
-        .setTimestamp();
-    
-    const button = new ButtonBuilder()
-        .setCustomId('open_review_menu')
-        .setLabel('🛠 Avaliar equipe')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('⭐');
-    
-    const row = new ActionRowBuilder().addComponents(button);
-    
-    // Limpar mensagens antigas do bot
-    try {
-        const messages = await channel.messages.fetch({ limit: 50 });
-        const botMessages = messages.filter(m => m.author.id === client.user.id);
-        for (const msg of botMessages.values()) {
-            await msg.delete().catch(() => {});
-        }
-    } catch (error) {
-        logger.warn('Erro ao limpar mensagens antigas', { error: error.message });
-    }
-    
-    await channel.send({ embeds: [embed], components: [row] });
-    logger.info('Canal de avaliações configurado', { channelId: REVIEWS_CHANNEL_ID });
+// ===============================
+// FUNÇÕES DE LOG PERSONALIZADAS
+// ===============================
+function getTimestamp() {
+  const dataBrasil = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  return chalk.gray(`[${dataBrasil}]`);
 }
 
-// ============================================
-// SISTEMAS AUTOMÁTICOS
-// ============================================
-
-function setupWeeklyRankingSystem() {
-    // Verificar a cada hora se precisa enviar ranking
-    setInterval(() => {
-        checkAndSendRanking();
-    }, 60 * 60 * 1000);
-    
-    // Verificar imediatamente
-    checkAndSendRanking();
-    logger.info('Sistema de ranking semanal inicializado');
+function logInfo(message) {
+  console.log(`${getTimestamp()} ${chalk.green('➜ INFO')}: ${chalk.cyan(message)}`);
 }
 
-function setupAutoBackup() {
-    // Backup a cada BACKUP_INTERVAL_HOURS horas
-    setInterval(() => {
-        createBackup();
-    }, BACKUP_INTERVAL_HOURS * 60 * 60 * 1000);
-    
-    logger.info(`Sistema de backup automático inicializado (a cada ${BACKUP_INTERVAL_HOURS}h)`);
+function logError(message) {
+  console.log(`${getTimestamp()} ${chalk.red('✖ ERRO')}: ${chalk.yellow(message)}`);
 }
 
-function setupPeriodicCleanup() {
-    // Limpeza diária às 04:00
-    setInterval(() => {
-        const now = new Date();
-        if (now.getHours() === 4 && now.getMinutes() === 0) {
-            cleanupOldData();
-            cleanCache();
-            logger.info('Limpeza periódica executada');
-        }
-    }, 60 * 60 * 1000);
+function logWarn(message) {
+  console.log(`${getTimestamp()} ${chalk.yellow('⚠ AVISO')}: ${chalk.white(message)}`);
 }
 
-function setupStatusRotation() {
-    const activities = [
-        { name: `${STAFF_ROLE_IDS.length} cargos da staff`, type: ActivityType.Watching },
-        { name: '/clearall | /clear', type: ActivityType.Listening },
-        { name: 'Sistema de Avaliação', type: ActivityType.Playing },
-        { name: `${loadReviews().length} avaliações`, type: ActivityType.Watching },
-        { name: 'Avalie sua equipe!', type: ActivityType.Competing }
-    ];
-    
-    let index = 0;
-    setInterval(() => {
-        const activity = activities[index % activities.length];
-        client.user.setPresence({
-            activities: [activity],
-            status: 'online'
-        });
-        index++;
-    }, 15000);
-    
-    logger.info('Sistema de status rotativo inicializado');
+function logSuccess(message) {
+  console.log(`${getTimestamp()} ${chalk.green('✔ SUCESSO')}: ${chalk.white(message)}`);
 }
 
-// ============================================
-// HANDLER: COMANDOS SLASH
-// ============================================
+function logModeration(message, user, content, channel, foundWord) {
+  console.log(chalk.red.bgBlack.bold('\n 🛡️ MENSAGEM MODERADA '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Usuário:   ${user.tag}`));
+  console.log(chalk.red(`   ID:        ${user.id}`));
+  console.log(chalk.red(`   Conteúdo:  ${content}`));
+  console.log(chalk.red(`   Palavra:   "${foundWord}"`));
+  console.log(chalk.red(`   Canal:     #${channel.name}`));
+  console.log(chalk.red(`   Motivo:    ${message}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+}
 
-client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-    
-    const { commandName, member, options } = interaction;
-    
-    // Verificar permissão para comandos de moderação
-    if (commandName === 'clearall' || commandName === 'clear' || commandName === 'backup' || commandName === 'config') {
-        if (!isStaff(member)) {
-            return interaction.reply({
-                embeds: [MessageBuilder.createErrorEmbed(
-                    'Permissão Negada',
-                    'Você não tem permissão para usar este comando! Apenas membros da staff podem usar.'
-                )],
-                ephemeral: true
-            });
-        }
-    }
-    
-    // Verificar cooldown
-    const cooldown = checkCooldown(interaction.user.id, commandName);
-    if (cooldown.onCooldown) {
-        return interaction.reply({
-            embeds: [MessageBuilder.createWarningEmbed(
-                'Aguarde!',
-                `Você está em cooldown. Tente novamente em ${cooldown.remaining} segundos.`
-            )],
-            ephemeral: true
-        });
-    }
-    
-    // ========== COMANDO /clearall ==========
-    if (commandName === 'clearall') {
-        const channel = options.getChannel('channel');
-        const limit = options.getInteger('limit') || 100;
-        const silent = options.getBoolean('silent') || false;
-        
-        if (!channel.isTextBased()) {
-            return interaction.reply({
-                embeds: [MessageBuilder.createErrorEmbed('Canal Inválido', 'Este não é um canal de texto válido!')],
-                ephemeral: true
-            });
-        }
-        
-        await interaction.reply({
-            embeds: [MessageBuilder.createInfoEmbed('Processando', `🔄 Apagando até ${limit} mensagens do canal ${channel}...`)],
-            ephemeral: true
-        });
-        
-        try {
-            let deletedCount = 0;
-            let fetched;
-            let remaining = limit;
-            
-            while (remaining > 0) {
-                const fetchLimit = Math.min(remaining, 100);
-                fetched = await channel.messages.fetch({ limit: fetchLimit });
-                
-                if (fetched.size === 0) break;
-                
-                const deleted = await channel.bulkDelete(fetched, true);
-                deletedCount += deleted.size;
-                remaining -= deleted.size;
-                
-                if (fetched.size < fetchLimit) break;
-            }
-            
-            await interaction.editReply({
-                embeds: [MessageBuilder.createSuccessEmbed(
-                    'Limpeza Concluída',
-                    `✅ ${deletedCount} mensagens foram apagadas do canal ${channel}!`
-                )]
-            });
-            
-            if (!silent) {
-                const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
-                if (logChannel) {
-                    const logEmbed = new EmbedBuilder()
-                        .setTitle('📝 Ação de Moderação')
-                        .setColor(0xFFA500)
-                        .addFields(
-                            { name: '👮 Ação', value: 'Limpeza de Canal', inline: true },
-                            { name: '👤 Staff', value: member.user.tag, inline: true },
-                            { name: '📺 Canal', value: channel.toString(), inline: true },
-                            { name: '🗑️ Mensagens', value: deletedCount.toString(), inline: true },
-                            { name: '🕐 Data', value: formatDate(new Date(), 'full'), inline: true }
-                        )
-                        .setTimestamp();
-                    await logChannel.send({ embeds: [logEmbed] });
-                }
-            }
-            
-            logger.info('Comando /clearall executado', { 
-                moderator: member.user.tag, 
-                channel: channel.name, 
-                messagesDeleted: deletedCount 
-            });
-            
-        } catch (error) {
-            logger.error('Erro ao executar /clearall', { error: error.message });
-            await interaction.editReply({
-                embeds: [MessageBuilder.createErrorEmbed(
-                    'Erro',
-                    '❌ Erro ao apagar mensagens! Mensagens podem ser muito antigas (mais de 14 dias) ou você não tem permissão.'
-                )]
-            });
-        }
-    }
-    
-    // ========== COMANDO /clear ==========
-    else if (commandName === 'clear') {
-        const targetUser = options.getUser('user');
-        const limit = options.getInteger('limit') || 100;
-        const silent = options.getBoolean('silent') || false;
-        const channel = interaction.channel;
-        
-        await interaction.reply({
-            embeds: [MessageBuilder.createInfoEmbed('Processando', `🔄 Apagando até ${limit} mensagens de ${targetUser.tag}...`)],
-            ephemeral: true
-        });
-        
-        try {
-            let deletedCount = 0;
-            let fetched;
-            let remaining = limit;
-            
-            while (remaining > 0) {
-                const fetchLimit = Math.min(remaining, 100);
-                fetched = await channel.messages.fetch({ limit: fetchLimit });
-                const messagesToDelete = fetched.filter(msg => msg.author.id === targetUser.id);
-                
-                if (messagesToDelete.size === 0) break;
-                
-                const deleted = await channel.bulkDelete(messagesToDelete, true);
-                deletedCount += deleted.size;
-                remaining -= deleted.size;
-            }
-            
-            await interaction.editReply({
-                embeds: [MessageBuilder.createSuccessEmbed(
-                    'Limpeza Concluída',
-                    `✅ ${deletedCount} mensagens de ${targetUser.tag} foram apagadas!`
-                )]
-            });
-            
-            if (!silent) {
-                const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
-                if (logChannel) {
-                    const logEmbed = new EmbedBuilder()
-                        .setTitle('📝 Ação de Moderação')
-                        .setColor(0xFFA500)
-                        .addFields(
-                            { name: '👮 Ação', value: 'Limpeza de Usuário', inline: true },
-                            { name: '👤 Staff', value: member.user.tag, inline: true },
-                            { name: '🎯 Alvo', value: targetUser.tag, inline: true },
-                            { name: '🗑️ Mensagens', value: deletedCount.toString(), inline: true },
-                            { name: '🕐 Data', value: formatDate(new Date(), 'full'), inline: true }
-                        )
-                        .setTimestamp();
-                    await logChannel.send({ embeds: [logEmbed] });
-                }
-            }
-            
-            logger.info('Comando /clear executado', { 
-                moderator: member.user.tag, 
-                target: targetUser.tag, 
-                messagesDeleted: deletedCount 
-            });
-            
-        } catch (error) {
-            logger.error('Erro ao executar /clear', { error: error.message });
-            await interaction.editReply({
-                embeds: [MessageBuilder.createErrorEmbed(
-                    'Erro',
-                    '❌ Erro ao apagar mensagens! Mensagens podem ser muito antigas (mais de 14 dias).'
-                )]
-            });
-        }
-    }
-    
-    // ========== COMANDO /stats ==========
-    else if (commandName === 'stats') {
-        const targetUser = options.getUser('user') || interaction.user;
-        const period = options.getString('period') || 'all';
-        
-        let reviews = loadReviews();
-        const now = new Date();
-        
-        if (period === 'week') {
-            const weekNumber = getWeekNumber(now);
-            const year = getYear(now);
-            reviews = reviews.filter(r => {
-                const reviewDate = new Date(r.createdAt);
-                return getWeekNumber(reviewDate) === weekNumber && getYear(reviewDate) === year;
-            });
-        } else if (period === 'month') {
-            const currentMonth = now.getMonth();
-            const currentYear = now.getFullYear();
-            reviews = reviews.filter(r => {
-                const reviewDate = new Date(r.createdAt);
-                return reviewDate.getMonth() === currentMonth && reviewDate.getFullYear() === currentYear;
-            });
-        }
-        
-        const userReviews = reviews.filter(r => r.reviewedId === targetUser.id);
-        const stats = calculateUserStats(targetUser.id);
-        const reviewerStats = calculateReviewerStats(targetUser.id);
-        
-        const embed = new EmbedBuilder()
-            .setTitle(`📊 Estatísticas de ${targetUser.tag}`)
-            .setColor(getColorByScore(stats.average))
-            .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                { name: '📝 Total de avaliações recebidas', value: stats.count.toString(), inline: true },
-                { name: '⭐ Média de notas', value: stats.average.toString(), inline: true },
-                { name: '📊 Mediana', value: stats.median.toString(), inline: true },
-                { name: '📈 Maior nota', value: stats.highest.toString(), inline: true },
-                { name: '📉 Menor nota', value: stats.lowest.toString(), inline: true },
-                { name: '📉 Desvio padrão', value: stats.standardDeviation.toString(), inline: true },
-                { name: '📊 Avaliações feitas', value: reviewerStats.count.toString(), inline: true },
-                { name: '⭐ Média de notas dadas', value: reviewerStats.averageGiven.toString(), inline: true }
-            )
-            .setFooter({ text: `Período: ${period === 'all' ? 'Geral' : period === 'week' ? 'Esta semana' : 'Este mês'}` })
-            .setTimestamp();
-        
-        // Adicionar últimas avaliações
-        if (stats.recentReviews.length > 0) {
-            const recentText = stats.recentReviews.slice(0, 3).map(r => {
-                const emoji = getScoreEmoji(r.score);
-                return `${emoji} **${r.score}/10** - ${r.feedback.substring(0, 50)}${r.feedback.length > 50 ? '...' : ''}\n*por ${r.reviewerName}*`;
-            }).join('\n\n');
-            embed.addFields({ name: '📋 Últimas avaliações', value: recentText, inline: false });
-        }
-        
-        await interaction.reply({ embeds: [embed] });
-        logger.debug('Comando /stats executado', { user: targetUser.tag, period });
-    }
-    
-    // ========== COMANDO /ranking ==========
-    else if (commandName === 'ranking') {
-        const weekNum = options.getInteger('week');
-        const yearNum = options.getInteger('year') || getYear(new Date());
-        
-        let rankingsData;
-        
-        if (weekNum) {
-            const rankings = loadRankings();
-            rankingsData = rankings.find(r => r.weekNumber === weekNum && r.year === yearNum);
-        } else {
-            const now = new Date();
-            const currentWeek = getWeekNumber(now);
-            rankingsData = (await generateWeeklyRanking());
-        }
-        
-        if (!rankingsData || (rankingsData.rankings && rankingsData.rankings.length === 0)) {
-            return interaction.reply({
-                embeds: [MessageBuilder.createWarningEmbed(
-                    'Sem Dados',
-                    `Nenhum dado de ranking encontrado${weekNum ? ` para a semana ${weekNum} de ${yearNum}` : ' para esta semana'}.`
-                )],
-                ephemeral: true
-            });
-        }
-        
-        const rankings = rankingsData.rankings || rankingsData.topRankings || [];
-        const weekNumber = rankingsData.weekNumber || weekNum;
-        const year = rankingsData.year || yearNum;
-        
-        const embed = new EmbedBuilder()
-            .setTitle('🏆 Ranking da Semana')
-            .setDescription(`Semana ${weekNumber} de ${year}\nTotal de avaliações: ${rankingsData.totalReviews || rankingsData.weekReviews || 'N/A'}`)
-            .setColor(0xFFD700)
-            .setTimestamp();
-        
-        const medals = ['🥇', '🥈', '🥉', '📊', '📊'];
-        for (let i = 0; i < Math.min(rankings.length, 10); i++) {
-            const r = rankings[i];
-            const medal = medals[i] || `${i + 1}º`;
-            embed.addFields({
-                name: `${medal} ${r.userName}`,
-                value: `⭐ Média: ${r.averageScore}/10 | 📝 ${r.totalReviews} avaliação(ões)`,
-                inline: false
-            });
-        }
-        
-        await interaction.reply({ embeds: [embed] });
-        logger.debug('Comando /ranking executado', { weekNumber, year });
-    }
-    
-    // ========== COMANDO /review ==========
-    else if (commandName === 'review') {
-        const targetUser = options.getUser('user');
-        const reviews = loadReviews();
-        const userReviews = reviews.filter(r => r.reviewedId === targetUser.id);
-        
-        if (userReviews.length === 0) {
-            return interaction.reply({
-                embeds: [MessageBuilder.createWarningEmbed('Sem Avaliações', `Nenhuma avaliação encontrada para ${targetUser.tag}.`)],
-                ephemeral: true
-            });
-        }
-        
-        const stats = calculateUserStats(targetUser.id);
-        
-        const embed = new EmbedBuilder()
-            .setTitle(`📝 Avaliações de ${targetUser.tag}`)
-            .setColor(getColorByScore(stats.average))
-            .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                { name: '📊 Total de avaliações', value: stats.count.toString(), inline: true },
-                { name: '⭐ Média', value: stats.average.toString(), inline: true },
-                { name: '📈 Melhor nota', value: stats.highest.toString(), inline: true },
-                { name: '📉 Pior nota', value: stats.lowest.toString(), inline: true }
-            )
-            .setTimestamp();
-        
-        // Adicionar últimas 5 avaliações
-        const last5 = userReviews.slice(-5).reverse();
-        if (last5.length > 0) {
-            const reviewsText = last5.map(r => {
-                const emoji = getScoreEmoji(r.score);
-                return `${emoji} **${r.score}/10** - ${r.feedback.substring(0, 100)}${r.feedback.length > 100 ? '...' : ''}\n*por ${r.reviewerName} em ${formatDate(r.createdAt, 'short')}*`;
-            }).join('\n\n---\n\n');
-            
-            embed.addFields({ name: '📋 Últimas avaliações', value: reviewsText, inline: false });
-        }
-        
-        await interaction.reply({ embeds: [embed] });
-        logger.debug('Comando /review executado', { target: targetUser.tag });
-    }
-    
-    // ========== COMANDO /botinfo ==========
-    else if (commandName === 'botinfo') {
-        const reviews = loadReviews();
-        const stats = loadStats();
-        const uptime = process.uptime();
-        const memory = process.memoryUsage();
-        
-        const embed = new EmbedBuilder()
-            .setTitle('🤖 Informações do Bot')
-            .setDescription('Bot de avaliação para equipes Discord')
-            .setColor(EMBED_COLOR)
-            .setThumbnail(client.user.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                { name: '📊 Estatísticas', value: `📝 Total de avaliações: ${reviews.length}\n👥 Usuários avaliados: ${Object.keys(stats.users).length}\n🔧 Cargos Staff: ${STAFF_ROLE_IDS.length}\n📡 Servidores: ${client.guilds.cache.size}`, inline: true },
-                { name: '⏰ Sistema', value: `⏱️ Uptime: ${Math.floor(uptime / 86400)}d ${Math.floor((uptime % 86400) / 3600)}h ${Math.floor((uptime % 3600) / 60)}m\n💾 Memória: ${(memory.heapUsed / 1024 / 1024).toFixed(2)} MB\n🖥️ Node.js: ${process.version}\n📦 Discord.js: ${discordVersion}`, inline: true },
-                { name: '🛠️ Comandos', value: `🔹 /clearall - Limpar canal\n🔹 /clear - Limpar usuário\n🔹 /stats - Estatísticas\n🔹 /ranking - Ranking semanal\n🔹 /review - Ver avaliações`, inline: false }
-            )
-            .setFooter({ text: `Bot criado para avaliação de equipes | ID: ${client.user.id}` })
-            .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
-        logger.debug('Comando /botinfo executado');
-    }
-    
-    // ========== COMANDO /backup ==========
-    else if (commandName === 'backup') {
-        const subcommand = options.getSubcommand();
-        
-        if (subcommand === 'create') {
-            const backupFile = createBackup();
-            await interaction.reply({
-                embeds: [MessageBuilder.createSuccessEmbed('Backup Criado', `Backup criado com sucesso!\nArquivo: ${path.basename(backupFile)}`)],
-                ephemeral: true
-            });
-        } 
-        else if (subcommand === 'list') {
-            const backups = fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json')).sort().reverse();
-            
-            if (backups.length === 0) {
-                return interaction.reply({
-                    embeds: [MessageBuilder.createWarningEmbed('Sem Backups', 'Nenhum backup encontrado.')],
-                    ephemeral: true
-                });
-            }
-            
-            const backupList = backups.slice(0, 10).map((f, i) => {
-                const stats = fs.statSync(path.join(BACKUP_DIR, f));
-                return `${i + 1}. ${f} - ${(stats.size / 1024).toFixed(2)} KB - ${formatDate(stats.mtime, 'full')}`;
-            }).join('\n');
-            
-            const embed = MessageBuilder.createInfoEmbed('Backups Disponíveis', `\`\`\`\n${backupList}\n\`\`\``);
-            await interaction.reply({ embeds: [embed], ephemeral: true });
-        }
-        else if (subcommand === 'restore') {
-            const fileName = options.getString('file');
-            const backupPath = path.join(BACKUP_DIR, fileName);
-            
-            if (!fs.existsSync(backupPath)) {
-                return interaction.reply({
-                    embeds: [MessageBuilder.createErrorEmbed('Backup Não Encontrado', `Arquivo ${fileName} não encontrado.`)],
-                    ephemeral: true
-                });
-            }
-            
-            const success = restoreBackup(backupPath);
-            if (success) {
-                await interaction.reply({
-                    embeds: [MessageBuilder.createSuccessEmbed('Backup Restaurado', `Backup ${fileName} restaurado com sucesso!`)],
-                    ephemeral: true
-                });
-            } else {
-                await interaction.reply({
-                    embeds: [MessageBuilder.createErrorEmbed('Erro', `Falha ao restaurar backup ${fileName}.`)],
-                    ephemeral: true
-                });
-            }
-        }
-    }
-    
-    // ========== COMANDO /config ==========
-    else if (commandName === 'config') {
-        const subcommand = options.getSubcommand();
-        const config = loadConfig();
-        
-        if (subcommand === 'show') {
-            const embed = new EmbedBuilder()
-                .setTitle('⚙️ Configurações do Bot')
-                .setColor(EMBED_COLOR)
-                .addFields(
-                    { name: '🤖 Backup Automático', value: config.autoBackup ? '✅ Ativado' : '❌ Desativado', inline: true },
-                    { name: '🏆 Ranking Semanal', value: config.weeklyRankingEnabled ? '✅ Ativado' : '❌ Desativado', inline: true },
-                    { name: '📢 Menção no Ranking', value: config.mentionOnRanking ? '✅ Ativado' : '❌ Desativado', inline: true }
-                )
-                .setTimestamp();
-            
-            await interaction.reply({ embeds: [embed], ephemeral: true });
-        }
-        else if (subcommand === 'set') {
-            const key = options.getString('key');
-            const value = options.getString('value');
-            
-            const validKeys = ['autoBackup', 'weeklyRankingEnabled', 'mentionOnRanking'];
-            if (!validKeys.includes(key)) {
-                return interaction.reply({
-                    embeds: [MessageBuilder.createErrorEmbed('Chave Inválida', `Chaves válidas: ${validKeys.join(', ')}`)],
-                    ephemeral: true
-                });
-            }
-            
-            const boolValue = value === 'true' || value === '1' || value === 'on' || value === 'ativado';
-            config[key] = boolValue;
-            saveConfig(config);
-            
-            await interaction.reply({
-                embeds: [MessageBuilder.createSuccessEmbed('Configuração Atualizada', `${key} agora está ${boolValue ? 'ativado' : 'desativado'}.`)],
-                ephemeral: true
-            });
-            
-            logger.info('Configuração alterada', { key, value: boolValue, moderator: member.user.tag });
-        }
-    }
-});
+// ===============================
+// FUNÇÃO PARA FORMATAR TEMPO
+// ===============================
+function formatTime(ms) {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  return `${days}d ${hours % 24}h ${minutes % 60}m`;
+}
 
-// ============================================
-// HANDLER: BOTÕES E MENUS
-// ============================================
-
-// Botão para abrir menu de avaliação
-client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isButton()) return;
-    if (interaction.customId !== 'open_review_menu') return;
-    
-    const member = interaction.member;
-    
-    if (!isStaff(member)) {
-        return interaction.reply({
-            embeds: [MessageBuilder.createErrorEmbed(
-                'Permissão Negada',
-                'Apenas membros da staff podem avaliar outros membros!'
-            )],
-            ephemeral: true
-        });
-    }
-    
-    const guild = interaction.guild;
-    const rolesWithMembers = [];
-    
-    for (const roleId of STAFF_ROLE_IDS) {
-        const role = guild.roles.cache.get(roleId);
-        if (role) {
-            const membersList = role.members.filter(m => m.id !== interaction.user.id);
-            if (membersList.size > 0) {
-                rolesWithMembers.push({
-                    id: role.id,
-                    name: role.name,
-                    memberCount: membersList.size,
-                    members: membersList
-                });
-            }
-        }
-    }
-    
-    if (rolesWithMembers.length === 0) {
-        return interaction.reply({
-            embeds: [MessageBuilder.createWarningEmbed('Sem Membros', 'Nenhum outro membro da staff disponível para avaliação!')],
-            ephemeral: true
-        });
-    }
-    
-    const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId('select_role')
-        .setPlaceholder('📌 Selecione um cargo para avaliar')
-        .addOptions(
-            rolesWithMembers.map(role => ({
-                label: role.name.substring(0, 25),
-                value: role.id,
-                description: `${role.memberCount} membro(s) neste cargo`,
-                emoji: '👥'
-            }))
-        );
-    
-    const row = new ActionRowBuilder().addComponents(selectMenu);
-    
-    await interaction.reply({
-        content: '**📋 Selecione o cargo do membro que deseja avaliar:**',
-        components: [row],
-        ephemeral: true
+// ===============================
+// FUNÇÃO PARA GERAR RELATÓRIO
+// ===============================
+async function generateDailyReport() {
+  const now = new Date();
+  const reportDate = now.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  
+  // Calcular comandos mais usados
+  const sortedCommands = Object.entries(stats.commandsUsed)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  
+  let commandsField = "📊 **Comandos mais usados:**\n";
+  if (sortedCommands.length > 0) {
+    sortedCommands.forEach(([cmd, count]) => {
+      commandsField += `• \`/${cmd}\`: ${count} vezes\n`;
     });
-});
-
-// Menu de seleção de cargo
-client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isStringSelectMenu()) return;
-    if (interaction.customId !== 'select_role') return;
-    
-    const selectedRoleId = interaction.values[0];
-    const guild = interaction.guild;
-    const role = guild.roles.cache.get(selectedRoleId);
-    
-    if (!role) {
-        return interaction.update({
-            content: '❌ Cargo não encontrado!',
-            components: [],
-            ephemeral: true
-        });
-    }
-    
-    const members = role.members.filter(m => m.id !== interaction.user.id);
-    
-    if (members.size === 0) {
-        return interaction.update({
-            content: '❌ Não há membros neste cargo para avaliar!',
-            components: [],
-            ephemeral: true
-        });
-    }
-    
-    const userSelectMenu = new StringSelectMenuBuilder()
-        .setCustomId('select_user')
-        .setPlaceholder('👤 Selecione o usuário para avaliar')
-        .addOptions(
-            members.map(member => ({
-                label: member.user.tag.length > 25 ? member.user.tag.substring(0, 22) + '...' : member.user.tag,
-                value: member.id,
-                description: `Avaliar ${member.user.displayName}`,
-                emoji: '⭐'
-            })).slice(0, 25)
-        );
-    
-    const row = new ActionRowBuilder().addComponents(userSelectMenu);
-    
-    await interaction.update({
-        content: `**📌 Cargo selecionado:** ${role.name}\n**👤 Selecione o usuário para avaliar:**`,
-        components: [row],
-        ephemeral: true
+  } else {
+    commandsField += "• Nenhum comando usado hoje";
+  }
+  
+  // Criar embed do relatório
+  const reportEmbed = new EmbedBuilder()
+    .setTitle('📊 Relatório Diário do Bot')
+    .setDescription(`Período: **${reportDate}**`)
+    .setColor(Colors.Blue)
+    .addFields(
+      { 
+        name: '🛡️ **Ações de Moderação**', 
+        value: `• Mensagens deletadas: **${stats.messagesDeleted}**\n• Avisos dados: **${stats.warnsGiven}**`,
+        inline: true 
+      },
+      { 
+        name: '👥 **Movimentação de Membros**', 
+        value: `• Entraram: **${stats.membersJoined}**\n• Saíram: **${stats.membersLeft}**`,
+        inline: true 
+      },
+      { 
+        name: '📈 **Crescimento Líquido**', 
+        value: `**${stats.membersJoined - stats.membersLeft}** membros`,
+        inline: true 
+      },
+      { 
+        name: '🤖 **Status do Bot**', 
+        value: `• Uptime: **${formatTime(client.uptime)}**\n• Ping: **${client.ws.ping}ms**\n• Servidores: **${client.guilds.cache.size}**`,
+        inline: false 
+      },
+      { 
+        name: '📋 **Comandos**', 
+        value: commandsField,
+        inline: false 
+      }
+    )
+    .setFooter({ 
+      text: `Relatório gerado automaticamente • Hoje às ${new Date().toLocaleTimeString('pt-BR', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        timeZone: 'America/Sao_Paulo' 
+      })}`,
+      iconURL: client.user.displayAvatarURL()
     });
-});
 
-// Menu de seleção de usuário
-client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isStringSelectMenu()) return;
-    if (interaction.customId !== 'select_user') return;
-    
-    const selectedUserId = interaction.values[0];
-    const guild = interaction.guild;
-    const targetMember = await guild.members.fetch(selectedUserId).catch(() => null);
-    
-    if (!targetMember) {
-        return interaction.update({
-            content: '❌ Usuário não encontrado!',
-            components: [],
-            ephemeral: true
-        });
-    }
-    
-    if (targetMember.id === interaction.user.id) {
-        return interaction.update({
-            content: '❌ Você não pode avaliar a si mesmo!',
-            components: [],
-            ephemeral: true
-        });
-    }
-    
-    // Verificar limite de avaliações por dia
-    const reviews = loadReviews();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayReviews = reviews.filter(r => 
-        r.reviewerId === interaction.user.id && 
-        new Date(r.createdAt) >= today
-    );
-    
-    if (todayReviews.length >= MAX_REVIEWS_PER_USER_PER_DAY) {
-        return interaction.update({
-            content: `❌ Você atingiu o limite de ${MAX_REVIEWS_PER_USER_PER_DAY} avaliações por dia!`,
-            components: [],
-            ephemeral: true
-        });
-    }
-    
-    // Criar modal para avaliação
-    const modal = new ModalBuilder()
-        .setCustomId(`review_modal_${selectedUserId}`)
-        .setTitle(`Avaliar ${targetMember.user.displayName}`);
-    
-    const scoreInput = new TextInputBuilder()
-        .setCustomId('score')
-        .setLabel('Nota (0 a 10)')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Digite um número entre 0 e 10')
-        .setRequired(true)
-        .setMinLength(1)
-        .setMaxLength(2);
-    
-    const feedbackInput = new TextInputBuilder()
-        .setCustomId('feedback')
-        .setLabel('Feedback (máx. 700 caracteres)')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('O que você achou? O que podia melhorar?')
-        .setRequired(false)
-        .setMaxLength(MAX_FEEDBACK_LENGTH);
-    
-    const firstRow = new ActionRowBuilder().addComponents(scoreInput);
-    const secondRow = new ActionRowBuilder().addComponents(feedbackInput);
-    
-    modal.addComponents(firstRow, secondRow);
-    
-    client.tempReviewData.set(interaction.user.id, {
-        targetId: selectedUserId,
-        targetName: targetMember.user.tag,
-        targetDisplayName: targetMember.user.displayName,
-        timestamp: Date.now()
-    });
-    
-    await interaction.showModal(modal);
-});
+  return reportEmbed;
+}
 
-// Modal de avaliação
-client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isModalSubmit()) return;
-    if (!interaction.customId.startsWith('review_modal_')) return;
+// ===============================
+// FUNÇÃO PARA ENVIAR RELATÓRIO PARA STAFF
+// ===============================
+async function sendReportToStaff() {
+  try {
+    const reportEmbed = await generateDailyReport();
     
-    const targetId = interaction.customId.replace('review_modal_', '');
-    const score = parseInt(interaction.fields.getTextInputValue('score'));
-    const feedback = interaction.fields.getTextInputValue('feedback') || 'Sem feedback fornecido';
+    // Dividir STAFF_USER_ID se houver múltiplos
+    const staffIds = CONFIG.STAFF_USER_ID ? CONFIG.STAFF_USER_ID.split(',') : [];
     
-    if (isNaN(score) || score < 0 || score > 10) {
-        return interaction.reply({
-            embeds: [MessageBuilder.createErrorEmbed('Nota Inválida', 'Por favor, insira um número entre 0 e 10.')],
-            ephemeral: true
-        });
+    for (const staffId of staffIds) {
+      const staffIdTrimmed = staffId.trim();
+      
+      // Se for menção (<@ID>), extrair apenas o ID
+      const cleanId = staffIdTrimmed.replace(/[<@>]/g, '');
+      
+      try {
+        const staffUser = await client.users.fetch(cleanId);
+        if (staffUser) {
+          await staffUser.send({ 
+            content: '📬 **Relatório Diário do Bot**',
+            embeds: [reportEmbed] 
+          });
+          logInfo(`📊 Relatório diário enviado para ${staffUser.tag}`);
+        }
+      } catch (err) {
+        logError(`Erro ao enviar relatório para ${cleanId}: ${err.message}`);
+      }
     }
     
-    const tempData = client.tempReviewData.get(interaction.user.id);
-    if (!tempData || tempData.targetId !== targetId) {
-        return interaction.reply({
-            embeds: [MessageBuilder.createErrorEmbed('Sessão Expirada', 'Por favor, inicie uma nova avaliação clicando no botão novamente.')],
-            ephemeral: true
+    // Também enviar para o canal de logs se configurado
+    if (CONFIG.logChannelId) {
+      const logChannel = await client.channels.fetch(CONFIG.logChannelId).catch(() => null);
+      if (logChannel) {
+        await logChannel.send({ 
+          content: '📊 **Relatório Diário do Bot**',
+          embeds: [reportEmbed] 
         });
+      }
     }
     
-    const guild = interaction.guild;
-    const reviewer = interaction.user;
-    const reviewed = await guild.members.fetch(targetId).catch(() => null);
+    // Resetar estatísticas para o próximo dia
+    stats.reset();
     
-    if (!reviewed) {
-        return interaction.reply({
-            embeds: [MessageBuilder.createErrorEmbed('Usuário Não Encontrado', 'O usuário que você está tentando avaliar não foi encontrado.')],
-            ephemeral: true
-        });
+  } catch (error) {
+    logError(`Erro ao gerar/enviar relatório: ${error.message}`);
+  }
+}
+
+// ===============================
+// FUNÇÃO PARA CALCULAR PRÓXIMO ENVIO
+// ===============================
+function scheduleDailyReport() {
+  const now = new Date();
+  const [reportHour, reportMinute] = CONFIG.DAILY_REPORT_TIME ? CONFIG.DAILY_REPORT_TIME.split(':').map(Number) : [0, 0];
+  
+  // Criar data para hoje no horário do relatório
+  const nextReport = new Date(now);
+  nextReport.setHours(reportHour, reportMinute, 0, 0);
+  
+  // Se já passou do horário hoje, agendar para amanhã
+  if (now > nextReport) {
+    nextReport.setDate(nextReport.getDate() + 1);
+  }
+  
+  const timeUntilReport = nextReport - now;
+  
+  logInfo(`📊 Próximo relatório diário agendado para: ${nextReport.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
+  
+  // Agendar o relatório
+  setTimeout(() => {
+    sendReportToStaff();
+    
+    // Agendar para os próximos dias (a cada 24h)
+    setInterval(sendReportToStaff, 24 * 60 * 60 * 1000);
+    
+    logInfo('📊 Relatórios diários agendados (a cada 24h)');
+  }, timeUntilReport);
+}
+
+// ===============================
+// FUNÇÃO PARA CHECAR PALAVRAS OFENSIVAS (VERSÃO CORRIGIDA - SEM FALSOS POSITIVOS E SEM REGEX INVÁLIDA)
+// ===============================
+function containsOffensiveWord(text) {
+  if (!text || typeof text !== 'string') return false;
+  
+  const textLower = text.toLowerCase().trim();
+  
+  // PASSO 1: Verificar frases completas primeiro
+  for (const offensivePhrase of offensiveWords) {
+    if (offensivePhrase.includes(' ') && textLower.includes(offensivePhrase)) {
+      return true;
+    }
+  }
+  
+  // PASSO 2: Remover caracteres especiais e números (para evitar falsos positivos)
+  // IMPORTANTE: NÃO usamos regex com quantificadores problemáticos
+  const textNormalized = textLower
+    .replace(/[^\w\sà-úÀ-Ú]/g, ' ') // substitui qualquer caractere não alfanumérico por espaço
+    .replace(/\s+/g, ' ') // substitui múltiplos espaços por um único espaço
+    .trim();
+  
+  // PASSO 3: Dividir em palavras
+  const words = textNormalized.split(' ');
+  
+  // PASSO 4: Verificar cada palavra
+  for (const word of words) {
+    // Ignorar palavras muito curtas (menos de 3 caracteres)
+    if (word.length < 3) continue;
+    
+    // Verificar se a palavra EXATA está na lista
+    if (offensiveWords.includes(word)) {
+      return true;
     }
     
-    // Validar feedback
-    const validated = validateFeedback(feedback);
-    
-    // Salvar avaliação
-    const reviews = loadReviews();
-    const newReview = {
-        id: Date.now().toString(),
-        reviewerId: reviewer.id,
-        reviewedId: reviewed.id,
-        reviewerName: reviewer.displayName,
-        reviewedName: reviewed.user.displayName,
-        reviewerTag: reviewer.tag,
-        reviewedTag: reviewed.user.tag,
-        score: score,
-        feedback: validated.cleaned || 'Sem feedback fornecido',
-        createdAt: new Date().toISOString(),
-        weekNumber: getWeekNumber(new Date()),
-        year: getYear(new Date())
+    // PASSO 5: Verificar variações comuns (leet speak) - sem usar regex problemática
+    // Substituições manuais sem quantificadores problemáticos
+    const leetMap = {
+      '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a', 
+      '5': 's', '6': 'g', '7': 't', '8': 'b', '9': 'g',
+      '@': 'a', '!': 'i', '$': 's', '#': 'h', '&': 'e'
     };
     
-    reviews.push(newReview);
-    saveReviews(reviews);
-    
-    // Atualizar estatísticas
-    const stats = loadStats();
-    stats.reviews = reviews.length;
-    if (!stats.users[reviewed.id]) {
-        stats.users[reviewed.id] = { name: reviewed.user.tag, reviews: 0, totalScore: 0 };
+    // Converter a palavra manualmente, caractere por caractere
+    let normalizedWord = '';
+    for (let i = 0; i < word.length; i++) {
+      const char = word[i];
+      normalizedWord += leetMap[char] || char;
     }
-    stats.users[reviewed.id].reviews++;
-    stats.users[reviewed.id].totalScore += score;
-    saveStats(stats);
     
-    // Atualizar user stats
-    const userStats = loadUserStats();
-    if (!userStats[reviewed.id]) {
-        userStats[reviewed.id] = { received: 0, given: 0 };
+    if (offensiveWords.includes(normalizedWord)) {
+      return true;
     }
-    userStats[reviewed.id].received = (userStats[reviewed.id].received || 0) + 1;
-    if (!userStats[reviewer.id]) {
-        userStats[reviewer.id] = { received: 0, given: 0 };
+  }
+  
+  return false;
+}
+
+// ===============================
+// FUNÇÃO PARA ENCONTRAR A PALAVRA OFENSIVA (VERSÃO CORRIGIDA)
+// ===============================
+function findOffensiveWord(text) {
+  if (!text || typeof text !== 'string') return null;
+  
+  const textLower = text.toLowerCase().trim();
+  
+  // Verificar frases completas primeiro
+  for (const offensivePhrase of offensiveWords) {
+    if (offensivePhrase.includes(' ') && textLower.includes(offensivePhrase)) {
+      return offensivePhrase;
     }
-    userStats[reviewer.id].given = (userStats[reviewer.id].given || 0) + 1;
-    saveUserStats(userStats);
+  }
+  
+  // Normalizar o texto
+  const textNormalized = textLower
+    .replace(/[^\w\sà-úÀ-Ú]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  const words = textNormalized.split(' ');
+  
+  for (const word of words) {
+    if (word.length < 3) continue;
     
-    // Criar embed para o canal de logs
-    const color = getColorByScore(score);
-    const scoreEmoji = getScoreEmoji(score);
-    const scoreDesc = getScoreDescription(score);
+    // Verificar palavra exata
+    if (offensiveWords.includes(word)) {
+      return word;
+    }
     
-    const logEmbed = new EmbedBuilder()
-        .setTitle(`${scoreEmoji} Nova Avaliação - ${scoreDesc}`)
-        .setColor(color)
+    // Verificar leet speak (substituição manual)
+    const leetMap = {
+      '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a', 
+      '5': 's', '6': 'g', '7': 't', '8': 'b', '9': 'g',
+      '@': 'a', '!': 'i', '$': 's', '#': 'h', '&': 'e'
+    };
+    
+    let normalizedWord = '';
+    for (let i = 0; i < word.length; i++) {
+      const char = word[i];
+      normalizedWord += leetMap[char] || char;
+    }
+    
+    if (offensiveWords.includes(normalizedWord)) {
+      return word;
+    }
+  }
+  
+  return null;
+}
+
+// ===============================
+// FUNÇÃO PARA VERIFICAR PERMISSÕES DE ADMIN
+// ===============================
+function isAdmin(member) {
+  if (!member) return false;
+  if (!CONFIG.adminRoles || CONFIG.adminRoles.length === 0) return false;
+  
+  return member.roles.cache.some(role => 
+    CONFIG.adminRoles.includes(role.id) || CONFIG.adminRoles.includes(role.name)
+  );
+}
+
+// ===============================
+// FUNÇÃO PARA VERIFICAR SE O USUÁRIO É STAFF (NÃO SERÁ MODERADO)
+// ===============================
+function isStaff(userId) {
+  return staffIds.includes(userId);
+}
+
+// ===============================
+// FUNÇÃO PARA ATIVAR/DESATIVAR MONITORAMENTO
+// ===============================
+function setServerMonitoring(guildId, status, user) {
+  serverMonitoring.set(guildId, status);
+  
+  // Log no console
+  const action = status ? 'ATIVADO' : 'DESATIVADO';
+  console.log(chalk.cyan.bgBlack.bold(`\n 🛡️ MONITORAMENTO ${action}`));
+  console.log(chalk.cyan('────────────────────────────────'));
+  console.log(chalk.cyan(`   Servidor: ${client.guilds.cache.get(guildId)?.name || guildId}`));
+  console.log(chalk.cyan(`   ID:       ${guildId}`));
+  console.log(chalk.cyan(`   Staff:    ${user.tag}`));
+  console.log(chalk.cyan(`   Data:     ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
+  console.log(chalk.cyan('────────────────────────────────\n'));
+}
+
+// ===============================
+// FUNÇÃO PARA CRIAR EMBED DE STATUS
+// ===============================
+function createStatusEmbed(guild, action, user) {
+  const isActive = action === 'on';
+  const color = isActive ? Colors.Green : Colors.Red;
+  const statusText = isActive ? '🟢 **ATIVO**' : '🔴 **INATIVO**';
+  
+  const embed = new EmbedBuilder()
+    .setTitle(`🛡️ Monitoramento ${isActive ? 'Ativado' : 'Desativado'}`)
+    .setColor(color)
+    .addFields(
+      { name: '🛡️ Status', value: statusText, inline: true },
+      { name: '🛠 Staff', value: user.toString(), inline: true },
+      { name: '🗓 Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: false }
+    )
+    .setTimestamp();
+  
+  if (guild) {
+    embed.addFields({ name: '🏛️ Servidor', value: guild.name, inline: true });
+  }
+  
+  return embed;
+}
+
+// ===============================
+// INICIALIZAR READLINE
+// ===============================
+let rl = null;
+let isMenuActive = false;
+
+function initReadline() {
+  if (!rl) {
+    rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    
+    rl.on('close', () => {
+      isMenuActive = false;
+      logWarn('Console do menu fechado.');
+    });
+    
+    rl.on('line', (input) => {
+      if (isMenuActive) {
+        handleMenuOption(input);
+      }
+    });
+  }
+}
+
+// ===============================
+// COMANDOS DO BOT
+// ===============================
+
+const commands = [
+  {
+    data: {
+      name: 'adm',
+      description: 'Painel administrativo do bot',
+      options: [{ 
+        name: 'code', 
+        type: 3, 
+        description: 'Senha de acesso administrativo', 
+        required: true 
+      }],
+    },
+    async execute(interaction) {
+      const code = interaction.options.getString('code');
+      
+      if (code !== CONFIG.ACCESS_CODE) {
+        return interaction.reply({ 
+          content: '❌ Código de acesso incorreto!', 
+          flags: 64
+        });
+      }
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('stats')
+          .setLabel('📊 Estatísticas')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId('console')
+          .setLabel('🖥️ Ver no Console')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId('help')
+          .setLabel('❓ Ajuda')
+          .setStyle(ButtonStyle.Success)
+      );
+
+      const embed = new EmbedBuilder()
+        .setTitle('🔐 Painel Administrativo')
+        .setDescription('Bem-vindo ao painel de controle do bot!')
+        .setColor(Colors.Blue)
         .addFields(
-            { name: '👤 Avaliador', value: `<@${reviewer.id}> (${reviewer.tag})`, inline: true },
-            { name: '⭐ Avaliado', value: `<@${reviewed.id}> (${reviewed.user.tag})`, inline: true },
-            { name: '🎯 Nota', value: `${score}/10`, inline: true },
-            { name: '💬 Feedback', value: validated.cleaned.length > 1024 ? validated.cleaned.substring(0, 1021) + '...' : validated.cleaned, inline: false }
+          { name: '👤 Usuário', value: interaction.user.tag, inline: true },
+          { name: '🆔 ID', value: interaction.user.id, inline: true }
         )
-        .setTimestamp()
-        .setFooter({ text: `ID: ${newReview.id} | Semana ${getWeekNumber(new Date())}` });
-    
-    const logChannel = client.channels.cache.get(REVIEWS_LOG_CHANNEL_ID);
-    if (logChannel) {
-        await logChannel.send({ embeds: [logEmbed] });
-    }
-    
-    // Limpar dados temporários
-    client.tempReviewData.delete(interaction.user.id);
-    
-    // Resposta de sucesso
-    const successEmbed = new EmbedBuilder()
-        .setTitle('✅ Avaliação Enviada!')
-        .setDescription(`Sua avaliação para **${reviewed.user.displayName}** foi registrada com sucesso!`)
-        .setColor(0x00FF00)
-        .addFields(
-            { name: 'Nota atribuída', value: `${score}/10 - ${scoreDesc}`, inline: true },
-            { name: 'Feedback', value: validated.cleaned.length > 200 ? validated.cleaned.substring(0, 197) + '...' : validated.cleaned, inline: false }
-        )
+        .setFooter({ text: 'Use os botões abaixo para acessar as funcionalidades' })
         .setTimestamp();
-    
-    await interaction.reply({
-        embeds: [successEmbed],
-        ephemeral: true
-    });
-    
-    logger.info('Nova avaliação criada', { 
-        reviewer: reviewer.tag, 
-        reviewed: reviewed.user.tag, 
-        score 
-    });
-});
 
-// ============================================
-// HANDLER: MENSAGENS DE TEXTO (PREFIXO !)
-// ============================================
+      await interaction.reply({ 
+        content: 'Painel Administrativo:', 
+        embeds: [embed],
+        components: [row], 
+        flags: 64
+      });
+      
+      logInfo(`/adm usado por ${interaction.user.tag}`);
+    },
+  },
+];
 
-client.on(Events.MessageCreate, async message => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(PREFIX)) return;
+// === COMANDO /PING ===
+const pingCommand = {
+  data: {
+    name: 'ping',
+    description: 'Verifica a latência do bot',
+  },
+  async execute(interaction) {
+    const embed = new EmbedBuilder()
+      .setTitle('🏓 Ping do Bot')
+      .setColor(Colors.Green)
+      .addFields(
+        { name: '📡 Latência', value: `${client.ws.ping}ms`, inline: true },
+        { name: '⏱️ Uptime', value: `${Math.floor(client.uptime / 1000)}s`, inline: true }
+      )
+      .setFooter({ text: 'Bot está funcionando corretamente!' })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed], flags: 64 });
+    logInfo(`Comando /ping usado por ${interaction.user.tag}`);
     
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
+    // Registrar comando usado
+    stats.commandsUsed['ping'] = (stats.commandsUsed['ping'] || 0) + 1;
+  },
+};
+
+// === COMANDO /HELP - AJUDA ===
+const helpCommand = {
+  data: {
+    name: 'help',
+    description: 'Mostra a lista de comandos disponíveis',
+  },
+  async execute(interaction) {
+    const embed = new EmbedBuilder()
+      .setTitle('❓ Comandos Disponíveis')
+      .setDescription('Lista de comandos que você pode usar no bot:')
+      .setColor(Colors.Blue)
+      .addFields(
+        { name: '/ping', value: 'Verifica a latência do bot', inline: false },
+        { name: '/help', value: 'Mostra esta lista de ajuda', inline: false },
+        { name: '/adm', value: 'Acesso ao painel administrativo (Staff)', inline: false },
+        { name: '/private', value: 'Enviar mensagem privada (Staff)', inline: false },
+        { name: '/report', value: 'Gerar relatório manual (Staff)', inline: false }
+      )
+      .setFooter({ text: 'Comandos de texto na DM: !clear, !clearAll, !MonitorOn, !MonitorOff' })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed], flags: 64 });
+    logInfo(`Comando /help usado por ${interaction.user.tag}`);
     
-    // Comando !help
-    if (command === 'help') {
-        const embed = new EmbedBuilder()
-            .setTitle('📚 Central de Ajuda - Comandos Disponíveis')
-            .setDescription('Aqui estão todos os comandos que você pode usar:')
-            .setColor(EMBED_COLOR)
-            .addFields(
-                { name: '🔹 Comandos Slash', value: '`/clearall` - Limpar canal (Staff)\n`/clear` - Limpar mensagens de usuário (Staff)\n`/stats` - Ver estatísticas\n`/ranking` - Ver ranking semanal\n`/review` - Ver avaliações de um usuário\n`/botinfo` - Informações do bot', inline: false },
-                { name: '🔸 Comandos de Texto', value: '`!help` - Mostra esta mensagem\n`!ping` - Verifica latência\n`!info` - Informações detalhadas\n`!top` - Ranking geral de todos os tempos\n`!review @user` - Ver avaliações\n`!stats @user` - Estatísticas de um usuário', inline: false },
-                { name: '⭐ Sistema de Notas', value: '🔴 0-3: Insatisfatório\n🟡 4-6: Regular\n🟢 7-10: Excelente', inline: false }
-            )
-            .setFooter({ text: `Você está em ${message.guild.name}`, iconURL: message.guild.iconURL() })
-            .setTimestamp();
-        
-        await message.reply({ embeds: [embed] });
+    // Registrar comando usado
+    stats.commandsUsed['help'] = (stats.commandsUsed['help'] || 0) + 1;
+  },
+};
+
+// === COMANDO /PRIVATE ===
+const privateCommand = {
+  data: {
+    name: 'private',
+    description: 'Enviar mensagem da staff',
+    options: [
+      {
+        name: 'user',
+        description: 'Usuário que receberá a mensagem',
+        type: 6,
+        required: true
+      },
+      {
+        name: 'message',
+        description: 'Mensagem a ser enviada',
+        type: 3,
+        required: true
+      },
+      {
+        name: 'code',
+        description: 'Código de acesso',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  async execute(interaction) {
+    const user = interaction.options.getUser('user');
+    const message = interaction.options.getString('message');
+    const code = interaction.options.getString('code');
+
+    if (code !== CONFIG.ACCESS_CODE) {
+      return interaction.reply({
+        content: '❌ Código de acesso incorreto!',
+        flags: 64
+      });
+    }
+
+    try {
+      await interaction.channel.send(
+        `🛠 **Mensagem da Staff 🛠**\n\n${user}\n\n${message}`
+      );
+
+      await user.send({
+        content: `📬 **Mensagem da Staff**\n\n${message}`
+      });
+
+      await interaction.reply({
+        content:
+          `✅ Mensagem enviada\n\nPara ${user}\n\nMensagem enviada:\n${message}`,
+        flags: 64
+      });
+
+      logInfo(`${interaction.user.tag} enviou mensagem para ${user.tag}`);
+      
+      // Registrar comando usado
+      stats.commandsUsed['private'] = (stats.commandsUsed['private'] || 0) + 1;
+    } catch (error) {
+      await interaction.reply({
+        content: '❌ Erro ao enviar a mensagem. Verifique se o usuário tem DMs abertos.',
+        flags: 64
+      });
+      logError(`Erro ao enviar mensagem privada: ${error.message}`);
+    }
+  }
+};
+
+// === COMANDO /REPORT ===
+const reportCommand = {
+  data: {
+    name: 'report',
+    description: 'Gerar relatório manual (Staff)',
+    options: [
+      {
+        name: 'code',
+        description: 'Código de acesso',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  async execute(interaction) {
+    const code = interaction.options.getString('code');
+    
+    if (code !== CONFIG.ACCESS_CODE) {
+      return interaction.reply({
+        content: '❌ Código de acesso incorreto!',
+        flags: 64
+      });
     }
     
-    // Comando !ping
-    else if (command === 'ping') {
-        const sent = await message.reply('🏓 Calculando ping...');
-        const latency = sent.createdTimestamp - message.createdTimestamp;
-        const apiLatency = Math.round(client.ws.ping);
-        
-        let emoji = '🟢';
-        if (apiLatency > 200) emoji = '🟡';
-        if (apiLatency > 500) emoji = '🔴';
-        
-        await sent.edit({
-            content: null,
-            embeds: [MessageBuilder.createInfoEmbed('🏓 Pong!', `**Latência do bot:** ${latency}ms\n**Latência da API:** ${apiLatency}ms ${emoji}`)]
+    await interaction.reply({ content: '🔄 Gerando relatório...', flags: 64 });
+    
+    const reportEmbed = await generateDailyReport();
+    
+    // Enviar para cada staff na DM (sem auto-delete)
+    const staffIds = CONFIG.STAFF_USER_ID ? CONFIG.STAFF_USER_ID.split(',') : [];
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const staffId of staffIds) {
+      const staffIdTrimmed = staffId.trim();
+      const cleanId = staffIdTrimmed.replace(/[<@>]/g, '');
+      
+      try {
+        const staffUser = await client.users.fetch(cleanId);
+        if (staffUser) {
+          await staffUser.send({ 
+            content: '📊 **Relatório Manual do Bot**',
+            embeds: [reportEmbed] 
+          });
+          successCount++;
+          logInfo(`📊 Relatório manual enviado para ${staffUser.tag}`);
+        }
+      } catch (err) {
+        failCount++;
+        logError(`Erro ao enviar relatório manual para ${cleanId}: ${err.message}`);
+      }
+    }
+    
+    // Também enviar para o canal de logs se configurado
+    if (CONFIG.logChannelId) {
+      const logChannel = await client.channels.fetch(CONFIG.logChannelId).catch(() => null);
+      if (logChannel) {
+        await logChannel.send({ 
+          content: '📊 **Relatório Manual do Bot**',
+          embeds: [reportEmbed] 
         });
+      }
     }
     
-    // Comando !info
-    else if (command === 'info') {
-        const reviews = loadReviews();
-        const stats = loadStats();
-        const uptime = process.uptime();
-        const memory = process.memoryUsage();
-        
-        const embed = new EmbedBuilder()
-            .setTitle('🤖 Informações do Bot')
-            .setDescription('Bot de avaliação profissional para equipes Discord')
-            .setColor(EMBED_COLOR)
-            .setThumbnail(client.user.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                { name: '📊 Estatísticas', value: `📝 Avaliações: ${reviews.length}\n👥 Usuários: ${Object.keys(stats.users).length}\n🔧 Cargos Staff: ${STAFF_ROLE_IDS.length}\n📡 Servidores: ${client.guilds.cache.size}`, inline: true },
-                { name: '⏰ Sistema', value: `⏱️ Uptime: ${Math.floor(uptime / 86400)}d ${Math.floor((uptime % 86400) / 3600)}h ${Math.floor((uptime % 3600) / 60)}m\n💾 RAM: ${(memory.heapUsed / 1024 / 1024).toFixed(2)} MB\n🖥️ Node: ${process.version}\n📦 Discord.js: v${discordVersion}`, inline: true },
-                { name: '🛠️ Funcionalidades', value: '✅ Sistema de avaliação\n✅ Ranking semanal automático\n✅ Comandos de moderação\n✅ Backup automático\n✅ Logs detalhados', inline: false }
-            )
-            .setFooter({ text: `Bot ID: ${client.user.id} | Desenvolvido para sua comunidade` })
-            .setTimestamp();
-        
-        await message.reply({ embeds: [embed] });
+    // Confirmar para quem usou o comando
+    await interaction.followUp({
+      content: `✅ Relatório gerado e enviado para **${successCount} staff(s)**${failCount > 0 ? ` (${failCount} falhas)` : ''}`,
+      flags: 64
+    });
+    
+    logInfo(`${interaction.user.tag} gerou relatório manual (enviado para ${successCount} staffs)`);
+    
+    // Registrar comando usado
+    stats.commandsUsed['report'] = (stats.commandsUsed['report'] || 0) + 1;
+  }
+};
+
+// ===============================
+// FUNÇÃO PARA ENVIAR MENSAGEM EFÊMERA NA DM
+// ===============================
+async function sendEphemeralDM(user, content, options = {}) {
+  try {
+    const msg = await user.send(content);
+    
+    if (options.deleteAfter) {
+      setTimeout(async () => {
+        try {
+          await msg.delete();
+        } catch (e) {}
+      }, options.deleteAfter);
     }
     
-    // Comando !top (ranking geral)
-    else if (command === 'top') {
-        const reviews = loadReviews();
-        const userScores = new Map();
-        
-        reviews.forEach(review => {
-            if (!userScores.has(review.reviewedId)) {
-                userScores.set(review.reviewedId, {
-                    name: review.reviewedName,
-                    tag: review.reviewedTag,
-                    totalScore: 0,
-                    count: 0
-                });
+    return msg;
+  } catch (error) {
+    logError(`Erro ao enviar mensagem efêmera: ${error.message}`);
+    return null;
+  }
+}
+
+// ===============================
+// EVENTO PRINCIPAL DE MENSAGENS (DM E MODERAÇÃO)
+// ===============================
+client.on("messageCreate", async (message) => {
+  // Ignora mensagens do próprio bot
+  if (message.author.bot) return;
+
+  // VERIFICAÇÃO DE MENSAGEM NA DM
+  if (message.channel.type === ChannelType.DM) {
+    
+    // COMANDO !MonitorOn na DM
+    if (message.content.startsWith('!MonitorOn')) {
+      const args = message.content.split(' ');
+      const password = args[1];
+      
+      if (!password) {
+        await message.reply('❌ Use: `!MonitorOn ACCESS_CODE`');
+        setTimeout(async () => {
+          try {
+            const msgs = await message.channel.messages.fetch({ limit: 2 });
+            for (const msg of msgs.values()) {
+              if (msg.author.id === client.user.id) {
+                await msg.delete();
+              }
             }
-            const data = userScores.get(review.reviewedId);
-            data.totalScore += review.score;
-            data.count++;
+          } catch (e) {}
+        }, 5000);
+        return;
+      }
+      
+      if (password !== CONFIG.ACCESS_CODE) {
+        await message.reply('❌ Código de acesso incorreto!');
+        setTimeout(async () => {
+          try {
+            const msgs = await message.channel.messages.fetch({ limit: 2 });
+            for (const msg of msgs.values()) {
+              if (msg.author.id === client.user.id) {
+                await msg.delete();
+              }
+            }
+          } catch (e) {}
+        }, 5000);
+        return;
+      }
+      
+      // Criar botões para escolher ação
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('monitor_all_on')
+            .setLabel('Todos os Servidores ⚠️')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('🌐'),
+          new ButtonBuilder()
+            .setCustomId('monitor_select_on')
+            .setLabel('Selecionar um Servidor')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🔍')
+        );
+      
+      const reply = await message.reply({
+        content: '🛡️ **Escolha uma opção para ATIVAR o monitoramento:**',
+        components: [row]
+      });
+      
+      // Apaga a mensagem do comando e a resposta após 2 minutos
+      setTimeout(async () => {
+        try {
+          await message.delete();
+          await reply.delete();
+        } catch (e) {}
+      }, 120000);
+      
+      return;
+    }
+    
+    // COMANDO !MonitorOff na DM
+    if (message.content.startsWith('!MonitorOff')) {
+      const args = message.content.split(' ');
+      const password = args[1];
+      
+      if (!password) {
+        await message.reply('❌ Use: `!MonitorOff ACCESS_CODE`');
+        setTimeout(async () => {
+          try {
+            const msgs = await message.channel.messages.fetch({ limit: 2 });
+            for (const msg of msgs.values()) {
+              if (msg.author.id === client.user.id) {
+                await msg.delete();
+              }
+            }
+          } catch (e) {}
+        }, 5000);
+        return;
+      }
+      
+      if (password !== CONFIG.ACCESS_CODE) {
+        await message.reply('❌ Código de acesso incorreto!');
+        setTimeout(async () => {
+          try {
+            const msgs = await message.channel.messages.fetch({ limit: 2 });
+            for (const msg of msgs.values()) {
+              if (msg.author.id === client.user.id) {
+                await msg.delete();
+              }
+            }
+          } catch (e) {}
+        }, 5000);
+        return;
+      }
+      
+      // Criar botões para escolher ação
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('monitor_all_off')
+            .setLabel('Todos os Servidores ⚠️')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('🌐'),
+          new ButtonBuilder()
+            .setCustomId('monitor_select_off')
+            .setLabel('Selecionar um Servidor')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🔍')
+        );
+      
+      const reply = await message.reply({
+        content: '🛡️ **Escolha uma opção para DESATIVAR o monitoramento:**',
+        components: [row]
+      });
+      
+      // Apaga a mensagem do comando e a resposta após 2 minutos
+      setTimeout(async () => {
+        try {
+          await message.delete();
+          await reply.delete();
+        } catch (e) {}
+      }, 120000);
+      
+      return;
+    }
+    
+    // COMANDO !clearAll
+    if (message.content.startsWith('!clearAll')) {
+      
+      // Extrai a senha
+      const args = message.content.split(' ');
+      const password = args[1];
+      
+      // Verifica se a senha foi fornecida
+      if (!password) {
+        const errorMsg = await message.reply('❌ Use: `!clearAll SUA_SENHA`');
+        setTimeout(async () => {
+          try {
+            await message.delete();
+            await errorMsg.delete();
+          } catch (e) {}
+        }, 5000);
+        return;
+      }
+      
+      // Verifica senha
+      if (password !== CONFIG.ACCESS_CODE) {
+        const errorMsg = await message.reply('❌ Código de acesso incorreto!');
+        setTimeout(async () => {
+          try {
+            await message.delete();
+            await errorMsg.delete();
+          } catch (e) {}
+        }, 5000);
+        return;
+      }
+      
+      // Apaga a mensagem do comando imediatamente
+      try {
+        await message.delete();
+      } catch (e) {}
+      
+      try {
+        const processingMsg = await message.channel.send('🔄 Limpando mensagens de TODAS as DMs... Isso pode levar alguns minutos...');
+        
+        let totalDeleted = 0;
+        let totalChannels = 0;
+        
+        // Para cada canal de DM que o bot tem acesso
+        for (const [channelId, channel] of client.channels.cache) {
+          if (channel.type === ChannelType.DM) {
+            totalChannels++;
+            let channelCount = 0;
+            
+            try {
+              let fetchedMessages;
+              do {
+                fetchedMessages = await channel.messages.fetch({ limit: 100 });
+                
+                if (fetchedMessages.size === 0) break;
+                
+                const deletableMessages = fetchedMessages.filter(msg => 
+                  msg.author.id === client.user.id
+                );
+                
+                if (deletableMessages.size === 0) break;
+                
+                for (const [id, msg] of deletableMessages) {
+                  try {
+                    await msg.delete();
+                    channelCount++;
+                    totalDeleted++;
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                  } catch (err) {
+                    logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
+                  }
+                }
+                
+              } while (fetchedMessages.size >= 100);
+              
+              logInfo(`Limpou ${channelCount} mensagens do bot na DM com ${channel.recipient ? channel.recipient.tag : 'desconhecido'}`);
+              
+            } catch (err) {
+              logError(`Erro ao processar DM ${channelId}: ${err.message}`);
+            }
+          }
+        }
+        
+        await processingMsg.edit(`✅ **${totalDeleted} mensagens** do bot foram limpas de **${totalChannels} DMs**!`);
+        
+        // Apaga a mensagem de processamento após 10 segundos
+        setTimeout(async () => {
+          try {
+            await processingMsg.delete();
+          } catch (e) {}
+        }, 10000);
+        
+        logInfo(`${message.author.tag} limpou ${totalDeleted} mensagens de todas as DMs usando !clearAll`);
+        
+      } catch (error) {
+        logError(`Erro ao limpar todas as DMs: ${error.message}`);
+        const errorMsg = await message.channel.send('❌ Erro ao limpar mensagens. Tente novamente.');
+        setTimeout(async () => {
+          try {
+            await errorMsg.delete();
+          } catch (e) {}
+        }, 5000);
+      }
+      
+      return;
+    }
+    
+    // COMANDO !clear - TODAS AS MENSAGENS SÃO EFÊMERAS (APAGAM AUTOMATICAMENTE)
+    if (message.content.startsWith('!clear')) {
+      
+      // Apaga a mensagem do comando imediatamente
+      try {
+        await message.delete();
+      } catch (e) {}
+      
+      try {
+        // Cria botões para o usuário confirmar
+        const row = new ActionRowBuilder()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId('confirm_clear')
+              .setLabel('✅ Sim, limpar mensagens')
+              .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+              .setCustomId('cancel_clear')
+              .setLabel('❌ Não, ignorar')
+              .setStyle(ButtonStyle.Secondary)
+          );
+        
+        // Envia mensagem de confirmação com botões
+        const confirmMsg = await message.channel.send({
+          content: '⚠️ **Tem certeza que deseja limpar todas as mensagens desta DM?**',
+          components: [row]
         });
         
-        const rankings = [];
-        for (const [userId, data] of userScores) {
-            rankings.push({
-                userId,
-                name: data.name,
-                tag: data.tag,
-                averageScore: parseFloat((data.totalScore / data.count).toFixed(2)),
-                totalReviews: data.count
-            });
-        }
+        // Criar um coletor para os botões
+        const filter = (interaction) => {
+          return interaction.user.id === message.author.id;
+        };
         
-        rankings.sort((a, b) => b.averageScore - a.averageScore);
-        const top10 = rankings.slice(0, 10);
+        const collector = confirmMsg.createMessageComponentCollector({ 
+          filter, 
+          time: 60000,
+          max: 1
+        });
         
-        if (top10.length === 0) {
-            return message.reply('📊 Nenhuma avaliação registrada ainda!');
-        }
+        collector.on('collect', async (interaction) => {
+          try {
+            if (interaction.customId === 'confirm_clear') {
+              // Atualiza a mensagem de confirmação
+              await interaction.update({ content: '🔄 Limpando mensagens...', components: [] });
+              
+              let deletedCount = 0;
+              let fetchedMessages;
+              
+              try {
+                do {
+                  fetchedMessages = await message.channel.messages.fetch({ limit: 100 });
+                  
+                  if (fetchedMessages.size === 0) break;
+                  
+                  const deletableMessages = fetchedMessages.filter(msg => 
+                    msg.id !== confirmMsg.id
+                  );
+                  
+                  if (deletableMessages.size === 0) break;
+                  
+                  for (const [id, msg] of deletableMessages) {
+                    try {
+                      await msg.delete();
+                      deletedCount++;
+                      await new Promise(resolve => setTimeout(resolve, 500));
+                    } catch (err) {
+                      logError(`Erro ao deletar mensagem ${id}: ${err.message}`);
+                    }
+                  }
+                  
+                } while (fetchedMessages.size >= 100);
+                
+                console.log(chalk.green.bgBlack.bold(`\n🧹 ${deletedCount} mensagens foram limpas do histórico da DM de ${message.author.tag}!`));
+                
+                // Atualiza a mensagem de confirmação com sucesso
+                await interaction.editReply({ 
+                  content: '✅ **Mensagens limpas com sucesso!**',
+                  components: [] 
+                });
+                
+                // Apaga a mensagem de confirmação após 5 segundos
+                setTimeout(async () => {
+                  try {
+                    await confirmMsg.delete();
+                  } catch (e) {}
+                }, 5000);
+                
+                logInfo(`${message.author.tag} limpou ${deletedCount} mensagens na DM`);
+                
+              } catch (error) {
+                logError(`Erro ao limpar DM: ${error.message}`);
+                await interaction.editReply({ 
+                  content: '❌ Erro ao limpar mensagens. Tente novamente.',
+                  components: [] 
+                });
+                
+                setTimeout(async () => {
+                  try {
+                    await confirmMsg.delete();
+                  } catch (e) {}
+                }, 5000);
+              }
+              
+            } else if (interaction.customId === 'cancel_clear') {
+              await interaction.update({ content: '❌ Operação cancelada.', components: [] });
+              
+              setTimeout(async () => {
+                try {
+                  await confirmMsg.delete();
+                } catch (e) {}
+              }, 3000);
+            }
+          } catch (error) {
+            logError(`Erro no coletor do !clear: ${error.message}`);
+          }
+        });
         
-        const embed = new EmbedBuilder()
-            .setTitle('🏆 Ranking Geral - Top 10 de Todos os Tempos')
-            .setDescription(`Total de avaliações: ${reviews.length}`)
-            .setColor(0xFFD700)
-            .setTimestamp();
+        collector.on('end', async (collected) => {
+          if (collected.size === 0) {
+            try {
+              await confirmMsg.edit({ 
+                content: '⏰ Tempo esgotado. Operação cancelada.',
+                components: [] 
+              });
+              
+              setTimeout(async () => {
+                try {
+                  await confirmMsg.delete();
+                } catch (e) {}
+              }, 3000);
+            } catch (error) {}
+          }
+        });
         
-        for (let i = 0; i < top10.length; i++) {
-            const r = top10[i];
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`;
-            const scoreEmoji = getScoreEmoji(r.averageScore);
-            embed.addFields({
-                name: `${medal} ${r.name}`,
-                value: `${scoreEmoji} **Média:** ${r.averageScore}/10 | **Avaliações:** ${r.totalReviews}`,
-                inline: false
-            });
-        }
-        
-        await message.reply({ embeds: [embed] });
+      } catch (error) {
+        logError(`Erro ao processar !clear: ${error.message}`);
+      }
+      
+      return;
     }
     
-    // Comando !review (alias para /review)
-    else if (command === 'review') {
-        const target = message.mentions.users.first();
-        if (!target) {
-            return message.reply('❌ Por favor, mencione um usuário para ver as avaliações! Ex: `!review @usuario`');
-        }
+    // RESPOSTA AUTOMÁTICA para outras mensagens na DM
+try {
+  const reply = await message.reply({
+    content: `❌ **Não é possível enviar esta mensagem.**\nCaso tenha algo para falar, entre em contato com <@${CONFIG.OWNER_ID}> `
+  });
+      
+      // Apaga a resposta automática após 10 segundos
+      setTimeout(async () => {
+        try {
+          await reply.delete();
+        } catch (e) {}
+      }, 10000);
+      
+      logInfo(`Mensagem automática enviada para ${message.author.tag} na DM`);
+    } catch (error) {
+      logError(`Erro ao responder DM: ${error.message}`);
+    }
+    return;
+  }
+
+  // MODERAÇÃO EM CANAIS DE SERVIDOR
+  // Verificar se o monitoramento está ativo para este servidor
+  const isMonitoringActive = serverMonitoring.get(message.guild.id) !== false;
+  
+  if (!isMonitoringActive) {
+    return;
+  }
+   
+  // VERIFICAR SE O USUÁRIO É STAFF (NÃO MODERAR)
+  if (isStaff(message.author.id)) {
+    return;
+  }
+  
+  if (isAdmin(message.member)) return;
+
+  if (containsOffensiveWord(message.content)) {
+    const foundWord = findOffensiveWord(message.content);
+    
+    try {
+      const permissions = message.channel.permissionsFor(client.user);
+      if (!permissions.has(PermissionFlagsBits.ManageMessages)) {
+        logWarn(`Bot não tem permissão para deletar mensagens em #${message.channel.name}`);
+        return;
+      }
+
+      if (!message.deletable) {
+        logWarn(`Mensagem muito antiga para ser deletada em #${message.channel.name}`);
+        return;
+      }
+
+      await message.delete();
+      
+      stats.messagesDeleted++;
+
+      const warningMsg = await message.channel.send({
+        embeds: [new EmbedBuilder()
+          .setTitle('🚫 Mensagem Removida')
+          .setDescription(`Sua mensagem foi removida por conter palavras ofensivas.`)
+          .setColor(Colors.Red)
+          .addFields(
+            { name: '👤 Usuário', value: message.author.toString(), inline: false },
+            { name: '🗓 Data', value: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), inline: false },
+            { name: '🚫 Palavra', value: `**${foundWord || "desconhecida"}**`, inline: false }
+          )
+          .setFooter({ text: 'Caso isso tenha sido um erro, contate a staff.' })
+          .setTimestamp()
+        ]
+      });
+
+      // Apaga o aviso após 10 segundos
+      setTimeout(async () => {
+        try {
+          await warningMsg.delete();
+        } catch (e) {}
+      }, 10000);
+
+      logModeration("Palavras ofensivas detectadas", message.author, message.content, message.channel, foundWord || "desconhecida");
+
+    } catch (err) {
+      logError(`Erro ao moderar mensagem: ${err.message}`);
+    }
+  }
+});
+
+// ===============================
+// EVENTO: BOT PRONTO (CORRIGIDO - USANDO 'ready' EM VEZ DE 'clientReady')
+// ===============================
+client.once('clientReady', async () => {
+  console.log('\n' + chalk.green.underline('═'.repeat(50)));
+  console.log(chalk.green('  ✅️ BOT ESTÁ ONLINE!'));
+  console.log(chalk.green.underline('═'.repeat(50)));
+
+  console.log(chalk.cyan('\n  📊 ESTATÍSTICAS INICIAIS:'));
+  console.log(chalk.white(`   • Tag: ${client.user.tag}`));
+  console.log(chalk.white(`   • ID: ${client.user.id}`));
+  console.log(chalk.white(`   • Servidores: ${client.guilds.cache.size}`));
+    
+  // Inicializar monitoramento para todos os servidores (padrão: ativo)
+  for (const guild of client.guilds.cache.values()) {
+    serverMonitoring.set(guild.id, true);
+  }
+  
+  // Registrar comandos em TODOS os servidores
+  if (client.guilds.cache.size > 0) {
+    try {
+      for (const guild of client.guilds.cache.values()) {
+        await guild.commands.set([
+          ...commands.map(c => c.data),
+          pingCommand.data,
+          helpCommand.data,
+          privateCommand.data,
+          reportCommand.data
+        ]);
+        logSuccess(`Comandos registrados em: ${guild.name}`);
+      }
+      logInfo('Comandos registrados nos servidores com sucesso!');
+    } catch (error) {
+      logError(`Erro ao registrar comandos: ${error.message}`);
+    }
+  } else {
+    logWarn('Nenhum servidor encontrado. Comandos não registrados.');
+  }
+
+  console.log(chalk.green('\n  ✅ Tudo pronto! Bot conectado com sucesso.\n'));
+  console.log(chalk.yellow('  📝 COMANDOS NA DM:'));
+  console.log(chalk.yellow('  • !clear - Limpa mensagens da DM (mensagens temporárias)'));
+  console.log(chalk.yellow('  • !clearAll - Limpa TODAS as DMs'));
+  console.log(chalk.yellow('  • !MonitorOn - Ativar monitoramento'));
+  console.log(chalk.yellow('  • !MonitorOff - Desativar monitoramento\n'));
+  
+  scheduleDailyReport();
+  
+  // Inicia o menu interativo
+  initReadline();
+  showMenu();
+});
+
+// ===============================
+// HANDLER PARA BOTÕES DE MONITORAMENTO
+// ===============================
+async function handleMonitorButtons(interaction) {
+  await interaction.deferReply({ flags: 64 });
+  
+  try {
+    const parts = interaction.customId.split('_');
+    const action = parts[1];
+    const state = parts[2];
+    const isOn = state === 'on';
+    const actionText = isOn ? 'ATIVAR' : 'DESATIVAR';
+    
+    if (action === 'all') {
+      let count = 0;
+      for (const [guildId, guild] of client.guilds.cache) {
+        setServerMonitoring(guildId, isOn, interaction.user);
+        count++;
+      }
+      
+      const embed = createStatusEmbed(null, state, interaction.user);
+      embed.setDescription(`✅ Monitoramento ${isOn ? 'ativado' : 'desativado'} em **${count} servidores**!`);
+      
+      await interaction.editReply({
+        content: `✅ Operação concluída!`,
+        embeds: [embed]
+      });
+      
+      // Apaga após 10 segundos
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 10000);
+      
+    } else if (action === 'select') {
+      const options = [];
+      
+      let count = 0;
+      for (const [guildId, guild] of client.guilds.cache) {
+        if (count >= 25) break;
         
-        const reviews = loadReviews();
-        const userReviews = reviews.filter(r => r.reviewedId === target.id);
-        
-        if (userReviews.length === 0) {
-            return message.reply(`📊 Nenhuma avaliação encontrada para ${target.tag}.`);
-        }
-        
-        const stats = calculateUserStats(target.id);
-        
-        const embed = new EmbedBuilder()
-            .setTitle(`📝 Avaliações de ${target.tag}`)
-            .setColor(getColorByScore(stats.average))
-            .setThumbnail(target.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                { name: '📊 Total', value: stats.count.toString(), inline: true },
-                { name: '⭐ Média', value: stats.average.toString(), inline: true },
-                { name: '📈 Melhor', value: stats.highest.toString(), inline: true },
-                { name: '📉 Pior', value: stats.lowest.toString(), inline: true },
-                { name: '📊 Mediana', value: stats.median.toString(), inline: true },
-                { name: '📉 Desvio', value: stats.standardDeviation.toString(), inline: true }
-            )
-            .setTimestamp();
-        
-        const last5 = userReviews.slice(-5).reverse();
-        if (last5.length > 0) {
-            const reviewsText = last5.map(r => {
-                const emoji = getScoreEmoji(r.score);
-                return `${emoji} **${r.score}/10** - "${r.feedback.substring(0, 80)}${r.feedback.length > 80 ? '...' : '""'}\n*por ${r.reviewerName}*`;
-            }).join('\n\n---\n\n');
-            
-            embed.addFields({ name: '📋 Últimas avaliações', value: reviewsText, inline: false });
-        }
-        
-        await message.reply({ embeds: [embed] });
+        const status = serverMonitoring.get(guildId) ? '🟢 ATIVO' : '🔴 INATIVO';
+        options.push(
+          new StringSelectMenuOptionBuilder()
+            .setLabel(guild.name.substring(0, 100))
+            .setDescription(`${guild.memberCount} membros - ${status}`)
+            .setValue(guildId)
+            .setEmoji('🏛️')
+        );
+        count++;
+      }
+      
+      if (client.guilds.cache.size > 25) {
+        options.push(
+          new StringSelectMenuOptionBuilder()
+            .setLabel('📌 Mais servidores...')
+            .setDescription('Use o comando novamente para ver outros servidores')
+            .setValue('more')
+            .setEmoji('📌')
+        );
+      }
+      
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId(`select_server_${state}`)
+        .setPlaceholder('Selecione um servidor')
+        .addOptions(options);
+      
+      const row = new ActionRowBuilder().addComponents(selectMenu);
+      
+      pendingActions.set(interaction.user.id, { 
+        action: state,
+        messageId: interaction.id 
+      });
+      
+      await interaction.editReply({
+        content: `🔍 **Selecione o servidor para ${actionText} o monitoramento:**`,
+        components: [row]
+      });
+    }
+  } catch (error) {
+    logError(`Erro no handleMonitorButtons: ${error.message}`);
+    await interaction.editReply({ 
+      content: '❌ Erro ao processar comando. Tente novamente.'
+    });
+    
+    setTimeout(async () => {
+      try {
+        await interaction.deleteReply();
+      } catch (e) {}
+    }, 5000);
+  }
+}
+
+// ===============================
+// HANDLER PARA SELEÇÃO DE SERVIDOR
+// ===============================
+async function handleServerSelection(interaction) {
+  await interaction.deferUpdate();
+  
+  try {
+    const selectedValue = interaction.values[0];
+    const customId = interaction.customId;
+    const state = customId.split('_')[2];
+    
+    const pending = pendingActions.get(interaction.user.id);
+    
+    if (!pending) {
+      await interaction.editReply({ 
+        content: '❌ Esta seleção expirou. Use o comando novamente.',
+        components: [] 
+      });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+      
+      return;
     }
     
-    // Comando !stats (alias para /stats)
-    else if (command === 'stats') {
-        const target = message.mentions.users.first() || message.author;
-        const stats = calculateUserStats(target.id);
-        const reviewerStats = calculateReviewerStats(target.id);
-        
-        const embed = new EmbedBuilder()
-            .setTitle(`📊 Estatísticas de ${target.tag}`)
-            .setColor(getColorByScore(stats.average))
-            .setThumbnail(target.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                { name: '📝 Avaliações recebidas', value: stats.count.toString(), inline: true },
-                { name: '⭐ Média recebida', value: stats.average.toString(), inline: true },
-                { name: '📊 Mediana', value: stats.median.toString(), inline: true },
-                { name: '📈 Melhor nota', value: stats.highest.toString(), inline: true },
-                { name: '📉 Pior nota', value: stats.lowest.toString(), inline: true },
-                { name: '📉 Desvio padrão', value: stats.standardDeviation.toString(), inline: true },
-                { name: '📝 Avaliações feitas', value: reviewerStats.count.toString(), inline: true },
-                { name: '⭐ Média das notas dadas', value: reviewerStats.averageGiven.toString(), inline: true }
-            )
-            .setFooter({ text: `ID: ${target.id}` })
-            .setTimestamp();
-        
-        await message.reply({ embeds: [embed] });
+    const isOn = state === 'on';
+    const actionText = isOn ? 'ATIVADO' : 'DESATIVADO';
+    
+    if (selectedValue === 'more') {
+      await interaction.editReply({ 
+        content: '📌 **Use o comando novamente para ver mais servidores.**\nDigite `!MonitorOn` ou `!MonitorOff` novamente.',
+        components: [] 
+      });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+      
+      pendingActions.delete(interaction.user.id);
+      return;
     }
+    
+    const guild = client.guilds.cache.get(selectedValue);
+    if (!guild) {
+      await interaction.editReply({ 
+        content: '❌ Servidor não encontrado.',
+        components: [] 
+      });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+      
+      pendingActions.delete(interaction.user.id);
+      return;
+    }
+    
+    setServerMonitoring(selectedValue, isOn, interaction.user);
+    
+    const embed = createStatusEmbed(guild, state, interaction.user);
+    
+    await interaction.editReply({ 
+      content: `✅ **Monitoramento ${actionText} em ${guild.name}!**`,
+      embeds: [embed],
+      components: [] 
+    });
+    
+    setTimeout(async () => {
+      try {
+        await interaction.deleteReply();
+      } catch (e) {}
+    }, 10000);
+    
+    pendingActions.delete(interaction.user.id);
+    
+  } catch (error) {
+    logError(`Erro no handleServerSelection: ${error.message}`);
+    await interaction.editReply({ 
+      content: '❌ Erro ao processar seleção.',
+      components: [] 
+    });
+    
+    setTimeout(async () => {
+      try {
+        await interaction.deleteReply();
+      } catch (e) {}
+    }, 5000);
+  }
+}
+
+// ===============================
+// EVENTO: INTERAÇÃO (BOTÕES E MENUS)
+// ===============================
+client.on('interactionCreate', async (interaction) => {
+  try {
+    // Handler para comandos de chat input
+    if (interaction.isChatInputCommand()) {
+      const cmdName = interaction.commandName;
+      stats.commandsUsed[cmdName] = (stats.commandsUsed[cmdName] || 0) + 1;
+      
+      const command = commands.find(c => c.data.name === interaction.commandName);
+      if (!command) {
+        if (interaction.commandName === 'ping') {
+          await pingCommand.execute(interaction);
+          return;
+        }
+        if (interaction.commandName === 'help') {
+          await helpCommand.execute(interaction);
+          return;
+        }
+        if (interaction.commandName === 'private') {
+          await privateCommand.execute(interaction);
+          return;
+        }
+        if (interaction.commandName === 'report') {
+          await reportCommand.execute(interaction);
+          return;
+        }
+        return;
+      }
+
+      try {
+        await command.execute(interaction);
+      } catch (error) {
+        logError(`Erro ao executar comando ${interaction.commandName}: ${error.message}`);
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
+        } else {
+          await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', flags: 64 });
+        }
+      }
+      return;
+    }
+
+    // Handler para botões
+    if (interaction.isButton()) {
+      if (interaction.customId === 'stats' || interaction.customId === 'console' || interaction.customId === 'help') {
+        await handleButtonInteraction(interaction);
+        return;
+      }
+      
+      if (interaction.customId === 'confirm_clear' || interaction.customId === 'cancel_clear') {
+        return;
+      }
+      
+      if (interaction.customId.startsWith('monitor_')) {
+        await handleMonitorButtons(interaction);
+        return;
+      }
+      
+      await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+    }
+    
+    // Handler para menus de seleção
+    if (interaction.isStringSelectMenu()) {
+      if (interaction.customId.startsWith('select_server_')) {
+        await handleServerSelection(interaction);
+        return;
+      }
+    }
+  } catch (error) {
+    logError(`Erro geral no interactionCreate: ${error.message}`);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: '❌ Erro ao processar interação.', flags: 64 }).catch(() => {});
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+    }
+  }
 });
 
-// ============================================
-// HANDLER: EVENTOS DO SISTEMA
-// ============================================
+// ===============================
+// EVENTO: BOTÃO INTERAÇÃO (PAINEL ADMIN)
+// ===============================
+async function handleButtonInteraction(interaction) {
+  switch (interaction.customId) {
+    case 'stats': {
+      const uptimeSeconds = Math.floor(client.uptime / 1000);
+      const hours = Math.floor(uptimeSeconds / 3600);
+      const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+      const seconds = uptimeSeconds % 60;
 
-client.on(Events.GuildMemberAdd, async member => {
-    logger.debug('Novo membro entrou no servidor', { user: member.user.tag, guild: member.guild.name });
+      const embed = new EmbedBuilder()
+        .setTitle('📊 Estatísticas do Bot')
+        .setColor(Colors.Green)
+        .addFields(
+          { name: '🏓 Ping', value: `${client.ws.ping}ms`, inline: true },
+          { name: '⏱️ Uptime', value: `${hours}h ${minutes}m ${seconds}s`, inline: true },
+          { name: '🏛️ Servidores', value: `${client.guilds.cache.size}`, inline: true },
+          { name: '👥 Usuários', value: `${client.users.cache.size}`, inline: true }
+        )
+        .setFooter({ text: 'Estatísticas atualizadas' })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], flags: 64 });
+      logInfo(`${interaction.user.tag} abriu estatísticas`);
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 15000);
+      
+      break;
+    }
+
+    case 'console': {
+      console.log(chalk.yellow('\n═══ ESTATÍSTICAS DO BOT ═══'));
+      console.log(chalk.white(`Ping:    ${client.ws.ping}ms`));
+      console.log(chalk.white(`Uptime:  ${Math.floor(client.uptime / 3600000)}h`));
+      console.log(chalk.white(`Servers: ${client.guilds.cache.size}`));
+      console.log(chalk.white(`Users:   ${client.users.cache.size}`));
+      console.log(chalk.yellow('═════════════════════════════\n'));
+      await interaction.reply({ content: '✅ Verifique o console!', flags: 64 });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+      
+      break;
+    }
+
+    case 'help': {
+      const embed = new EmbedBuilder()
+        .setTitle('❓ Ajuda - Painel Administrativo')
+        .setDescription('Como usar o painel administrativo:')
+        .setColor(Colors.Blue)
+        .addFields(
+          { name: '📊 Estatísticas', value: 'Clique em "Estatísticas" para ver dados do bot', inline: false },
+          { name: '🖥️ Console', value: 'Clique em "Ver no Console" para ver dados no terminal', inline: false },
+          { name: '🔐 Segurança', value: 'Use o comando /adm com a senha correta', inline: false }
+        )
+        .setFooter({ text: 'Painel Administrativo' })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], flags: 64 });
+      logInfo(`${interaction.user.tag} pediu ajuda no painel`);
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 15000);
+      
+      break;
+    }
+
+    default:
+      await interaction.reply({ content: '❌ Botão desconhecido!', flags: 64 });
+      
+      setTimeout(async () => {
+        try {
+          await interaction.deleteReply();
+        } catch (e) {}
+      }, 5000);
+  }
+}
+
+
+// ===============================
+// MENU INTERATIVO NO CONSOLE
+// ===============================
+
+function showMenu() {
+  if (isMenuActive) return;
+  isMenuActive = true;
+  
+  console.log(chalk.cyan('\n╔═══════════════════════════════════════════════════════╗'));
+  console.log(chalk.cyan('║                  𝙷𝚘𝚜𝚝𝚅𝚒𝚕𝚕𝚎-𝙱𝙾𝚃 𝚅𝚎𝚛𝚜ã𝚘 𝟺.𝟷.𝟸                     ║'));
+  console.log(chalk.cyan('╠═══════════════════════════════════════════════════════╣'));
+  console.log(chalk.cyan('║  1.  Ver estatísticas detalhadas                                ║'));
+  console.log(chalk.cyan('║  2.  Listar todos os servidores                                 ║'));
+  console.log(chalk.cyan('║  3.  Ver membros de um servidor                                 ║'));
+  console.log(chalk.cyan('║  4.  Enviar mensagem para canal                                 ║'));
+  console.log(chalk.cyan('║  5.  Ver status do monitoramento                                ║'));
+  console.log(chalk.cyan('║  6.  Ver logs recentes                                          ║'));
+  console.log(chalk.cyan('║  7.  Ver status do bot                                          ║'));
+  console.log(chalk.cyan('║  8.  Gerar relatório manual                                     ║'));
+  console.log(chalk.cyan('║  0.  Sair                                                       ║'));
+  console.log(chalk.cyan('╚═══════════════════════════════════════════════════════╝'));
+  
+  rl.question(chalk.yellow('\n👉 Escolha uma opção: '), (answer) => {
+    isMenuActive = false;
+    handleMenuOption(answer);
+  });
+}
+
+function handleMenuOption(option) {
+  if (!rl || rl.closed) {
+    initReadline();
+  }
+  
+  switch (option) {
+    case '1':
+      showStats();
+      break;
+    case '2':
+      listServers();
+      break;
+    case '3':
+      listMembersInServer();
+      break;
+    case '4':
+      sendMessageToChannel();
+      break;
+    case '5':
+      showMonitoringStatus();
+      break;
+    case '6':
+      showRecentLogs();
+      break;
+    case '7':
+      showBotStatus();
+      break;
+    case '8':
+      generateManualReport();
+      break;
+    case '0':
+      console.log(chalk.red('❌ Encerrando o bot...'));
+      if (rl && !rl.closed) {
+        rl.close();
+      }
+      process.exit(0);
+    default:
+      console.log(chalk.red('❌ Opção inválida!'));
+      showMenu();
+  }
+}
+
+function showStats() {
+  const uptimeSeconds = Math.floor(client.uptime / 1000);
+  const hours = Math.floor(uptimeSeconds / 3600);
+  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+  const seconds = uptimeSeconds % 60;
+
+  console.log(chalk.yellow('\n═══ 📊 ESTATÍSTICAS DO BOT ═══'));
+  console.log(chalk.white(`🤖 Tag:        ${client.user.tag}`));
+  console.log(chalk.white(`🏓 Ping:       ${client.ws.ping}ms`));
+  console.log(chalk.white(`⏱️  Uptime:     ${hours}h ${minutes}m ${seconds}s`));
+  console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
+  console.log(chalk.white(`👥 Usuários:   ${client.users.cache.size}`));
+  console.log(chalk.white(`📁 Canais:     ${client.channels.cache.size}`));
+  console.log(chalk.white(`📊 Stats Hoje:  Del:${stats.messagesDeleted} Ent:${stats.membersJoined} Sai:${stats.membersLeft}`));
+  console.log(chalk.yellow('═══════════════════════════════\n'));
+  
+  showMenu();
+}
+
+function listServers() {
+  console.log(chalk.yellow('\n═══ 🏛️ SERVIDORES DO BOT ═══'));
+  
+  if (client.guilds.cache.size === 0) {
+    console.log(chalk.gray('Nenhum servidor encontrado.'));
+  } else {
+    client.guilds.cache.forEach((guild, index) => {
+      const monitorStatus = serverMonitoring.get(guild.id) ? '🟢 ATIVO' : '🔴 INATIVO';
+      console.log(chalk.white(`${index + 1}. ${guild.name} (${guild.memberCount} membros) - ${monitorStatus}`));
+    });
+  }
+  
+  console.log(chalk.yellow('══════════════════════════════\n'));
+  showMenu();
+}
+
+function showMonitoringStatus() {
+  console.log(chalk.yellow('\n═══ 🛡️ STATUS DO MONITORAMENTO ═══'));
+  
+  if (client.guilds.cache.size === 0) {
+    console.log(chalk.gray('Nenhum servidor encontrado.'));
+  } else {
+    client.guilds.cache.forEach((guild) => {
+      const status = serverMonitoring.get(guild.id) !== false ? '🟢 ATIVO' : '🔴 INATIVO';
+      console.log(chalk.white(`• ${guild.name}: ${status}`));
+    });
+  }
+  
+  console.log(chalk.yellow('═══════════════════════════════════\n'));
+  showMenu();
+}
+
+async function generateManualReport() {
+  console.log(chalk.yellow('\n═══ 📊 GERANDO RELATÓRIO ═══'));
+  try {
+    const reportEmbed = await generateDailyReport();
+    console.log(chalk.white('✅ Relatório gerado com sucesso!'));
+    console.log(chalk.white(`📊 Mensagens deletadas: ${stats.messagesDeleted}`));
+    console.log(chalk.white(`👥 Membros novos: ${stats.membersJoined}`));
+    console.log(chalk.white(`👋 Membros que saíram: ${stats.membersLeft}`));
+    
+    console.log(chalk.cyan('\n📋 Comandos mais usados:'));
+    const sortedCommands = Object.entries(stats.commandsUsed).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (sortedCommands.length > 0) {
+      sortedCommands.forEach(([cmd, count]) => {
+        console.log(chalk.white(`   • /${cmd}: ${count} vezes`));
+      });
+    } else {
+      console.log(chalk.white('   • Nenhum comando usado hoje'));
+    }
+    
+  } catch (error) {
+    console.log(chalk.red(`❌ Erro: ${error.message}`));
+  }
+  console.log(chalk.yellow('═══════════════════════════════\n'));
+  showMenu();
+}
+
+function listMembersInServer() {
+  const guilds = Array.from(client.guilds.cache.values());
+  
+  if (guilds.length === 0) {
+    console.log(chalk.red('Nenhum servidor encontrado.'));
+    showMenu();
+    return;
+  }
+
+  console.log(chalk.yellow('\n═══ 👥 ESCOLHA UM SERVIDOR ═══'));
+  guilds.forEach((guild, index) => {
+    console.log(chalk.white(`${index + 1}. ${guild.name}`));
+  });
+  
+  rl.question(chalk.yellow('\n👉 Digite o número do servidor: '), async (answer) => {
+    const index = parseInt(answer) - 1;
+    
+    if (index >= 0 && index < guilds.length) {
+      const guild = guilds[index];
+      console.log(chalk.cyan(`\nCarregando membros de ${guild.name}...`));
+      
+      try {
+        await guild.members.fetch();
+        const members = guild.members.cache;
+        
+        console.log(chalk.yellow(`\n═══ MEMBROS DE ${guild.name.toUpperCase()} ═══`));
+        console.log(chalk.white(`Total: ${members.size} membros\n`));
+        
+        let count = 0;
+        members.forEach((member) => {
+          if (count < 10) {
+            const status = member.user.bot ? chalk.blue('[BOT]') : chalk.green('[USER]');
+            console.log(`  ${status} ${member.user.tag} - ${member.user.id}`);
+            count++;
+          }
+        });
+        
+        if (members.size > 10) {
+          console.log(chalk.gray(`  ... e mais ${members.size - 10} membros`));
+        }
+        
+        console.log(chalk.yellow('══════════════════════════════════════\n'));
+      } catch (error) {
+        logError(`Erro ao buscar membros: ${error.message}`);
+      }
+    } else {
+      console.log(chalk.red('Servidor inválido!'));
+    }
+    
+    showMenu();
+  });
+}
+
+function sendMessageToChannel() {
+  const guilds = Array.from(client.guilds.cache.values());
+  
+  if (guilds.length === 0) {
+    console.log(chalk.red('Nenhum servidor encontrado.'));
+    showMenu();
+    return;
+  }
+
+  console.log(chalk.yellow('\n═══ 📢 ENVIAR MENSAGEM ═══'));
+  guilds.forEach((guild, index) => {
+    console.log(chalk.white(`${index + 1}. ${guild.name}`));
+  });
+  
+  rl.question(chalk.yellow('\n👉 Escolha o servidor: '), (guildAnswer) => {
+    const guildIndex = parseInt(guildAnswer) - 1;
+    
+    if (guildIndex >= 0 && guildIndex < guilds.length) {
+      const guild = guilds[guildIndex];
+      const channels = guild.channels.cache.filter(
+        c => c.type === ChannelType.GuildText
+      );
+      
+      if (channels.length === 0) {
+        console.log(chalk.red('Nenhum canal de texto encontrado.'));
+        showMenu();
+        return;
+      }
+      
+      console.log(chalk.cyan('\n📁 Canais de texto:'));
+      channels.forEach((channel, index) => {
+        console.log(chalk.white(`${index + 1}. #${channel.name}`));
+      });
+      
+      rl.question(chalk.yellow('\n👉 Escolha o canal: '), async (channelAnswer) => {
+        const channelIndex = parseInt(channelAnswer) - 1;
+        
+        if (channelIndex >= 0 && channelIndex < channels.length) {
+          const channel = channels[channelIndex];
+          
+          rl.question(chalk.yellow('\n📝 Digite a mensagem: '), async (message) => {
+            try {
+              await channel.send(message);
+              console.log(chalk.green(`\n✅ Mensagem enviada para #${channel.name}!`));
+            } catch (error) {
+              logError(`Erro ao enviar mensagem: ${error.message}`);
+            }
+            showMenu();
+          });
+        } else {
+          console.log(chalk.red('Canal inválido!'));
+          showMenu();
+        }
+      });
+    } else {
+      console.log(chalk.red('Servidor inválido!'));
+      showMenu();
+    }
+  });
+}
+
+function showRecentLogs() {
+  console.log(chalk.yellow('\n═══ 📋 LOGS RECENTES ═══'));
+  console.log(chalk.white('Os logs recentes foram exibidos no console.'));
+  console.log(chalk.yellow('══════════════════════════════\n'));
+  showMenu();
+}
+
+function showBotStatus() {
+  const uptimeSeconds = Math.floor(client.uptime / 1000);
+  const hours = Math.floor(uptimeSeconds / 3600);
+  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+  const seconds = uptimeSeconds % 60;
+
+  console.log(chalk.yellow('\n═══ 🛡️ STATUS DO BOT ═══'));
+  console.log(chalk.white(`🟢 Status: Online`));
+  console.log(chalk.white(`🏓 Ping: ${client.ws.ping}ms`));
+  console.log(chalk.white(`⏱️  Uptime: ${hours}h ${minutes}m ${seconds}s`));
+  console.log(chalk.white(`🏛️  Servidores: ${client.guilds.cache.size}`));
+  console.log(chalk.white(`👥 Usuários: ${client.users.cache.size}`));
+  console.log(chalk.yellow('══════════════════════════════\n'));
+  showMenu();
+}
+
+// ===============================
+// EVENTOS DE LOG
+// ===============================
+client.on('messageDelete', async (message) => {
+  if (!message.guild || !message.author) return;
+
+  let deleter = 'Desconhecido';
+  try {
+    const auditLogs = await message.guild.fetchAuditLogs({ type: 72, limit: 1 });
+    const entry = auditLogs.entries.first();
+    if (entry && entry.target.id === message.author.id && entry.createdTimestamp > Date.now() - 5000) {
+      deleter = entry.executor.tag;
+    }
+  } catch (e) {}
+
+  console.log(chalk.red.bgBlack.bold('\n 🗑️ MENSAGEM DELETADA '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Autor:     ${message.author.tag}`));
+  console.log(chalk.red(`   Conteúdo: ${message.content || '[sem texto]'}`));
+  console.log(chalk.red(`   Deletado:  ${deleter}`));
+  console.log(chalk.red(`   Canal:     #${message.channel.name}`));
+  console.log(chalk.red(`   Servidor:  ${message.guild.name}`));
+  console.log(chalk.red('────────────────────────────────\n'));
 });
 
-client.on(Events.GuildMemberRemove, async member => {
-    logger.debug('Membro saiu do servidor', { user: member.user.tag, guild: member.guild.name });
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+  if (!oldMessage.guild || !oldMessage.author) return;
+  if (oldMessage.content === newMessage.content) return;
+
+  console.log(chalk.yellow.bgBlack.bold('\n 📝 MENSAGEM ATUALIZADA '));
+  console.log(chalk.yellow('────────────────────────────────'));
+  console.log(chalk.yellow(`   Autor:     ${oldMessage.author.tag}`));
+  console.log(chalk.yellow(`   Antigo:    ${oldMessage.content}`));
+  console.log(chalk.yellow(`   Novo:      ${newMessage.content}`));
+  console.log(chalk.yellow(`   Canal:     #${oldMessage.channel.name}`));
+  console.log(chalk.yellow('────────────────────────────────\n'));
 });
 
-client.on(Events.Error, error => {
-    logger.error('Erro no client', { error: error.message });
+client.on('guildMemberAdd', async (member) => {
+  stats.membersJoined++;
+  
+  console.log(chalk.green.bgBlack.bold('\n 👤 NOVO MEMBRO '));
+  console.log(chalk.green('────────────────────────────────'));
+  console.log(chalk.green(`   Usuário: ${member.user.tag}`));
+  console.log(chalk.green(`   ID:      ${member.user.id}`));
+  console.log(chalk.green(`   Servidor: ${member.guild.name}`));
+  console.log(chalk.green(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
+  console.log(chalk.green('────────────────────────────────\n'));
+  logInfo(`Novo membro: ${member.user.tag} (${member.guild.name})`);
 });
 
+client.on('guildMemberRemove', async (member) => {
+  stats.membersLeft++;
+  
+  console.log(chalk.red.bgBlack.bold('\n ❌ MEMBRO SAIU '));
+  console.log(chalk.red('────────────────────────────────'));
+  console.log(chalk.red(`   Usuário: ${member.user.tag}`));
+  console.log(chalk.red(`   Servidor: ${member.guild.name}`));
+  console.log(chalk.red(`   Data:    ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`));
+  console.log(chalk.red('────────────────────────────────\n'));
+  logInfo(`Membro saiu: ${member.user.tag} (${member.guild.name})`);
+});
+
+// ===============================
+// ERROS NÃO TRATADOS
+// ===============================
 process.on('unhandledRejection', (error) => {
-    logger.error('Promise rejection não tratada', { error: error.message, stack: error.stack });
+  logError(`Erro não tratado: ${error.message}`);
+  console.error(error);
 });
 
 process.on('uncaughtException', (error) => {
-    logger.fatal('Exceção não capturada', { error: error.message, stack: error.stack });
-    createBackup();
-    setTimeout(() => {
-        process.exit(1);
-    }, 5000);
+  logError(`Exceção não tratada: ${error.message}`);
+  console.error(error);
+  process.exit(1);
 });
 
-// ============================================
-// LIMPEZA PERIÓDICA DE DADOS TEMPORÁRIOS
-// ============================================
-
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, value] of client.tempReviewData) {
-        if (value.timestamp && now - value.timestamp > 30 * 60 * 1000) {
-            client.tempReviewData.delete(key);
-        } else if (!value.timestamp) {
-            value.timestamp = now;
-        }
-    }
-    
-    for (const [key, value] of client.cooldowns) {
-        if (value < now) {
-            client.cooldowns.delete(key);
-        }
-    }
-    
-    cleanCache();
-}, 5 * 60 * 1000);
-
-// ============================================
-// INICIALIZAÇÃO DO BOT
-// ============================================
-
-console.log('='.repeat(60));
-console.log('🚀 INICIANDO BOT DE AVALIAÇÃO');
-console.log('='.repeat(60));
-console.log(`📂 Diretório de dados: ${DATA_DIR}`);
-console.log(`🔧 Cargos Staff configurados: ${STAFF_ROLE_IDS.length}`);
-console.log(`📺 REVIEWS_CHANNEL_ID: ${REVIEWS_CHANNEL_ID || 'NÃO CONFIGURADO'}`);
-console.log(`📝 REVIEWS_LOG_CHANNEL_ID: ${REVIEWS_LOG_CHANNEL_ID || 'NÃO CONFIGURADO'}`);
-console.log(`📊 LOG_CHANNEL_ID: ${LOG_CHANNEL_ID || 'NÃO CONFIGURADO'}`);
-console.log('='.repeat(60));
-
-client.login(TOKEN).catch(error => {
-    console.error('❌ Erro ao fazer login:', error);
-    process.exit(1);
-});
-
-// ============================================
-// EXPORTS PARA TESTES E MÓDULOS EXTERNOS
-// ============================================
-
-module.exports = {
-    client,
-    isStaff,
-    getColorByScore,
-    getScoreEmoji,
-    calculateUserStats,
-    generateWeeklyRanking,
-    createBackup,
-    loadReviews,
-    saveReviews,
-    logger,
-    MessageBuilder,
-    PermissionManager
-};
+// ===============================
+// LOGIN DO BOT
+// ===============================
+client.login(process.env.TOKEN);
