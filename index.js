@@ -81,7 +81,7 @@ const stats = {
 const offensiveWords = [
   // PALAVRAS BASE (TODAS LIMPAS, SEM REGEX INVÁLIDOS)
   "idiota", "burro", "estupido", "retardado", "lixo",
-  "merda", "fdp", "otario", "hilter", "sybau", "vsfd", "nazista", "nazismo", "perereca", "stfu", "desgracado",
+  "merda", "fdp", "otario", "desgracado",
   "vtnc", "imbecil", "inutil", "arrombado", "viado", "bicha", 
   "piranha", "prostituta", "corno", "babaca", "palhaco", "nojento", 
   "escroto", "cretino", "canalha", "maldito", "peste", "verme", 
@@ -112,12 +112,135 @@ const offensiveWords = [
   "maçante", "enfadonho", "mrd", "fodendo", "fudendo", "crl", 
   "crlh", "putaria", "puteiro", "caraio", "karaio",
   
-  // EXPRESSÕES COMUNS (FRASES)
+  // ==================== NOVAS PALAVRAS ADICIONADAS ====================
+  
+  // INSULTOS GERAIS (CONTINUAÇÃO)
+  "abobado", "acéfalo", "aleijado", "anencéfalo", "anormal",
+  "antipático", "babuíno", "balofo", "baranga", "barata",
+  "barbado", "barnabé", "barraqueiro", "besta-fera", "bobalhão",
+  "boboca", "bode", "boçalidade", "bosta mole", "bostana",
+  "bostejante", "bostento", "bromista", "bronha", "bucha",
+  "bugre", "burrão", "burrice", "cabeça de bagre", "cabeça de vento",
+  "cabeça oca", "cabeçudo", "cabra da peste", "cachaceiro",
+  "cagado", "cagão", "cagüeiro", "caipira", "caititu",
+  "calabreso", "calango", "calhorda", "cambaleante", "cambista",
+  "canalhaço", "canastrão", "caneco", "cangaceiro", "caniço",
+  "canjica", "canalha", "capacho", "capenga", "capiau",
+  "capiroto", "capitão do mato", "cara de pau", "cara fechada",
+  "carcamano", "careca de merda", "carniceiro", "cascavel",
+  "cascão", "casco de burro", "catinguento", "catingueiro",
+  "cavalão", "cavalo", "caxias", "cdf", "cegueta",
+  "cérebro de mosquito", "cérebro de passarinho", "chabu",
+  "chacal", "chaleira", "chambão", "chaminé", "champanhe",
+  "chanfrado", "chantagista", "charlatão", "chato", "chavascal",
+  "chibante", "chibata", "chicletinho", "chilique", "chinelão",
+  "chinfra", "chinfrim", "chiqueiro", "chocalho", "chocho",
+  "chucro", "chupeta", "chupim", "chupista",
+  
+  // INSULTOS RACIAIS E PRECONCEITUOSOS (NÃO RECOMENDADO USAR, MAS LISTADO PARA MODERAÇÃO)
+  "macaco", "macaca", "preto", "preta", "neguinho", "neguinha",
+  
+  // XINGAMENTOS LGBTFÓBICOS
+  "bicha", "bichinha", "baitola", "boiola", "boiolinha",
+  "viado", "viadinho", "veado", "sapatão", "sapatona",
+  "sapata", "sapatilha", "machona", "caminhoneira",
+  "queima-rosca", "entorta-pinto", "bixa", "bixona",
+  "traveco", "transexual", "travesti", "transformista",
+  
+  // XINGAMENTOS RELACIONADOS A DEFICIÊNCIA
+  "aleijado", "manco", "tropeço", "deficiente", "mongol",
+  "mongoloide", "down", "síndrome", "autista", "esquizofrênico",
+  "louco", "louca", "doido", "doida", "maluco", "maluca",
+  "pirado", "pirueta", "surdo", "cego", "mudo", "paralítico",
+  
+  // PALAVRÕES E EXPRESSÕES
+  "puta merda", "putamerda", "puta merda", "pqp", "putaquepariu",
+  "caralho", "caralho de asa", "cacete", "porra", "porra nenhuma",
+  "merda nenhuma", "bosta nenhuma", "foda-se", "fodase", "foda-se",
+  "vai a merda", "vai a merda", "vai pra puta que pariu",
+  "vai se catar", "vai tomar banho", "vai plantar batata",
+  "vai pra casa do caralho", "vai chupar cana", "vai pastar",
+  
+  // HOMENAGEM A FAMÍLIA (INADEQUADA)
+  "filha da puta", "filho da puta", "filho da mãe", "filha da mãe",
+  "neto da puta", "neta da puta", "avo da puta", "avo da puta",
+  "tio da puta", "tia da puta", "primo da puta", "irmao da puta",
+  "irma da puta", "pai da puta", "mae da puta", "sogra da puta",
+  
+  // INSULTOS RELACIONADOS A ANIMAIS
+  "porco", "porca", "porcão", "vaca", "vacas", "boi", "boiada",
+  "cavalo", "égua", "jumento", "jumenta", "asno", "mula",
+  "burro", "burra", "besta", "bode", "cabra", "ovelha", "carneiro",
+  "galinha", "frango", "peru", "perua", "pato", "ganso", "cisne",
+  "rato", "ratazana", "barata", "formiga", "besouro", "mosquito",
+  "barbeiro", "pernilongo", "mutuca", "carrapato", "pulga", "piolho",
+  
+  // INSULTOS SOBRE APARÊNCIA
+  "feio", "feia", "horrível", "horroroso", "asqueroso", "nojento",
+  "repugnante", "nojenta", "asquerosa", "repugnante", "gordo", "gorda",
+  "baleia", "baleia encalhada", "hipopótamo", "elefante", "tartaruga",
+  "magrelo", "magrela", "palito", "vara", "esqueleto", "camiseta",
+  "baixo", "baixinho", "anão", "nanico", "pequeno", "miniatura",
+  "alto", "altão", "gigante", "monstro", "trator", "guindaste",
+  
+  // EXPRESSÕES DE ÓDIO
+  "morre", "morra", "morte", "mata", "matar", "assassinar",
+  "suicida", "suicídio", "se mata", "te mato", "vou matar",
+  "acabar com", "destruir", "aniquilar", "exterminar",
+  "odeio", "detesto", "desprezo", "abomino", "repugno",
+  
+  // EXPRESSÕES COMUNS (FRASES) - ADICIONAIS
   "vai tomar no cu", "vai tnc", "vai tmnc",
   "vai se foder", "vai se fuder", "vsf",
   "foda se", "fodase", "foda-se",
   "puta que pariu", "puta q pariu",
-  "filho da puta", "filha da puta"
+  "filho da puta", "filha da puta",
+  "vai pra puta que pariu", "vai pra pqp",
+  "vai pro inferno", "vai capinar um lote",
+  "vai lavar uma louça", "vai estudar",
+  "cala a boca", "cala boca", "cala-te",
+  "boca de sacola", "boca de pelo", "boca de bagre",
+  "cabeça de vento", "cabeça de porco", "cabeça de bagre",
+  "mão de vaca", "pé de rato", "olho de sogra",
+  "cara de bunda", "cara de pau", "cara de cu",
+  "sua anta", "sua besta", "sua mula", "seu jumento",
+  "seu animal", "seu monstro", "seu cretino", "seu canalha",
+  
+  // VARIANTES COM ACENTOS E SEM
+  "otário", "otaria", "otário", "otarias",
+  "idiota", "idiotas", "idiotice", "idiotices",
+  "burrice", "burrices", "burrão", "burrona",
+  "merdeiro", "merdeira", "merdoso", "merdosa",
+  "fuderoso", "fuderosa", "fudido", "fudida",
+  "cuzona", "cuzonas", "cuzão", "cuzões",
+  "bocó", "bocós", "bocozão", "bocozona",
+  
+  // PALAVRAS LEET SPEAK (PREVENÇÃO)
+  "c4r4lh0", "c4r4lho", "c4c3t3", "c4cete",
+  "m3rd4", "m3rd4", "b0st4", "b0sta",
+  "f0d4", "f0da", "f0d4s3", "f0dase",
+  "p0rr4", "p0rra", "krl", "krlh", "krlho",
+  "vtnc", "tmnc", "vs foder", "vsf", "vs fuder",
+  "pqp", "puta", "puta que pariu", "pqp",
+  
+  // PALAVRAS EM INGLÊS (OFENSIVAS)
+  "fuck", "fucking", "shit", "bullshit", "bitch",
+  "asshole", "bastard", "cunt", "dick", "pussy",
+  "whore", "slut", "motherfucker", "mf", "mdf",
+  "son of a bitch", "sob", "damn", "goddamn",
+  "hell", "bloody", "crap", "wanker", "twat",
+  
+  // PALAVRAS EM ESPANHOL (OFENSIVAS)
+  "puta", "mierda", "coño", "carajo", "joder",
+  "cabrón", "cabron", "hijo de puta", "hdp",
+  "gilipollas", "imbécil", "estúpido", "idiota",
+  "maricón", "marica", "bobo", "tonto", "loco",
+  
+  // EXTREMAS (RARAMENTE USADAS MAS PREVENÇÃO)
+  "estrupício", "estrupo", "estrupar", "violador",
+  "pedófilo", "pedofilo", "estuprador", "abusador sexual",
+  "nazista", "fascista", "hitler", "nazi", "skinhead",
+  "terrorista", "extremista", "radical", "fundamentalista"
 ];
 
 // FUNÇÕES DE LOG PERSONALIZADAS
