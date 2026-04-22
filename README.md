@@ -159,10 +159,10 @@ G --> H[Incrementar estatísticas]
 
 ```bash
 # Clone o repositório
-git clone https://github.com/seu-usuario/hostville-moderation-bot.git
+git clone https://github.com/Y2kNat/HostVille-BOT.git
 
 # Entre na pasta
-cd hostville-moderation-bot
+cd hostville-bot
 
 # Instale as dependências
 npm install discord.js dotenv chalk
