@@ -155,28 +155,6 @@ G --> H[Incrementar estatísticas]
 
 ---
 
-✦ 𝙸𝙽𝚂𝚃𝙰𝙻𝙻𝙰𝚃𝙸𝙾𝙽
-
-```bash
-# Clone o repositório
-git clone https://github.com/Y2kNat/HostVille-BOT.git
-
-# Entre na pasta
-cd hostville-bot
-
-# Instale as dependências
-npm install discord.js dotenv chalk
-
-# Configure o arquivo .env
-cp .env.example .env
-# Edite o .env com suas configurações
-
-# Inicie o bot
-node index.js
-```
-
----
-
 ✦ 𝙳𝙴𝙿𝙴𝙽𝙳𝙴𝙽𝙲𝙸𝙴𝚂
 
 ```json
